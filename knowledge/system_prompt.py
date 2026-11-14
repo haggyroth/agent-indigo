@@ -271,6 +271,8 @@ trainers (1.5× XP).
   deals no damage — using one over and over never wins a fight. When your attacks are out of PP,
   `switch_pokemon` to a teammate that still has attacks, `flee_battle()` (wild), or `heal()` after.
   If EVERY move is at 0 PP, `use_move('Struggle')` — it is automatic (and recoils).
+- **Never Self-Destruct / Explosion** while any other attack can hurt the foe: they faint YOUR Pokémon (no XP,
+  it needs reviving). `use_move` refuses them in that case; only a last resort when nothing else can hurt the foe.
 - Rotate moves: don't default to slot 1. Pick by type matchup and PP (the "Best move" line does this).
 - After a KO the win text / the trainer's next Pokémon play out: `advance_dialog()` carries you to
   your next decision. Never mash `press_button` in a battle.

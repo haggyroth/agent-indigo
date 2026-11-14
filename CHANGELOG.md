@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — Self-Destruct/Explosion training loop (run 20261114-145026)
+- `_best_damaging_move` ranked by raw power, so a Geodude with Self-Destruct (200) always picked it: the trainee
+  fainted every fight, gained no XP, was revived, and grind looped for hours (4 × 100-min time limits).
+  `SUICIDE_MOVES` (Self-Destruct, Explosion) are now skipped by the auto-fighters and the "Best move" hint;
+  with only a suicide move left the caller gets `None` → switch/flee (`_no_attack_turn`).
+- `use_move` refuses them while any other damaging move has PP; the battle observation and system prompt say why.
+
 ### Fixed — training swap-back, false "balanced", party composition (watched-run follow-up)
 - fix(training): `_train_fight` swapped the trainee back in right after tagging it out for the ace (its `switched_in`
   flag was only set when it had been brought in, not when it started the battle) — so the trainee took the foe's hits

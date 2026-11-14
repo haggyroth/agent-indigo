@@ -55,6 +55,7 @@ class BattleMixin:
         from game.constants import Addr
         from game.state import GameContext
         from game.menu import _healthy_roster, forced_party_screen
+        from knowledge.leafgreen_data import MOVE_POWER, SUICIDE_MOVES
         if forced_party_screen(self.mgba, self.reader):
             return (f"Your Pokémon fainted — the game is forcing a replacement. Call "
                     f"switch_pokemon('<name or slot>') first. Healthy: {_healthy_roster(self.reader)}.")
@@ -102,6 +103,13 @@ class BattleMixin:
                     f"pressing it again does nothing. Use a different move: {alt or 'none left'}.")
         if pp[slot] == 0:
             return f"{move_label} has no PP left — choose another move."
+        if in_battle and move_label in SUICIDE_MOVES:
+            others = [m for i, (m, q) in enumerate(zip(move_names, pp))
+                      if m and q > 0 and i != slot and i != dslot and m not in SUICIDE_MOVES
+                      and MOVE_POWER.get(m, 0) > 0]
+            if others:
+                return (f"Refused: {move_label} faints your own Pokémon (no XP, and it has to be revived). "
+                        f"Attack with {', '.join(others)} instead.")
         # Remember who's giving the order so we can tell if it fainted mid-turn (#68):
         # a faster foe can KO our lead before our move executes, in which case PP never
         # drops and the naive success check would mash A blindly through the forced
@@ -932,11 +940,13 @@ class BattleMixin:
         with no type info it's plain highest power. None when no damaging move with PP can
         hurt the foe (all out of PP, only status moves, or all immune) — NEVER a status
         move. Empty slots (name "") are skipped, so a mon with <4 moves is safe."""
-        from knowledge.leafgreen_data import MOVE_POWER, MOVE_TYPE
+        from knowledge.leafgreen_data import MOVE_POWER, MOVE_TYPE, SUICIDE_MOVES
         from knowledge.battle import effectiveness_vs
         best, best_score = None, 0.0
         for name, p in zip(move_names, pp):
             if not name or p <= 0:
+                continue
+            if name in SUICIDE_MOVES:      # Self-Destruct/Explosion faint the user: no XP, a lost teammate
                 continue
             pw = MOVE_POWER.get(name, 0)
             if pw <= 0:
