@@ -502,3 +502,8 @@ def _merge_generated_moves() -> None:
 
 
 _merge_generated_moves()
+
+# Moves that faint their own user. They out-power everything (200/250) so a plain "highest power" pick
+# chooses them every time — and the user then gains no XP and has to be revived (the 2026-11-14 Geodude
+# training loop). Never pick one while any other damaging move can hurt the foe.
+SUICIDE_MOVES = frozenset({"Self-Destruct", "Explosion"})

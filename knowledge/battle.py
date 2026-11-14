@@ -5,7 +5,7 @@ from __future__ import annotations
 from knowledge.type_chart import get_effectiveness
 from knowledge.leafgreen_data import (
     POKEMON_TYPES, MOVE_TYPE, GEN3_CATEGORY, STATUS_MOVES,
-    MOVE_POWER, MOVE_POWER_DEFAULT,
+    MOVE_POWER, MOVE_POWER_DEFAULT, SUICIDE_MOVES,
 )
 
 
@@ -160,9 +160,13 @@ def battle_summary(move_names: list[str],
 
     if pp_list is not None and move_names:
         usable_attack = any(
-            n and n not in STATUS_MOVES and MOVE_POWER.get(n, 1) > 0 and idx < len(pp_list)
-            and pp_list[idx] > 0 and idx != disabled_slot
+            n and n not in STATUS_MOVES and n not in SUICIDE_MOVES and MOVE_POWER.get(n, 1) > 0
+            and idx < len(pp_list) and pp_list[idx] > 0 and idx != disabled_slot
             for idx, n in enumerate(move_names))
+        if any(n in SUICIDE_MOVES and idx < len(pp_list) and pp_list[idx] > 0
+               for idx, n in enumerate(move_names)):
+            lines.append("⚠ Self-Destruct/Explosion FAINT YOUR OWN Pokémon (no XP, it must be revived) — never use "
+                         "one while another attack can hurt the foe; the 'Best move' line never suggests them.")
         has_pp = any(n and idx < len(pp_list) and pp_list[idx] > 0 for idx, n in enumerate(move_names))
         if has_pp and not usable_attack:
             lines.append("⚠ NO ATTACKING MOVE WITH PP — status moves deal no damage and repeating one never "
@@ -180,7 +184,7 @@ def battle_summary(move_names: list[str],
         # so a strong neutral move can outrank a weak super-effective one.
         scored = []
         for idx, name in enumerate(move_names):
-            if not name or name in STATUS_MOVES:
+            if not name or name in STATUS_MOVES or name in SUICIDE_MOVES:
                 continue
             if pp_list and idx < len(pp_list) and pp_list[idx] == 0:
                 continue  # can't use — no PP
