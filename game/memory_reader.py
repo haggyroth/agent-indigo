@@ -366,10 +366,6 @@ class LeafGreenReader:
                     bag[iid] = qty
         return bag
 
-    def read_bag_count(self, item_id: int) -> int:
-        """Quantity of one item id in the bag (0 if absent)."""
-        return self.read_bag().get(item_id, 0)
-
     def read_items_pocket(self) -> list[tuple[int, int]]:
         """The Items pocket as an ORDERED [(item_id, quantity)] list, in the same slot
         order the in-game list displays (compacted — empties skipped). use_item needs
@@ -454,15 +450,6 @@ class LeafGreenReader:
     def read_current_box(self) -> int | None:
         base = self._storage_ptr()
         return self.client.read8(base) if base else None
-
-    def read_box_mon(self, box: int, slot: int) -> dict | None:
-        """One boxed Pokémon as {species_id, species_name, nickname, level, move_names} (None when the slot is
-        empty / unreadable). Box Pokémon keep only experience, so the level is derived from it."""
-        base = self._storage_ptr()
-        if not base or not (0 <= box < self.BOX_COUNT and 0 <= slot < self.BOX_SLOTS):
-            return None
-        addr = base + 4 + (box * self.BOX_SLOTS + slot) * self.BOXMON_SIZE      # u8 currentBox, 3 pad bytes (u32 alignment)
-        return self._decode_box_mon(bytes(self.client.read_range(addr, self.BOXMON_SIZE)), box, slot)
 
     def _decode_box_mon(self, raw80: bytes, box: int, slot: int) -> dict | None:
         raw = raw80 + bytes(20)

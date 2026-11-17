@@ -154,8 +154,8 @@ ones:
 
 ### Context Detection (verified live — implemented in `memory_reader.detect_context`)
 
-⚠ The old `OVERWORLD_FLAG` / `BATTLE_FLAGS` approach was **wrong** and is
-deprecated: `OVERWORLD_FLAG` (`0x0202287C`) reads 0 during free-roam, and
+⚠ The old `OVERWORLD_FLAG` / `BATTLE_FLAGS` approach was **wrong** and has been
+removed: `OVERWORLD_FLAG` (`0x0202287C`) reads 0 during free-roam, and
 `BATTLE_FLAGS` (`0x02022880`) is transient during battle and stale afterward. The
 correct gate is `gMain.callback2`:
 

@@ -63,7 +63,7 @@ def test_box_mons_decode_species_level_and_skip_empty_slots():
         [(0, 0, "Pikachu", 5), (1, 14, "Bulbasaur", 19)]
     assert boxes[0]["move_names"] == ["Tackle"]
     assert r.read_current_box() == 1
-    assert r.read_box_mon(3, 3) is None
+    assert r._decode_box_mon(bytes(80), 3, 3) is None                      # an empty slot
 
 
 def _client(party, boxes=()):

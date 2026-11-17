@@ -182,15 +182,6 @@ KEY_ITEMS: list[dict] = [
     {"item": "TM29 Psychic",     "location": "Saffron City (man in house)"},
 ]
 
-# ── Starter Recommendation ────────────────────────────────────────────────────
-
-STARTER_RECOMMENDATION = "Bulbasaur"
-STARTER_REASON = (
-    "Trivializes Gyms 1 (Vine Whip vs Rock) and 2 (Vine Whip vs Water). "
-    "Learns Sleep Powder for catching Pokémon. "
-    "Gives the agent more time to learn navigation before difficulty spikes."
-)
-
 # ── Gen III damage category (CRITICAL — differs from Gen IV+) ─────────────────
 # Determined by MOVE TYPE, not per-move.
 # Physical types use Atk vs Def; Special types use SpAtk vs SpDef.

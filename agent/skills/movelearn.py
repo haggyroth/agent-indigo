@@ -174,27 +174,6 @@ class MoveLearnMixin:
             self.mgba.tick(8)
         return True
 
-    def _accept_forget_slot0(self) -> None:
-        """Accept the learn and forget slot 0 (the summary cursor's default position),
-        so no summary navigation is needed. A at the delete box (cursor YES) → summary
-        → A selects the top move → the '1,2,3 poof!' result advances back to battle."""
-        from game.constants import Addr
-        self._press_until_lms_leaves("A", 1)          # accept the delete box → lms 2
-        # Wait for the summary to open (callback2 leaves the battle main callback).
-        for _ in range(15):
-            if self.mgba.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_BATTLE:
-                break
-            self._wait_idle()
-            self.mgba.tick(4)
-        self.mgba.tick(24)   # settle the fade-in (A ignored mid-fade)
-        # A selects slot 0; then advance the forgot/learned text back to the battle.
-        for _ in range(20):
-            if self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_BATTLE and not self._delete_box_live():
-                break
-            self._wait_idle()
-            self.mgba.tap("A")
-            self.mgba.tick(6)
-
     def _maybe_drive_learn(self) -> str | None:
         """If a level-up is offering the lead a new move, take over and drive the whole
         move-learn flow carefully per policy. Returns a note if it did, else None. Cheap

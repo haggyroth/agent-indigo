@@ -48,11 +48,6 @@ def resolve_boxed(who: str, boxes: list) -> tuple[dict | None, str]:
 
 
 class PCMixin:
-    # ── reading ──────────────────────────────────────────────────────────────
-    def _storage_base(self) -> int:
-        ptr = self.mgba.read32(Addr.POKEMON_STORAGE_PTR)
-        return ptr if 0x02000000 <= ptr < 0x02040000 else 0
-
     # ── driving ──────────────────────────────────────────────────────────────
     def _pc_tile(self):
         self.tilemap.refresh()

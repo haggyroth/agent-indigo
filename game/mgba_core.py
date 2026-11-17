@@ -151,9 +151,6 @@ class NativeMGBAClient:
     def tap(self, button: str) -> None:
         self._press(_mask([button]))
 
-    def tap_many(self, buttons: list[str]) -> None:
-        self._press(_mask(buttons))
-
     def hold(self, button: str, duration_frames: int) -> None:
         lib.pycore_set_keys(self._h, _mask([button]))
         self.run_frames(max(1, duration_frames))

@@ -72,10 +72,6 @@ class OverworldMixin:
     # party returning to full HP.
     _NURSE_TILE = (7, 4)
 
-    def _party_full_hp(self) -> bool:
-        party = self.reader.read_party()
-        return bool(party) and all(m.current_hp == m.max_hp for m in party)
-
     def _party_needs_heal(self) -> bool:
         """Hurt, OR a mon whose every attacking move is at 0 PP (a Pokémon Center restores PP too —
         full HP alone must not make heal() refuse, or an out-of-PP team can never recover)."""

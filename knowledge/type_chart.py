@@ -36,18 +36,3 @@ def get_effectiveness(attacking_type: str, defending_type: str) -> float:
     Types use 3-letter codes: NOR FIR WAT ELE GRS ICE FIG POI GRD FLY PSY BUG ROC GHO DRG DRK STL
     """
     return TYPE_CHART.get(attacking_type, {}).get(defending_type, 1.0)
-
-
-def best_move_type(attacking_types: list[str], defending_types: list[str]) -> tuple[str, float]:
-    """Return the attacking type with the highest combined multiplier against all defending types.
-    Useful for choosing move type when opponent has multiple types.
-    Returns (best_type, multiplier).
-    """
-    best = ("NOR", 1.0)
-    for atk in attacking_types:
-        mult = 1.0
-        for def_ in defending_types:
-            mult *= get_effectiveness(atk, def_)
-        if mult > best[1]:
-            best = (atk, mult)
-    return best

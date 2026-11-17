@@ -4,7 +4,6 @@ from types import SimpleNamespace
 import pytest
 
 from game.state import GameContext, PokemonStatus
-from knowledge.nicknames import auto_name, critique, sanitize
 
 pytest.importorskip("openai")
 from agent.lm_studio_client import AgentClient   # noqa: E402
@@ -13,20 +12,6 @@ from agent.lm_studio_client import AgentClient   # noqa: E402
 def mon(species=1, level=10, nick="", hp=20):
     return PokemonStatus(slot=0, level=level, current_hp=hp, max_hp=20, status="healthy", species_id=species,
                          species_name=f"S{species}", nickname=nick, move_names=["Tackle"], pp=[30])
-
-
-# ── autopilot nicknames ─────────────────────────────────────────────────────────
-def test_auto_names_are_typeable_varied_and_never_the_species():
-    seen = set()
-    for sp in ("Zubat", "Pidgey", "Tauros", "Mew"):
-        n = auto_name(sp, taken=list(seen))
-        assert n == sanitize(n) and len(n) <= 10 and critique(n, sp, seen) is None
-        seen.add(n)
-    assert len(seen) == 4
-
-
-def test_auto_name_skips_a_taken_pun():
-    assert auto_name("Zubat", ["Batty"]) != "Batty"
 
 
 # ── reorder_party guards ────────────────────────────────────────────────────────

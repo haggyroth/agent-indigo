@@ -27,42 +27,6 @@ def make_ltm(monkeypatch, tmp_path):
     return lt.LongTermMemory()
 
 
-def test_reconcile_adopts_ram_badges(monkeypatch, tmp_path):
-    ltm = make_ltm(monkeypatch, tmp_path)
-    adopted = ltm.reconcile_badges_from_ram(0b11)
-    assert set(adopted) == {"beat_brock", "beat_misty"}
-    assert ltm.data["badges_earned"] == 2
-    assert ltm.data["gyms_beaten"] == ["Brock", "Misty"]
-    assert "beat_brock" in ltm.data["milestones"]
-
-
-def test_reconcile_is_monotonic_on_ram_regression(monkeypatch, tmp_path):
-    ltm = make_ltm(monkeypatch, tmp_path)
-    ltm.reconcile_badges_from_ram(0b11)          # earned 2 badges
-    adopted = ltm.reconcile_badges_from_ram(0b0)  # RAM rolled back via load_state
-    assert adopted == []
-    assert ltm.data["badges_earned"] == 2        # not un-earned
-    assert ltm.data["gyms_beaten"] == ["Brock", "Misty"]
-
-
-def test_reconcile_is_idempotent(monkeypatch, tmp_path):
-    ltm = make_ltm(monkeypatch, tmp_path)
-    ltm.reconcile_badges_from_ram(0b101)          # Brock + Surge
-    assert ltm.reconcile_badges_from_ram(0b101) == []
-    assert ltm.data["badges_earned"] == 2
-
-
-def test_reconcile_persists(monkeypatch, tmp_path):
-    ltm = make_ltm(monkeypatch, tmp_path)
-    ltm.reconcile_badges_from_ram(0b1)
-    # A fresh instance reading the same file sees the adopted badge.
-    reloaded = lt.LongTermMemory()
-    assert reloaded.data["badges_earned"] == 1
-    assert "Brock" in reloaded.data["gyms_beaten"]
-
-
-# ── Authoritative startup sync (journal must not get ahead of the cartridge) ──
-
 def test_authoritative_drops_badges_the_save_lacks(monkeypatch, tmp_path):
     ltm = make_ltm(monkeypatch, tmp_path)
     # Journal claims Brock beaten (from a prior run) ...

@@ -26,7 +26,7 @@ def test_read_badges_ignores_stale_fixed_address():
     sb = 0x02025600                       # block relocated away from canonical base
     fc.set32(Addr.SAVEBLOCK1_PTR, sb)
     fc.set8(sb + Addr.BADGES_OFFSET, 0)   # true badges = 0
-    fc.set8(Addr.BADGES, 0x04)            # stale garbage at the old fixed address
+    fc.set8(0x02026530, 0x04)             # stale garbage at the old fixed address (the removed Addr.BADGES)
     count, bits = make_reader(fc).read_badges()
     assert (count, bits) == (0, 0)
 
@@ -200,7 +200,7 @@ def test_post_battle_overworld_is_overworld():
     # address would still be non-zero (stale).
     fc = FakeClient()
     stage_overworld(fc)
-    fc.set32(Addr.BATTLE_FLAGS, 0x04)  # stale leftover — must be ignored now
+    fc.set32(0x02022880, 0x04)  # stale leftover — must be ignored now
     assert make_reader(fc).detect_context() == GameContext.OVERWORLD
 
 

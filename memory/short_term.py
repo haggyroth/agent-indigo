@@ -1,16 +1,10 @@
 from dataclasses import dataclass, field
 from collections import defaultdict
-from game.state import GameState, StateDiff
 
 @dataclass
 class ShortTermMemory:
-    current_state:           GameState | None = None
-    last_state:              GameState | None = None
-    last_diff:               StateDiff | None = None
     last_action:             str = ""
     action_history:          list[str] = field(default_factory=list)
-    battle_turn:             int = 0
-    consecutive_same_action: int = 0
     steps_without_movement:  int = 0
     last_x:                  int | None = None
     last_y:                  int | None = None
@@ -23,10 +17,6 @@ class ShortTermMemory:
         # must be tracked like any other (it isn't a sentinel).
         has_pos = x is not None and y is not None
         pos_changed = has_pos and (x, y) != (self.last_x, self.last_y)
-        if action == self.last_action and not pos_changed:
-            self.consecutive_same_action += 1
-        else:
-            self.consecutive_same_action = 1
         if has_pos and not pos_changed:
             self.steps_without_movement += 1
         elif has_pos:
@@ -54,6 +44,4 @@ class ShortTermMemory:
         self.steps_without_movement = 0
 
     def reset_for_new_battle(self):
-        self.battle_turn = 0
-        self.consecutive_same_action = 0
         self.steps_without_movement = 0

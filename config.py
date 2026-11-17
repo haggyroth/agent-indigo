@@ -105,10 +105,9 @@ MGBA_HTTP_BASE    = os.getenv("MGBA_HTTP_BASE",    "http://localhost:5000")
 #   LLM_API_KEY    your provider key (kept out of git via .env)
 #   MODEL_NAME     the provider's model id
 # Defaults point at a local LM Studio server with a placeholder key.
-# LM_STUDIO_BASE is kept as a back-compat alias for LLM_BASE_URL.
+# The old LM_STUDIO_BASE variable is still honoured as a fallback for LLM_BASE_URL.
 LLM_BASE_URL      = os.getenv("LLM_BASE_URL",
                               os.getenv("LM_STUDIO_BASE", "http://localhost:1234/v1"))
-LM_STUDIO_BASE    = LLM_BASE_URL   # back-compat
 # LLM_API_KEY: prefer an explicit key. Fall back to OPENAI_API_KEY ONLY when the
 # endpoint really is OpenAI — never hand one provider's key to another (a stray
 # OPENAI_API_KEY in the shell would otherwise be sent to OpenRouter/Together/Groq).
@@ -169,10 +168,7 @@ MAX_WALL_SECONDS  = _env_float("MAX_WALL_SECONDS", 0.0, minimum=0.0)
 
 # ── Timing ────────────────────────────────────────────────────────────────────
 BUTTON_TAP_DELAY  = _env_float("BUTTON_TAP_DELAY", 0.10, minimum=0.0)
-DECISION_INTERVAL = _env_float("DECISION_INTERVAL", 1.00, minimum=0.0)
 
-# ── Reward ────────────────────────────────────────────────────────────────────
-HP_HEAL_THRESHOLD = _env_float("HP_HEAL_THRESHOLD", 0.30, minimum=0.0, maximum=1.0)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SAVE_DIR          = PROJECT_ROOT / "saves"

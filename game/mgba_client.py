@@ -38,12 +38,6 @@ class MGBAClient:
                           params={"button": button})
         time.sleep(BUTTON_TAP_DELAY)
 
-    def tap_many(self, buttons: list[str]) -> None:
-        """Press and release multiple buttons simultaneously."""
-        self.session.post(f"{self.base}/mgba-http/button/tapmany",
-                          params=[("buttons", b) for b in buttons])
-        time.sleep(BUTTON_TAP_DELAY)
-
     def hold(self, button: str, duration_frames: int) -> None:
         """Hold a button for exactly N frames then release."""
         self.session.post(f"{self.base}/mgba-http/button/hold",
