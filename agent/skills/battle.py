@@ -1,6 +1,7 @@
 """Battle skills: use_move, flee, catch, switch, use_item, and the
 best-move auto-fight driver. See agent.lm_studio_client.AgentClient
 (which inherits BattleMixin)."""
+from agent.skills.base import log_once
 import re
 
 
@@ -11,9 +12,7 @@ class BattleMixin:
         """A battle-reliable press: wait until the game is idle (text finished /
         menu up), then hold long enough to register. Short taps are silently
         dropped during battle animations/printing."""
-        waiter = getattr(self.mgba, "wait_until_idle", None)
-        if waiter:
-            waiter()
+        self._wait_idle()
         self.mgba.hold(button, 20)
 
     def _active_moves_view(self):
@@ -21,8 +20,7 @@ class BattleMixin:
         Disabled move's PP zeroed (so ranking/validation skip it). Tolerates readers that predate
         the Disable fields."""
         ids, names, pp = self.reader.read_active_battle_moves()
-        read_dis = getattr(self.reader, "read_disabled_move", None)
-        dmove, turns = read_dis(0) if read_dis else (0, 0)
+        dmove, turns = self.reader.read_disabled_move(0)
         slot = ids.index(dmove) if dmove and dmove in ids else None
         eff = list(pp)
         if slot is not None:
@@ -154,8 +152,7 @@ class BattleMixin:
                 # Pokémon reads as a brief menu/transition) — advance, don't bail.
                 self._battle_advance()
                 continue
-            if hasattr(self.mgba, "wait_until_idle"):
-                self.mgba.wait_until_idle()
+            self._wait_idle()
             if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) != Addr.CTRL_CHOOSE_MOVE:
                 # A level-up delete box (offered move pending) hides behind the same
                 # "advance text" path — resolve it instead of pressing A through it.
@@ -174,8 +171,7 @@ class BattleMixin:
             self.mgba.hold("A", 20)       # A edge → commits gMoveSelectionCursor
             # A committed move leaves the move menu at once. If it is STILL up after settling,
             # the game refused the choice (Disabled, Taunted, Torment, ...): never loop on it.
-            if hasattr(self.mgba, "wait_until_idle"):
-                self.mgba.wait_until_idle()
+            self._wait_idle()
             self.mgba.tick(20)
             if (self.mgba.read32(Addr.BATTLE_CTRL_FUNC) == Addr.CTRL_CHOOSE_MOVE
                     and self.reader.read_active_battle_moves()[2][slot] == pp_before):
@@ -213,8 +209,7 @@ class BattleMixin:
                     return (f"Your lead fainted before {move_label} could resolve — "
                             f"the foe was faster. Send out your next Pokémon with "
                             f"switch_pokemon.")
-                if hasattr(self.mgba, "wait_until_idle"):
-                    self.mgba.wait_until_idle()
+                self._wait_idle()
                 self.mgba.hold("A", 18)
         if forced_party_screen(self.mgba, self.reader):
             return forced_msg.format(_healthy_roster(self.reader))
@@ -293,10 +288,10 @@ class BattleMixin:
     def _battle_trapped(self) -> bool:
         """Is the ACTIVE battler held (Wrap/Bind/Fire Spin/Clamp/Whirlpool for 2-5 turns, or Mean Look / Spider
         Web / Block until it leaves)? Then neither Run nor a voluntary switch is allowed."""
-        fn = getattr(self.reader, "is_trapped", None)
         try:
-            return bool(fn and fn(0))
+            return bool(self.reader.is_trapped(0))
         except Exception:
+            log_once("battle._battle_trapped", "battle._battle_trapped: tolerated failure (continuing with a default)")
             return False
 
     def _trapped_message(self, what: str) -> str:
@@ -304,6 +299,7 @@ class BattleMixin:
         try:
             v = self.reader.read_battle_volatiles(0)
         except Exception:
+            log_once("battle._trapped_message", "battle._trapped_message: tolerated failure (continuing with a default)")
             pass
         why = ("a trapping move (Wrap/Bind/Fire Spin/Clamp/Whirlpool — it wears off after 2-5 turns)"
                if v.get("wrapped") else "Mean Look / Spider Web / Block (it holds you until the foe is gone)")
@@ -324,12 +320,10 @@ class BattleMixin:
             return "Can't run from a trainer battle — win it or switch Pokémon."
         if self._battle_trapped():
             return self._trapped_message("run")
-        idle = getattr(self.mgba, "wait_until_idle", None)
         for _ in range(20):
             if self.reader.detect_context() != GameContext.IN_BATTLE:
                 return "Got away safely — fled the wild battle."
-            if idle:
-                idle()
+            self._wait_idle()
             if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) == Addr.CTRL_CHOOSE_ACTION:
                 self.mgba.write8(Addr.ACTION_CURSOR, Addr.ACTION_RUN)   # select RUN
                 self.mgba.hold("A", 20)                                 # commit
@@ -360,14 +354,12 @@ class BattleMixin:
         callback change."""
         from game.constants import Addr
         from game.state import GameContext
-        idle = getattr(self.mgba, "wait_until_idle", None)
         for _ in range(30):
             if self._battle_bag_open():
                 return True
             if self.reader.detect_context() == GameContext.OVERWORLD:
                 return False                 # battle ended out from under us
-            if idle:
-                idle()
+            self._wait_idle()
             # The action-menu controller value VARIES by turn (0x08030611 on turn 1,
             # 0x0802e439 later), so don't gate on it. Instead: if the MOVE menu is up,
             # back out with B (never attack); otherwise write the BAG cursor and press
@@ -406,7 +398,6 @@ class BattleMixin:
         from game.constants import Addr
         from game.menu import _healthy_roster, forced_party_screen
         from game.state import GameContext
-        idle = getattr(self.mgba, "wait_until_idle", None)
         for _ in range(max_steps):
             if forced_party_screen(self.mgba, self.reader):
                 return ("Your Pokémon fainted — the game is forcing a replacement. Call "
@@ -418,8 +409,7 @@ class BattleMixin:
                     return "Battle is over — back on the field."
                 self._battle_advance()           # transient (send-out / fade)
                 continue
-            if idle:
-                idle()
+            self._wait_idle()
             learn = self._maybe_drive_learn()
             if learn:
                 return learn
@@ -493,6 +483,7 @@ class BattleMixin:
         try:
             foe_pid = self.reader.read_enemy_lead().personality      # identifies the new catch afterwards (IV report)
         except Exception:
+            log_once("battle._catch", "battle._catch: tolerated failure (continuing with a default)")
             foe_pid = 0
         # Vet the nickname BEFORE spending a ball: the naming keyboard only types letters, digits,
         # space and . , ! ? — and the model's first idea is often just the species name ("Zubat",
@@ -512,11 +503,9 @@ class BattleMixin:
                         "space/. , ! ? only) and call catch(nickname=...) again.")
             self._nick_refused = None
             nickname = sanitize(nickname)
-        idle = getattr(self.mgba, "wait_until_idle", None)
         if not self._open_battle_bag():
             return "Couldn't open the Bag in battle — try catch again."
-        if idle:
-            idle()
+        self._wait_idle()
         self.mgba.tick(12)
         # Switch to the Poké Balls pocket (Right cycles Items→Key Items→Balls).
         SD = Addr.BAG_MENU_STATE
@@ -524,8 +513,7 @@ class BattleMixin:
             if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) == Addr.BAG_POCKET_BALLS:
                 break
             self.mgba.tap("Right")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(8)
         if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) != Addr.BAG_POCKET_BALLS:
             self._exit_battle_menus()
@@ -534,12 +522,10 @@ class BattleMixin:
         # the default); A there throws it. Press A until a ball is actually consumed —
         # self-verifying, so a dropped input in the list→context→USE chain just means
         # another press instead of stranding us mid-menu (the old flaky spot).
-        if idle:
-            idle()
+        self._wait_idle()
         for _ in range(10):
             self.mgba.tap("A")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(10)
             if self._ball_count() < balls0:
                 break
@@ -559,8 +545,7 @@ class BattleMixin:
         named = ""
         menu_seen = 0
         for _ in range(60 if not nickname else 120):
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(10)
             if self.mgba.read8(OUTCOME) == Addr.B_OUTCOME_CAUGHT:
                 caught = True
@@ -598,6 +583,7 @@ class BattleMixin:
                             + (" (party full → PC box)" if party_before >= 6 else "")
                             + (f" · {quality.split(' — ')[0].replace('Quality: ', '')}" if quality else ""), species=foe0)
             except Exception:
+                log_once("battle._catch", "battle._catch: tolerated failure (continuing with a default)")
                 pass
             if party_before >= 6:
                 return ("Gotcha! Caught the wild Pokémon — your party was full, so it was sent to the PC "
@@ -625,6 +611,7 @@ class BattleMixin:
             cmp = compare_text(mon, others)
             return f"Quality: {q.summary()}" + (f"; {cmp}" if cmp else "") + "."
         except Exception:
+            log_once("battle._caught_quality", "battle._caught_quality: tolerated failure (continuing with a default)")
             return ""
 
     @staticmethod
@@ -646,7 +633,6 @@ class BattleMixin:
         via the callback leaving CB2_BATTLE (the party screen has its own callback)."""
         from game.constants import Addr
         from game.state import GameContext
-        idle = getattr(self.mgba, "wait_until_idle", None)
         opened = False
         for _ in range(30):
             if self.mgba.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_BATTLE:
@@ -654,8 +640,7 @@ class BattleMixin:
                 break                             # the party screen is coming up
             if self.reader.detect_context() == GameContext.OVERWORLD:
                 return False                      # battle ended out from under us
-            if idle:
-                idle()
+            self._wait_idle()
             if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) == Addr.CTRL_CHOOSE_MOVE:
                 self._battle_press("B")           # back out of the move menu; never attack
             else:
@@ -706,6 +691,7 @@ class BattleMixin:
             if phys_ok and not (map_ok and p0 != 0):
                 return field_slot
         except Exception:
+            log_once("battle._battle_display_slot", "battle._battle_display_slot: tolerated failure (continuing with a default)")
             pass
         for s in range(6):
             if order_pid(s) == field_slot:
@@ -763,6 +749,7 @@ class BattleMixin:
             return (f" [{'; '.join(bits)}] Still in battle — call use_move again "
                     f"(do NOT press A or wait).")
         except Exception:
+            log_once("battle._turn_summary", "battle._turn_summary: tolerated failure (continuing with a default)")
             return ""
 
     def _party_cursor_to(self, disp_slot: int, tries: int = 14) -> bool:
@@ -772,7 +759,6 @@ class BattleMixin:
         or act on a stale read (live: switches to slot 2 'randomly' failed). Wait for two
         identical reads before trusting the cursor, and tap once per settled state."""
         from game.constants import Addr
-        idle = getattr(self.mgba, "wait_until_idle", None)
 
         def settled() -> int:
             prev, cur = -1, self.mgba.read8(Addr.PARTY_FIELD_SLOT)
@@ -788,8 +774,7 @@ class BattleMixin:
             if cur == disp_slot:
                 return True
             self.mgba.tap("Down" if cur < disp_slot else "Up")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(14)
         return settled() == disp_slot
 
@@ -820,11 +805,9 @@ class BattleMixin:
         if mon.species_id == active_species and not forced:
             return f"{mon.species_name} is already the one battling."
         target_species = mon.species_id
-        idle = getattr(self.mgba, "wait_until_idle", None)
         if not forced and not self._open_party_menu():
             return "Couldn't open the party menu — try switch_pokemon again."
-        if idle:
-            idle()
+        self._wait_idle()
         self.mgba.tick(30)                        # let the party screen settle
         # The in-battle party screen lists mons in BATTLE order: once it has finished loading,
         # the game physically reorders gPlayerParty into that order (UpdatePartyToBattleOrder
@@ -860,8 +843,7 @@ class BattleMixin:
             if self.mgba.read16(Addr.BATTLE_MON0_SPECIES) == target_species:
                 break
             self.mgba.tap("A")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(16)
         if self.mgba.read16(Addr.BATTLE_MON0_SPECIES) != target_species:
             self._exit_battle_menus()
@@ -903,19 +885,16 @@ class BattleMixin:
         lead0 = self.reader.read_party()
         before_hp = lead0[0].current_hp if lead0 else 0
         before_status = lead0[0].status if lead0 else "healthy"
-        idle = getattr(self.mgba, "wait_until_idle", None)
         if not self._open_battle_bag():
             return "Couldn't open the Bag in battle — try use_item again."
-        if idle:
-            idle()
+        self._wait_idle()
         self.mgba.tick(12)
         SD = Addr.BAG_MENU_STATE
         for _ in range(8):                       # Left cycles Balls→Key Items→Items
             if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) == Addr.BAG_POCKET_ITEMS:
                 break
             self.mgba.tap("Left")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(8)
         if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) != Addr.BAG_POCKET_ITEMS:
             self._exit_battle_menus()
@@ -925,8 +904,7 @@ class BattleMixin:
             if cur == target_index:
                 break
             self.mgba.tap("Down" if cur < target_index else "Up")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(6)
         if self.mgba.read8(Addr.BAG_LIST_CURSOR) + self.mgba.read8(Addr.BAG_LIST_SCROLL) != target_index:
             self._exit_battle_menus()
@@ -947,8 +925,7 @@ class BattleMixin:
             if used():
                 break
             self.mgba.tap("A")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(12)
         self._exit_battle_menus()
         if not used():
@@ -969,12 +946,10 @@ class BattleMixin:
         (IN_BATTLE or OVERWORLD), so a catch attempt never strands the agent. Settles
         before each press (menu inputs drop mid-animation) and tries B then A."""
         from game.state import GameContext
-        idle = getattr(self.mgba, "wait_until_idle", None)
         for _ in range(14):
             if self.reader.detect_context() in (GameContext.IN_BATTLE, GameContext.OVERWORLD):
                 return
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tap("B")
             self.mgba.tick(8)
             if self.reader.detect_context() in (GameContext.IN_BATTLE, GameContext.OVERWORLD):
@@ -1007,6 +982,7 @@ class BattleMixin:
                 ctx["foe_hp"] = foe.current_hp
                 ctx["foe_asleep"] = "asleep" in (foe.status or "")
         except Exception:
+            log_once("battle._battle_ctx", "battle._battle_ctx: tolerated failure (continuing with a default)")
             pass
         return ctx
 
@@ -1043,6 +1019,7 @@ class BattleMixin:
             en = self.reader.read_enemy_lead()
             foe = (en.species_name or "") if en else ""
         except Exception:
+            log_once("battle._battle_types", "battle._battle_types: tolerated failure (continuing with a default)")
             return (), ()
         return (POKEMON_TYPES.get(me.upper().strip(), ()),
                 POKEMON_TYPES.get(foe.upper().strip(), ()))

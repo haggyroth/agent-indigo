@@ -5,6 +5,7 @@ Pokémon's sub-menu (Start → POKéMON → pick a mon → SWITCH → pick the d
 [SUMMARY, <field moves the mon knows>, SWITCH, ITEM, CANCEL], so SWITCH sits at index
 1 + (number of field moves), the same layout _party_field_move relies on.
 """
+from agent.skills.base import log_once
 from game.constants import Addr
 from game.state import GameContext
 
@@ -115,6 +116,7 @@ class PartyMixin:
             return wanted_species(party if party is not None else self.reader.read_party(), None,
                                   self.ltm.data.get("gyms_beaten", []))
         except Exception:
+            log_once("party._wanted_species", "party._wanted_species: tolerated failure (continuing with a default)")
             return {}
 
     def _party_names(self) -> str:

@@ -2,6 +2,7 @@
 battles, and pick up item balls. See agent.lm_studio_client.AgentClient
 (which inherits OverworldMixin)."""
 
+from agent.skills.base import log_once
 from knowledge.navigation import MAP_NAMES
 
 
@@ -204,8 +205,7 @@ class OverworldMixin:
         # 2. Select Buy (default top option) → enter the item list, then settle so the
         #    fade finishes and the list starts taking D-pad input.
         self.mgba.tap("A")
-        if hasattr(self.mgba, "wait_until_idle"):
-            self.mgba.wait_until_idle()
+        self._wait_idle()
         self.mgba.tick(40)
         return self._buy_list_open()
 
@@ -228,16 +228,13 @@ class OverworldMixin:
         else:
             return 0
         before = self.reader.read_bag().get(item_id, 0)
-        idle = getattr(self.mgba, "wait_until_idle", None)
         # Select the item → the "How many?" quantity box. Wait for its init to run
         # (it computes maxQuantity = money/price; 0 means it hasn't run yet).
-        if idle:
-            idle()
+        self._wait_idle()
         self.mgba.tap("A")
         maxq = 0
         for _ in range(10):
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(6)
             maxq = self.mgba.read16(SD + Addr.SHOP_MAXQTY)
             if maxq > 0:
@@ -262,8 +259,7 @@ class OverworldMixin:
         got = 0
         for _ in range(10):
             self.mgba.tap("A")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(10)
             got = self.reader.read_bag().get(item_id, 0) - before
             if got > 0:
@@ -276,8 +272,7 @@ class OverworldMixin:
                 if self._buy_list_interactive():
                     break
                 self.mgba.tap("A")
-                if idle:
-                    idle()
+                self._wait_idle()
                 self.mgba.tick(10)
         return max(0, got)
 
@@ -469,6 +464,7 @@ class OverworldMixin:
         try:
             self._battle_settle(40)               # gBattleMons[0] is stale until the first action menu is up
         except Exception:
+            log_once("overworld._train_fight", "overworld._train_fight: tolerated failure (continuing with a default)")
             pass
         for _ in range(40):
             if self._send_next_mon():
@@ -569,6 +565,7 @@ class OverworldMixin:
             if getattr(self, "_training_swapped", False) and self.reader.detect_context() == GameContext.OVERWORLD:
                 self._grind_finish()
         except Exception:
+            log_once("overworld._grind_abandon", "overworld._grind_abandon: tolerated failure (continuing with a default)")
             pass
 
     def _grind_finish(self) -> None:
@@ -581,6 +578,7 @@ class OverworldMixin:
                                  # the flag stays set, so the next grind/abandon puts the ace back in front
             self._restore_ace_lead()
         except Exception:
+            log_once("overworld._grind_finish", "overworld._grind_finish: tolerated failure (continuing with a default)")
             pass
         self._training_swapped = False
 
@@ -661,6 +659,7 @@ class OverworldMixin:
         try:
             where = MAP_NAMES.get(self.reader.read_current_map(), "here")
         except Exception:
+            log_once("overworld._grind_yield", "overworld._grind_yield: tolerated failure (continuing with a default)")
             where = "here"
         what, verdict = "Pokémon", ""
         try:
@@ -671,11 +670,12 @@ class OverworldMixin:
                 if run["catch"] and not trainer and balls > 0 and foe.species_id not in {p.species_id for p in party}:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
-                                 dex_owned=getattr(self.reader, "read_dex_owned", lambda _s: None)(foe.species_id),
+                                 dex_owned=self.reader.read_dex_owned(foe.species_id),
                                  wanted=self._wanted_species(party))
                     verdict = (f" Worth a ball: {v.reason}." if v.catch else f" Not worth a ball: {v.reason}.") \
                         + f" ({balls} Poké Balls.)"
         except Exception:
+            log_once("overworld._grind_yield", "overworld._grind_yield: tolerated failure (continuing with a default)")
             pass
         lead = party[0] if party else None
         lead_name = (lead.nickname or lead.species_name) if lead else "your lead"
@@ -862,6 +862,7 @@ class OverworldMixin:
             from game.menu import forced_party_screen
             return bool(forced_party_screen(self.mgba, self.reader))
         except Exception:
+            log_once("overworld._forced_replacement", "overworld._forced_replacement: tolerated failure (continuing with a default)")
             return False
 
     def _grind_auto_ok(self, run, trainer: bool, party) -> bool:
@@ -879,9 +880,10 @@ class OverworldMixin:
                 return False
             if run["catch"] and self._ball_count() > 0:
                 from knowledge.catch_policy import evaluate
-                dex = getattr(self.reader, "read_dex_owned", lambda _s: None)(foe.species_id)
+                dex = self.reader.read_dex_owned(foe.species_id)
                 if evaluate(party, foe.species_id, foe.level, dex_owned=dex, wanted=self._wanted_species(party)).catch:
                     return False
             return True
         except Exception:
+            log_once("overworld._grind_auto_ok", "overworld._grind_auto_ok: tolerated failure (continuing with a default)")
             return False

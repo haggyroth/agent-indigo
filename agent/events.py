@@ -17,6 +17,8 @@ from __future__ import annotations
 import time
 from collections import Counter, deque
 
+from agent.skills.base import log_once
+
 LEVELS = {"quiet": 0, "events": 1, "debug": 2}
 
 # kind -> (icon, rich style)
@@ -116,6 +118,7 @@ def emit(kind: str, text: str, *, major: bool = True, log: bool = True, debug: b
         try:
             _S["run_log"].event("ev", ev=kind, text=text, **fields)
         except Exception:
+            log_once("events.emit", "events.emit: tolerated failure (continuing with a default)")
             pass
     con = _S["console"]
     if con is None or (debug and lvl < 2) or (not major and lvl < 1):
@@ -125,6 +128,7 @@ def emit(kind: str, text: str, *, major: bool = True, log: bool = True, debug: b
         from rich.markup import escape
         con.print(f"[dim]{_clock()}[/] [{style}]{icon} {escape(text)}[/]", highlight=False)
     except Exception:
+        log_once("events.emit", "events.emit: tolerated failure (continuing with a default)")
         pass
     return rec
 
@@ -135,6 +139,7 @@ def _compact_args(args_json: str) -> str:
     try:
         args = json.loads(args_json) if args_json else {}
     except Exception:
+        log_once("events._compact_args", "events._compact_args: tolerated failure (continuing with a default)")
         return str(args_json)[:60]
     if not isinstance(args, dict):
         return str(args)[:60]
@@ -181,6 +186,7 @@ def observe(reader, ltm=None) -> None:
         try:
             step(reader)
         except Exception:
+            log_once("events.observe", "events.observe: tolerated failure (continuing with a default)")
             pass
 
 
@@ -247,6 +253,7 @@ def _observe_battle(reader) -> None:
                 from knowledge.navigation import MAP_NAMES
                 where = MAP_NAMES.get(reader.read_current_map(), "")
             except Exception:
+                log_once("events._observe_battle", "events._observe_battle: tolerated failure (continuing with a default)")
                 where = ""
             _S["battle"] = cur = {"trainer": trainer, "foe": None, "foe_hp": None, "foe_species": None,
                                   "where": where, "announced": False, "turns": 0, "moves": [], "lead": "",
@@ -257,6 +264,7 @@ def _observe_battle(reader) -> None:
         try:
             foe = reader.read_enemy_lead()
         except Exception:
+            log_once("events._observe_battle", "events._observe_battle: tolerated failure (continuing with a default)")
             pass
         if not (foe and foe.species_id and foe.max_hp and not (foe.species_name or "").startswith("#")):
             return
@@ -266,6 +274,7 @@ def _observe_battle(reader) -> None:
             if not cur["lead"]:
                 cur["lead"] = (reader.read_party() or [None])[0].species_name
         except Exception:
+            log_once("events._observe_battle", "events._observe_battle: tolerated failure (continuing with a default)")
             pass
         if not cur["announced"]:
             cur["announced"] = True
@@ -301,4 +310,5 @@ def _observe_battle(reader) -> None:
             try:
                 fn(summary)
             except Exception:
+                log_once("events._observe_battle", "events._observe_battle: tolerated failure (continuing with a default)")
                 pass

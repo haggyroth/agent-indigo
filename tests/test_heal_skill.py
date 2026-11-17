@@ -42,6 +42,9 @@ class _Mgba:
     def __init__(self):
         self.taps = []
 
+    def read32(self, _addr):
+        return 0
+
     def tap(self, b):
         self.taps.append(b)
 

@@ -26,15 +26,13 @@ class FieldItemMixin:
 
     def _bag_pocket_open(self, pocket: int = 0) -> bool:
         """Switch the open Bag to `pocket` (0 Items, 1 Key Items, 2 Poké Balls; L/R cycles)."""
-        idle = getattr(self.mgba, "wait_until_idle", None)
         cell = Addr.BAG_MENU_STATE + Addr.BAG_POCKET_OFF
         for _ in range(8):
             cur = self.mgba.read16(cell)
             if cur == pocket:
                 return True
             self.mgba.tap("Left" if cur > pocket else "Right")
-            if idle:
-                idle()
+            self._wait_idle()
             self.mgba.tick(14)
         return self.mgba.read16(cell) == pocket
 

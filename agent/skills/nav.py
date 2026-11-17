@@ -7,19 +7,12 @@ import logging
 
 from rich.console import Console
 
+from agent.skills.base import log_once
 from knowledge.navigation import MAP_NAMES
 from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
 console = Console()
 logger = logging.getLogger(__name__)
-_LOGGED: set = set()
-
-
-def _log_once(key: str, msg: str, *args) -> None:
-    """Log a failure the code deliberately tolerates, once per kind — silent `except: pass` hid them completely."""
-    if key not in _LOGGED:
-        _LOGGED.add(key)
-        logger.warning(msg, *args, exc_info=True)
 
 
 class NavMixin:
@@ -37,8 +30,7 @@ class NavMixin:
 
 
     def _surfing(self) -> bool:
-        fn = getattr(self.reader, "is_surfing", None)
-        return bool(fn()) if fn else False
+        return bool(self.reader.is_surfing())
 
     def _npc_tiles(self) -> set:
         """Grid coords of on-screen NPCs (loaded object events, excluding the
@@ -503,7 +495,7 @@ class NavMixin:
                 if balls > 0 and foe.species_id not in {p.species_id for p in party}:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
-                                 dex_owned=getattr(self.reader, "read_dex_owned", lambda _s: None)(foe.species_id),
+                                 dex_owned=self.reader.read_dex_owned(foe.species_id),
                                  wanted=self._wanted_species(party))
                     verdict = (f" Worth a ball: {v.reason}." if v.catch else f" Not worth a ball: {v.reason}.") \
                         + f" ({balls} Poké Balls.)"
@@ -544,7 +536,7 @@ class NavMixin:
                 # Remember WHERE we lost: a mandatory trainer on the way (the rival at Cerulean's north exit,
                 # Route 22) beats an under-levelled team every time, and a retry loop of
                 # lose → Pokémon Center → walk back → lose again helps nobody.
-                here = getattr(self.reader, "read_current_map", lambda: (0, 0))()
+                here = self.reader.read_current_map()
                 losses = self.__dict__.setdefault("_trainer_losses", {})
                 losses[here] = losses.get(here, 0) + 1
                 if losses[here] >= 2:
@@ -595,12 +587,11 @@ class NavMixin:
                     if sender():               # forced replacement after a faint: B can't cancel it
                         continue
                 except Exception:
-                    _log_once("advance.send_next_mon", "nav: _send_next_mon failed while advancing to control (ignored)")
+                    log_once("advance.send_next_mon", "nav: _send_next_mon failed while advancing to control (ignored)")
             # A stray full-screen menu (Bag / party / summary / TM Case / map): A would USE or
             # SELECT things in it (that is how a left-open Bag drank potions in a loop) — back out.
             from game.constants import Addr
-            rd = getattr(self.mgba, "read32", None)
-            in_screen = bool(rd) and rd(Addr.GMAIN_CALLBACK2) in Addr.FULLSCREEN_MENU_CB2
+            in_screen = self.mgba.read32(Addr.GMAIN_CALLBACK2) in Addr.FULLSCREEN_MENU_CB2
             self.mgba.tap("B" if in_screen else "A")
             self.mgba.tick(30 if in_screen else 10)    # menu inputs drop mid-fade: give B time
         return self.reader.detect_context()
@@ -662,7 +653,7 @@ class NavMixin:
                 move_id, bit = HM_BADGE[req.value]
                 return self._party_knows(move_id) and bool(self.reader.read_badges()[1] >> bit & 1)
         except Exception:
-            _log_once(f"gate.{req.kind}", "nav: could not check the %s requirement — treating it as met (ignored)", req.kind)
+            log_once(f"gate.{req.kind}", "nav: could not check the %s requirement — treating it as met (ignored)", req.kind)
             return True                       # never block travel on a read hiccup
         return True
 

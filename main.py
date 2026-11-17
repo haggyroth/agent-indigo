@@ -1,3 +1,4 @@
+from agent.skills.base import log_once
 from datetime import datetime
 from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
@@ -130,6 +131,7 @@ def _status_line(state, ltm, client, reader, step: int, t_start: float) -> str:
         balls = sum(bag.get(b, 0) for b in (1, 2, 3, 4))
         money = reader.read_money()
     except Exception:
+        log_once("main._status_line", "main._status_line: tolerated failure (continuing with a default)")
         party, balls, money = "?", "?", "?"
     mins = (time.time() - t_start) / 60
     return (f"STATUS step {step} · badges {ltm.data['badges_earned']}/8 · [{party}] · ¥{money} · balls {balls} · "
@@ -378,6 +380,7 @@ def _record_battle(s: dict, run: "_RunState", reader: LeafGreenReader,
         try:
             owned = reader.read_pokedex()[0]
         except Exception:
+            log_once("main._record_battle", "main._record_battle: tolerated failure (continuing with a default)")
             owned = None
         if owned is not None:
             run.prev_dex_owned = owned
@@ -442,6 +445,7 @@ def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
     try:
         run.prev_dex_owned = reader.read_pokedex()[0]       # absorbs dex gains from evolutions; catches book theirs in _record_battle
     except Exception:
+        log_once("main._apply_progress", "main._apply_progress: tolerated failure (continuing with a default)")
         pass
 
     if run.prev_state is not None and state.party_count > run.prev_state.party_count:
@@ -506,19 +510,23 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 _pots = sum(q for iid, q in reader.read_items_pocket() if iid in (13, 22, 21))
                 _money = reader.read_money()
             except Exception:
+                log_once("main.build_observation.1", "main.build_observation: tolerated failure #1 (continuing with a default)")
                 _balls = _pots = _money = 0
             try:
                 _dex = reader.read_pokedex()
             except Exception:
+                log_once("main.build_observation.2", "main.build_observation: tolerated failure #2 (continuing with a default)")
                 _dex = None
             try:
                 _tms = reader.read_tmhm_pocket()
                 _items = reader.read_items_pocket()
             except Exception:
+                log_once("main.build_observation.3", "main.build_observation: tolerated failure #3 (continuing with a default)")
                 _tms, _items = None, []
             try:       # the PC contents only matter (and are only read) where the PC is: "you already own one — pc('swap') it in"
                 _boxes = reader.read_boxes() if MAP_KIND.get((state.map_bank, state.map_id)) == "pokecenter" else None
             except Exception:
+                log_once("main.build_observation.4", "main.build_observation: tolerated failure #4 (continuing with a default)")
                 _boxes = None
             _block = _render(_assess(state.party, _balls, _pots, _money, ltm.data.get("gyms_beaten", []),
                                      dex=_dex, tms=_tms, boxes=_boxes))
@@ -545,6 +553,7 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
             try:
                 _rope = dict(reader.read_items_pocket()).get(85, 0)
             except Exception:
+                log_once("main.build_observation.5", "main.build_observation: tolerated failure #5 (continuing with a default)")
                 _rope = 0
             _ids = {m for p in state.party for m in (p.move_ids or [])}
             _eh = _escape_hint((state.map_bank, state.map_id), _ids, _rope)
@@ -557,6 +566,7 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 _rn = _repel_note((state.map_bank, state.map_id), _lead.level, reader.read_var(VAR_REPEL_STEP_COUNT),
                                   sum(_pk.get(i, 0) for i in REPEL_IDS), len(state.party))
             except Exception:
+                log_once("main.build_observation.6", "main.build_observation: tolerated failure #6 (continuing with a default)")
                 _rn = ""
             if _rn:
                 obs_parts.append(_rn)
@@ -597,6 +607,7 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 from knowledge.bag import booster_note
                 _bn = booster_note(reader.read_items_pocket(), run.battle_is_trainer)
             except Exception:
+                log_once("main.build_observation.7", "main.build_observation: tolerated failure #7 (continuing with a default)")
                 _bn = ""
             if _bn:
                 obs_parts.append(_bn)
@@ -611,10 +622,12 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 if _xp:
                     obs_parts.append(_xp)
             except Exception:
+                log_once("main.build_observation.8", "main.build_observation: tolerated failure #8 (continuing with a default)")
                 pass
             try:
                 _vol = reader.read_battle_volatiles(0)
             except Exception:
+                log_once("main.build_observation.9", "main.build_observation: tolerated failure #9 (continuing with a default)")
                 _vol = {}
             if _vol.get("wrapped") or _vol.get("escape_prevention"):
                 obs_parts.append(
@@ -710,6 +723,7 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
             try:
                 stored = len(reader.read_boxes())
             except Exception:
+                log_once("main.build_observation.10", "main.build_observation: tolerated failure #10 (continuing with a default)")
                 stored = 0
             if stored:
                 obs_parts.append(f"PC: {stored} Pokémon stored in the boxes — pc('list', detail=true) to look, "

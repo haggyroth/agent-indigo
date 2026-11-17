@@ -182,7 +182,7 @@ class PCMixin:
         by_box: dict = {}
         for m in boxes:
             by_box.setdefault(m["box"], []).append(m)
-        cur = getattr(self.reader, "read_current_box", lambda: None)()
+        cur = self.reader.read_current_box()
         lines = [f"{len(boxes)} Pokémon stored" + (f" (current box: {cur + 1})." if cur is not None else ".")]
         for b in sorted(by_box):
             if not detail:
