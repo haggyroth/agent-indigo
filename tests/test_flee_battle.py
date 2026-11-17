@@ -109,3 +109,94 @@ def test_action_cursor_constants():
     assert Addr.ACTION_RUN == 3
     assert Addr.ACTION_CURSOR == 0x02023FF8
     assert Addr.CTRL_CHOOSE_ACTION == 0x08030611
+
+
+# ── go_to encounter hand-off (#202) ──────────────────────────────────────────────────
+def _wild_client(party=None, balls=3):
+    from types import SimpleNamespace as NS
+    c = _client(GameContext.IN_BATTLE, flags=0, party=party or [_mon(50)])
+    foe = NS(species_id=19, species_name="RATTATA", level=4, current_hp=14, max_hp=14)
+    c.reader.read_enemy_lead = lambda: foe
+    c.reader.read_current_map = lambda: (3, 19)          # Route 1
+    c.reader.read_dex_owned = lambda _s: True
+    c._ball_count = lambda: balls
+    c._flee_battle = lambda: "Got away safely!"
+    c._auto_fight = lambda: None
+    return c
+
+
+def test_yield_mode_hands_a_wild_battle_to_the_model_and_records_the_trip():
+    c = _wild_client()
+    msg = c._handle_travel_battle("Viridian City", mode="yield", resume="Viridian City")
+    assert "wild RATTATA L4" in msg and "go_to('Viridian City')" in msg
+    assert "use_move" in msg and "catch()" in msg and "flee_battle()" in msg
+    assert c._trip == {"dest": "Viridian City", "target": "Viridian City"}
+
+
+def test_yield_mode_never_fights_flees_or_throws_a_ball_itself():
+    c = _wild_client()
+    called = []
+    c._flee_battle = lambda: called.append("flee") or "Got away safely!"
+    c._auto_fight = lambda: called.append("fight")
+    c._grind_try_catch = lambda: called.append("catch")
+    assert c._handle_travel_battle("Pewter City", mode="yield") is not None
+    assert called == []
+
+
+def test_yield_mode_resume_uses_the_original_waypoint_not_the_resolved_name():
+    c = _wild_client()
+    msg = c._handle_travel_battle("Pewter Gym (Brock)", mode="yield", resume="Gym")
+    assert "go_to('Gym')" in msg and c._trip["dest"] == "Gym"
+
+
+def test_yield_mode_trainer_battle_is_handed_over_too():
+    c = _trainer_client(outcome=0, ctx_after=GameContext.IN_BATTLE, party=[_mon(50)])
+    c.reader.read_current_map = lambda: (3, 2)
+    msg = c._handle_travel_battle("Cerulean City", mode="yield")
+    assert "TRAINER" in msg and "can't flee" in msg and "go_to('Cerulean City')" in msg
+
+
+def test_auto_trainers_still_autofights_trainers_but_wild_is_yielded():
+    c = _trainer_client(outcome=Addr.B_OUTCOME_WON, ctx_after=GameContext.OVERWORLD, party=[_mon(45)])
+    assert c._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True) is None
+    w = _wild_client()
+    assert w._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True) is not None
+
+
+def test_flee_mode_runs_from_wild_and_does_not_stop_for_low_hp():
+    c = _wild_client(party=[_mon(5)])                    # 10% HP, on its way to a Center
+    assert c._handle_travel_battle("Pokemon Center", mode="flee") is None
+    c2 = _wild_client(party=[_mon(5)], balls=0)
+    c2._travel_wants_xp = lambda: False
+    assert c2._handle_travel_battle("Pewter City", mode="autopilot") is not None   # legacy: stop and heal
+
+
+def test_flee_mode_reports_a_failed_escape():
+    c = _wild_client()
+    c._flee_battle = lambda: "Couldn't escape!"
+    msg = c._handle_travel_battle("Pokemon Center", mode="flee")
+    assert msg is not None and "escape failed" in msg
+
+
+def test_go_to_tool_without_a_destination_resumes_the_trip():
+    c = _wild_client()
+    c._readiness = lambda: []
+    seen = []
+    c._go_to = lambda d, mode="yield", auto_trainers=False: seen.append((d, mode, auto_trainers)) or "Arrived at X."
+    assert "No trip in progress" in c._go_to_tool("")
+    c._trip = {"dest": "Viridian City", "target": "Viridian City"}
+    c.reader.detect_context = lambda: GameContext.OVERWORLD
+    assert c._go_to_tool("").startswith("Arrived")
+    assert seen == [("Viridian City", "yield", False)]
+    c._go_to_tool("Route 2", auto_trainers=True)
+    assert seen[-1] == ("Route 2", "yield", True)
+
+
+def test_heal_travels_in_flee_mode():
+    c = _wild_client()
+    modes = []
+    c._party_needs_heal = lambda: True
+    c.reader.read_current_map = lambda: (3, 1)
+    c._go_to = lambda d, mode="yield", **kw: modes.append(mode) or "Stopped"
+    c._heal()
+    assert modes == ["flee"]

@@ -65,11 +65,12 @@ section — don't repeat the thing you just finished.
 ## Movement Rules — use the navigation tools, not tile-by-tile presses
 - **`go_to("<place>")` is your main travel tool.** It auto-routes across maps
   (connections + building/cave doors) to a town/route by name ("Pewter City",
-  "Route 2") OR a waypoint ("Pokemon Center", "Mart", "Gym"), and **auto-flees wild
-  battles** as it goes — so one `go_to` walks through a whole route/forest/cave (it's
-  the fast way through Viridian Forest). It stops — just call it again to resume —
-  only on a TRAINER battle (win it first), when your HP is low (call `heal()` first),
-  or if the way is blocked. Follow the Navigation section's objective (e.g. go_to the
+  "Route 2") OR a waypoint ("Pokemon Center", "Mart", "Gym"). It walks until something
+  needs a decision: when a **wild Pokémon appears or a trainer spots you the call ends** and tells you
+  what it is. YOU play the encounter (`use_move`, `catch()`, `switch_pokemon`, `flee_battle()`), then call
+  `go_to` again — with no destination it resumes the trip. It also stops if the way is blocked, and refuses to
+  start while your party is hurt (`heal()` first; `heal()` itself flees wild battles on its way to the Center).
+  On a long trainer-heavy march you can pass `auto_trainers=true`. Follow the Navigation section's objective (e.g. go_to the
   next town toward the gym).
 - **`walk_to(x, y)`** moves to a tile on the CURRENT map (path-finds around walls
   and NPCs). Use it to reach a specific spot, or a door/EXIT tile to enter/leave a
@@ -181,8 +182,8 @@ the observation's **READINESS** block (when present) tell you what is overdue:
    ball even with a full party — the extra goes to the PC box.
 6. **Then** travel (`go_to`) toward the next objective. Don't chain `go_to` calls over an unhealed, undersized,
    under-levelled team just because the route is open — that is how runs die at a gym or on a blackout.
-Wild battles on the way are opportunities (XP, a new species), not just obstacles: `go_to` itself will fight a
-few for XP when the team needs levels. Pay attention to PP in "Your moves" — don't keep leaning on one move
+Wild battles on the way are opportunities (XP, a new species), not just obstacles: when `go_to` hands you one,
+fight it for XP when the team needs levels, or catch it if the advice says it is worth a ball. Pay attention to PP in "Your moves" — don't keep leaning on one move
 until it runs dry; rotate to another good attack, switch to a Pokémon with PP left, or heal.
 
 ## The PC (box storage)
@@ -253,7 +254,7 @@ lagging Pokémon gets the XP, and heals itself at a Pokémon Center when HP or a
 
 **Party composition.** Aim for a full party of 6 with different types and strong evolution lines. Early placeholders
 (Weedle, Rattata, Pidgey…) are fine to start, but when you find a clearly better species — or a new type — catch it
-(`grind()` and `go_to` now catch worthwhile wild Pokémon automatically) and swap the weakest member out with
+(`grind()` catches worthwhile wild Pokémon automatically; when `go_to` hands you a wild encounter, `catch()` it yourself) and swap the weakest member out with
 `pc_swap`. Don't run from a wild Pokémon you could use.
 
 **Tag-switch XP.** In any battle you can lead with a low-level Pokémon, then `switch_pokemon` to your strongest on

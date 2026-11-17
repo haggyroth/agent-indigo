@@ -50,7 +50,7 @@ class QuestMixin:
         for _ in range(12):
             if self.reader.read_current_map() == COTTAGE:
                 break
-            out = self._go_to("Bill's Sea Cottage")
+            out = self._go_to("Bill's Sea Cottage", mode="autopilot")
             if self.reader.read_current_map() == COTTAGE:
                 break
             if "heal()" in out or "Lost a trainer" in out:
@@ -108,7 +108,7 @@ class QuestMixin:
             for _ in range(14):
                 if self.reader.read_current_map() == CAPTAIN_OFFICE:
                     break
-                out = self._go_to("S.S. Anne Captain's Office")
+                out = self._go_to("S.S. Anne Captain's Office", mode="autopilot")
                 if self.reader.read_current_map() == CAPTAIN_OFFICE:
                     break
                 if "heal()" in out or "Lost a trainer" in out:

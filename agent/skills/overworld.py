@@ -109,7 +109,7 @@ class OverworldMixin:
             return "Party is already at full HP and PP — no need to heal."
         # Get inside a Pokémon Center first (resumable travel).
         if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
-            res = self._go_to("Pokemon Center")
+            res = self._go_to("Pokemon Center", mode="flee")
             if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
                 return f"On the way to a Pokémon Center to heal: {res}"
         # Walk to the nurse's counter and face her.
@@ -390,7 +390,7 @@ class OverworldMixin:
             # before Brock) it never arrives, so skip that route and try the next-nearest.
             lost = False
             for _ in range(6):
-                out = self._go_to(name)
+                out = self._go_to(name, mode="autopilot")      # grind still plays its own encounters (#203)
                 if self.reader.read_current_map() == goal_map:
                     break
                 if out.startswith("Blocked") or "gated" in out:

@@ -58,7 +58,7 @@ def _client(needs, ctx=GameContext.OVERWORLD):
     c.reader = SimpleNamespace(detect_context=lambda: ctx)
     c._readiness = lambda: needs
     c.calls = []
-    c._go_to = lambda d: c.calls.append(d) or "Arrived at X."
+    c._go_to = lambda d, **kw: c.calls.append(d) or "Arrived at X."
     return c
 
 

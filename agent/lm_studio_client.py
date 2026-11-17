@@ -352,7 +352,8 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             case "go_to_map":
                 return self._go_to_map(args["direction"])
             case "go_to":
-                return self._go_to_tool(args["destination"], bool(args.get("force", False)))
+                return self._go_to_tool(args.get("destination", ""), bool(args.get("force", False)),
+                                        bool(args.get("auto_trainers", False)))
             case "get_ss_ticket":
                 return self._get_ss_ticket()
             case "pc_boxes":
