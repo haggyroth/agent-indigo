@@ -332,7 +332,7 @@ class OverworldMixin:
         heading, reverses when blocked, and rotates axis if fully boxed in. Returns
         True if a battle started."""
         from game.state import GameContext
-        heading = getattr(self, "_wander_dir", "Up")
+        heading = self._wander_dir
         # Try the current heading, then its reverse, then the other axis.
         order = [heading, self._OPPOSITE[heading]]
         for d in ("Up", "Down", "Left", "Right"):
@@ -366,10 +366,10 @@ class OverworldMixin:
         (which it tends to ignore). Returns True if we end up somewhere with grass."""
         from knowledge.grind_routes import best_grass
         if level is None:
-            level = (getattr(self, "_grind_run", None) or {}).get("lvl") or 0
+            level = (self._grind_run or {}).get("lvl") or 0
         bank, mid = self.reader.read_current_map()
         # Routes whose way in already beat us twice are off the list for the whole session.
-        losses = self.__dict__.get("_trainer_losses", {})
+        losses = self._trainer_losses
         avoid: set = {m for m, n in losses.items() if n >= 2}
         for _attempt in range(3):
             found = best_grass((bank, mid), level, exclude_current=exclude_current, avoid=avoid)
@@ -436,7 +436,7 @@ class OverworldMixin:
         """Party members more than BALANCE_GAP (7) levels below the top level (knowledge.party), lowest first
         — fainted ones included (they are lagging, just waiting for a heal)."""
         from knowledge.party import lagging_mons
-        run = getattr(self, "_grind_run", None)         # inside a grind session the floor is FIXED (see _grind_inner)
+        run = self._grind_run         # inside a grind session the floor is FIXED (see _grind_inner)
         return lagging_mons(party if party is not None else self.reader.read_party(),
                             run["floor"] if run else None)
 
@@ -492,7 +492,7 @@ class OverworldMixin:
                     plan["tried_in"] = True
                     if foe_lv > tm.level + 2 or frac < 0.5:
                         plan["tagged"] = True                     # tag out NOW, for good
-                        run = getattr(self, "_grind_run", None) or {}
+                        run = self._grind_run or {}
                         ace = ace_index(party) if run.get("balance") else None
                         fin = pick_finisher(party, t, foe_lv, bench=() if ace is None else (ace,))
                         if fin is not None:
@@ -562,14 +562,14 @@ class OverworldMixin:
         self._grind_run = None
         try:
             from game.state import GameContext
-            if getattr(self, "_training_swapped", False) and self.reader.detect_context() == GameContext.OVERWORLD:
+            if self._training_swapped and self.reader.detect_context() == GameContext.OVERWORLD:
                 self._grind_finish()
         except Exception:
             log_once("overworld._grind_abandon", "overworld._grind_abandon: tolerated failure (continuing with a default)")
             pass
 
     def _grind_finish(self) -> None:
-        if not getattr(self, "_training_swapped", False):
+        if not self._training_swapped:
             return
         try:
             from game.state import GameContext
@@ -628,7 +628,6 @@ class OverworldMixin:
     # ── grind(): resumable sessions that hand encounters to the model ─────────────────────────────
     _GRIND_MAX_BATTLES = 150          # encounters (handed over or automatic) one session may take before it reports
     _GRIND_AUTO_MARGIN = 2            # an auto_battles fight needs a foe at most (active level + this)
-    _grind_run = None                 # state of the session in progress (None = no session)
 
     def _grind_level(self, party, lag) -> int:
         """The level of the Pokémon being trained: the lowest lagging member, else the best (target-level mode)."""

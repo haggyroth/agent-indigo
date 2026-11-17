@@ -17,6 +17,7 @@ from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKE
                     ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT)
 from agent import events
 from agent.skills.base import SkillBase
+from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.quests import QuestMixin
 from agent.skills.party import PartyMixin
@@ -32,7 +33,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -350,7 +351,7 @@ class AgentClient(SkillBase, PCMixin, PartyMixin, QuestMixin, NavMixin, Overworl
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
         events.observe(getattr(self, "reader", None))      # register a battle already under way before the tool runs
-        if name in self._ABANDONS_GRIND and getattr(self, "_grind_run", None):
+        if name in self._ABANDONS_GRIND and self._grind_run:
             self._grind_abandon()              # the model moved on: a stale session must not pin the floor
         match name:
             case "press_button":

@@ -8,17 +8,12 @@ class MoveLearnMixin:
     # We arm on a lead level-up edge and disarm after driving, so the driver never
     # re-engages on the stale value mid-battle (which starved use_move of a clean
     # move menu during Brock's Onix and forfeited the gym).
-    _learn_armed = False
-    _lead_level_seen = None   # legacy name, unused; see _levels_seen
-    _levels_seen = None       # {species_id: summed levels}: a level-up is a rise for the SAME species
     # The last move-offer id we already resolved (declined/accepted). gMoveToLearn
     # AND learnMoveState both LINGER after a decline, so _delete_box_live() keeps
     # reading a phantom box every turn — which made use_move re-decline the same
     # move instead of attacking, looping the whole battle. We refuse to re-drive an
     # offer whose id we've already handled until it actually clears.
-    _offer_resolved = 0
     # True while we're inside a battle whose lingering-offer baseline we've already taken.
-    _learn_in_battle = False
 
 
     # ── Level-up move learning (frame-stepped driver: never cripple the moveset) ──

@@ -189,7 +189,7 @@ class QuestMixin:
         s1, s2 = self.reader.read_var(0x4000), self.reader.read_var(0x4001)
         if 1 <= s1 <= 15 and 1 <= s2 <= 15:
             self._vermilion_cans = (s1, s2)          # remember: a gym trainer's battle can interrupt us mid-way
-        elif getattr(self, "_vermilion_cans", None):
+        elif self._vermilion_cans:
             s1, s2 = self._vermilion_cans            # …and the temp vars may read 0 after it
         if not (1 <= s1 <= 15 and 1 <= s2 <= 15):
             return f"Couldn't read the trash-can switches (got {s1}, {s2}) — search the cans by hand (A on each)."

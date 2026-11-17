@@ -20,13 +20,10 @@ class NavMixin:
     # without arriving. The "call go_to again" resume message loops the agent
     # forever when the path is story-gated (e.g. the Pewter guard shuffles it back,
     # which reads as progress), so after a few we return actionable guidance.
-    _go_to_last_end = None
-    _go_to_stalls = 0
-    # Team-building: while travelling with a small team, go_to stops ONCE on a wild
+        # Team-building: while travelling with a small team, go_to stops ONCE on a wild
     # new-species encounter so the model can catch it (instead of auto-fleeing past
     # everything). This flag makes that offer once-per-battle so re-issuing go_to
     # skips it rather than re-offering forever. Reset when back in the overworld.
-    _trip = None             # {"dest", "target"} of a go_to that handed an encounter to the model (see _yield_encounter)
 
 
     def _surfing(self) -> bool:
@@ -307,7 +304,7 @@ class NavMixin:
                         if self._surfing():
                             continue
                         return res
-                if puzzle_tries < 1 and not getattr(self, "_in_puzzle", False) and self._solve_puzzle_tiles(
+                if puzzle_tries < 1 and not self._in_puzzle and self._solve_puzzle_tiles(
                         (px, py), (tx, ty), grid, w, h, npcs, blocked):
                     puzzle_tries += 1
                     continue
@@ -537,7 +534,7 @@ class NavMixin:
                 # Route 22) beats an under-levelled team every time, and a retry loop of
                 # lose → Pokémon Center → walk back → lose again helps nobody.
                 here = self.reader.read_current_map()
-                losses = self.__dict__.setdefault("_trainer_losses", {})
+                losses = self._trainer_losses
                 losses[here] = losses.get(here, 0) + 1
                 if losses[here] >= 2:
                     return (f"Lost to a trainer near {MAP_NAMES.get(here, here)} {losses[here]} times — you're "
@@ -693,7 +690,7 @@ class NavMixin:
         from game.state import GameContext
         town = tuple(town[:2])
         if town not in self._PC_TOWNS or "pokemon center" in str(destination).lower() \
-                or getattr(self, "_in_town_visit", False):
+                or self._in_town_visit:
             return
         seen = self.ltm.data.setdefault("pc_visited", [])
         key = f"{town[0]},{town[1]}"
@@ -748,7 +745,7 @@ class NavMixin:
         from knowledge.readiness import blocking
         destination = (destination or "").strip()
         if not destination:
-            trip = getattr(self, "_trip", None)
+            trip = self._trip
             if not trip:
                 return "No trip in progress — call go_to('<place>') with a destination."
             destination = trip["dest"]
@@ -800,7 +797,7 @@ class NavMixin:
         """Travel (see _go_to_inner) with a depth guard and a recorded, structured stop reason: `last_trip_stop`
         = {reason, target, map} and one `trip` event per outermost trip — so "Stopped at X en route…" from a spent
         hop budget no longer looks the same as an interrupted trip."""
-        depth = getattr(self, "_go_depth", 0)
+        depth = self._go_depth
         if depth >= self.MAX_TRIP_DEPTH:
             return self._stop("nested", f"Travel to {destination!r} is nested {depth} deep (a heal or a first-visit "
                                         "stop led back into travel) — stopping so it can't loop. Call it again from here.")
@@ -880,7 +877,7 @@ class NavMixin:
             # differently) so a split map is crossed via its gate, not a sealed edge.
             px, py = self.reader.read_player_pos()
             cur_node = node_for(*cur, px, py)
-            fails = self.__dict__.setdefault("_edge_fail", {})
+            fails = self._edge_fail
             avoid = {k for k, n in fails.items() if n >= 2}
             route = route_to(cur_node, target_map, avoid_edges=avoid)
             if not route and avoid:
@@ -1049,13 +1046,13 @@ class NavMixin:
         ace = GYM_ACE_LEVEL.get(leader)
         party = self.reader.read_party()
         top = max((p.level for p in party), default=0)
-        if ace and top < ace - 2 and getattr(self, "_gym_warned", None) != cur:
+        if ace and top < ace - 2 and self._gym_warned != cur:
             self._gym_warned = cur
             return (f"Your highest-level Pokémon is L{top} but {leader}'s ace is L{ace} — "
                     f"you will likely lose. grind({ace - 1}) first (and heal()), or call "
                     f"challenge_leader() again to fight anyway.")
         lag = self._lagging_mons(party)
-        if lag and getattr(self, "_balance_warned", None) != cur:
+        if lag and self._balance_warned != cur:
             self._balance_warned = cur
             names = ", ".join(f"{p.species_name} L{p.level}" for _, p in lag)
             return (f"Your team is lopsided (top L{top}; lagging: {names}). Call grind() (no level) first so "
@@ -1151,7 +1148,7 @@ class NavMixin:
                     nb, ni = self.reader.read_current_map()
                     return f"Crossed {direction} to map {nb}/{ni} at {self.reader.read_player_pos()}."
         if (not self._surfing() and self._party_knows(57)
-                and not getattr(self, "_surf_retry", False)):
+                and not self._surf_retry):
             # The land edge tiles lead into open water (a shore, not a crossing): Surf, retry.
             self._surf_retry = True
             try:
