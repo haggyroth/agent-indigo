@@ -901,6 +901,14 @@ class BattleMixin:
         if mon.species_id == active_species and not forced:
             return f"{mon.species_name} is already the one battling. {switch_options(party, active_species)}"
         target_species = mon.species_id
+        if forced:
+            # A on the fainted lead leaves "<mon> has no energy left to battle!" on screen (live: a run pressed A 300×), and
+            # while that box is up Down/Up do not move the party cursor. B dismisses it and is harmless at the root screen
+            # ("Choose a POKéMON." — B cannot cancel a forced choice).
+            for _ in range(2):
+                self.mgba.tap("B")
+                self._wait_idle()
+                self.mgba.tick(20)
         if not forced and not self._open_party_menu():
             return "Couldn't open the party menu — try switch_pokemon again."
         self._wait_idle()

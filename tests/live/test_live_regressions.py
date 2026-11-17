@@ -746,3 +746,24 @@ def test_foe_battler_read_matches_the_real_wild_mon_and_feeds_the_observation(li
     line = roster(party, live.r.read_active_battle_species(),
                   foe=Foe(name=enemy.species_name, level=enemy.level, hp=enemy.current_hp, max_hp=enemy.max_hp, **foe))
     assert line.startswith(f"Party vs {enemy.species_name.title()}") and "ACTIVE" in line, line
+
+
+def test_forced_switch_screen_is_named_in_the_observation_and_blind_presses_are_refused(live):
+    """Watched-run finding: after a faint the forced party screen read as TRANSITIONING and the observation said 'press A' — a
+    Gemma run pressed A/wait for 319 tool calls. Now the observation says FORCED SWITCH and press_button/advance_dialog
+    point at switch_pokemon (which does leave the screen)."""
+    import pytest
+    live.load("forced_stuck")
+    from game.menu import forced_party_screen
+    if not forced_party_screen(live.m, live.r):
+        pytest.skip("fixture is not on the forced party screen")
+    txt = _observation(live, in_battle=False)
+    assert "FORCED SWITCH" in txt and "switch_pokemon" in txt and "press A" not in txt, txt
+    assert "Party vs" in txt or "Healthy:" in txt
+    for out in (live.c._execute("press_button", json.dumps({"button": "A"})), live.c._execute("advance_dialog", "{}")):
+        assert "switch_pokemon" in out and "forcing a replacement" in out, out
+    party = live.r.read_party()
+    fainted_sp = live.r.read_active_battle_species()          # live.load() heals the party structs; the battler is still down
+    other = next(p for p in party if p.current_hp > 0 and p.species_id != fainted_sp)
+    out = live.c._execute("switch_pokemon", json.dumps({"target": other.nickname or other.species_name}))
+    assert not forced_party_screen(live.m, live.r), out

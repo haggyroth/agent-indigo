@@ -372,6 +372,10 @@ class AgentClient(SkillBase, SkillState, GameCornerMixin, PCMixin, PartyMixin, Q
                 # the game only accepts input once idle. Use the reliable path so
                 # the model's FIGHT/move/A presses actually register.
                 from game.state import GameContext
+                from game.menu import _healthy_roster, forced_party_screen
+                if forced_party_screen(self.mgba, self.reader):        # a fainted lead: A/B cannot get out of this screen
+                    return (f"Your Pokémon fainted — the game is forcing a replacement; button presses will not leave this "
+                            f"screen. Call switch_pokemon('<name or slot>'). Healthy: {_healthy_roster(self.reader)}.")
                 in_battle = self.reader.detect_context() == GameContext.IN_BATTLE
                 for _ in range(times):
                     if in_battle:

@@ -219,6 +219,30 @@ def _safari_battle(t: Tick) -> list[str]:
     return out
 
 
+def _foe_info(t: Tick, enemy) -> Foe:
+    """The opponent as the matchup maths wants it: gEnemyParty identity + the live battler's moves / Spe / Atk / ability."""
+    return Foe(name=enemy.species_name or t.run.current_enemy, level=enemy.level or 0, hp=enemy.current_hp, max_hp=enemy.max_hp,
+               **_safe("foe_battler", t.reader.read_foe_battler, {}))
+
+
+def _forced_switch(t: Tick) -> list[str]:
+    """The party screen the game forces open when your active Pokémon faints mid-battle: B cannot cancel it and A just
+    selects the highlighted (fainted) lead, so the ONLY way out is switch_pokemon. Its callback is the party menu's, which
+    reads as TRANSITIONING — and the old 'dialog not advancing — press A' hint sent a run into 319 useless presses."""
+    from game.menu import _healthy_roster, forced_party_screen
+    r = t.reader
+    if t.state.context.name not in ("TRANSITIONING", "IN_MENU", "UNKNOWN") or not _safe("forced", lambda: forced_party_screen(r.client, r), False):
+        return []
+    out = ["FORCED SWITCH: your Pokémon fainted and the game is waiting for you to choose the next one. B cannot cancel and "
+           f"pressing A does nothing useful — call switch_pokemon('<name or slot>') NOW. Healthy: {_healthy_roster(r)}."]
+    enemy = _safe("forced_enemy", r.read_enemy_lead, None)
+    if enemy and enemy.max_hp:
+        line = roster(t.state.party, r.read_active_battle_species(), foe=_foe_info(t, enemy))
+        if line:
+            out.append(line)
+    return out
+
+
 def _battle(t: Tick) -> list[str]:
     """Moves/PP of the ACTIVE battler, the foe, volatile conditions, catch advice. (party[0] is not necessarily the one
     fighting after a switch; a Disabled move's PP is zeroed so it is never suggested.)"""
@@ -244,8 +268,7 @@ def _battle(t: Tick) -> list[str]:
                               foe_level=(enemy.level or 0) if enemy else 0, foe_hp=enemy.current_hp if enemy else 0,
                               hidden_power=hidden_power(me.ivs)))
     if enemy and enemy.max_hp:           # who is down, who is up, and who matches up well against THIS foe
-        foe = Foe(name=enemy.species_name or run.current_enemy, level=enemy.level or 0, hp=enemy.current_hp, max_hp=enemy.max_hp,
-                  **_safe("foe_battler", r.read_foe_battler, {}))        # live moves / Spe / Atk / ability sharpen the maths
+        foe = _foe_info(t, enemy)
         heals = _safe("heals", lambda: [HEAL_HP[i] for i, q in r.read_items_pocket() if q and i in HEAL_HP], [])
         for line in (roster(party, active, foe=foe), better_matchup(party, active, foe=foe),
                      low_hp_advice(party, active, foe, heals, wild=not run.battle_is_trainer)):
@@ -414,6 +437,9 @@ def _loop_signals(t: Tick) -> list[str]:
     """Changes since last tick, revisit and stuck warnings. Side effect: when stuck on the overworld with vision on and no map
     queued, re-queue the area map so the agent can re-orient."""
     state, stm, out = t.state, t.stm, []
+    forced = _forced_switch(t)
+    if forced:
+        return (["Changes: " + "; ".join(t.diff.notes)] if t.diff.notes else []) + forced      # never "press A" here
     if t.diff.notes:
         out.append("Changes: " + "; ".join(t.diff.notes))
     visits = stm.visit_count(state.player_x, state.player_y)

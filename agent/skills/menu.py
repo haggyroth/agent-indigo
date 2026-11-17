@@ -22,8 +22,11 @@ class MenuMixin:
         from game.state import GameContext
         # In a battle the "dialogue" is battle text: drive it to the next decision point
         # instead of refusing (the old reply — "a battle started" — pressed nothing).
-        if (self.reader.detect_context() == GameContext.IN_BATTLE
-                or forced_party_screen(self.mgba, self.reader)):
+        if forced_party_screen(self.mgba, self.reader):
+            from game.menu import _healthy_roster
+            return (f"Your Pokémon fainted — the game is forcing a replacement and no dialogue is waiting. Call "
+                    f"switch_pokemon('<name or slot>'). Healthy: {_healthy_roster(self.reader)}.")
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
             return self._battle_settle()
         return self._menus.advance_dialog()
 
