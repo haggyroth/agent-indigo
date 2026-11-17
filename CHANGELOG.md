@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — go_to hands encounters to the model (#202)
+- `go_to` no longer plays wild battles itself. When a wild Pokémon appears (or a trainer spots you) the call ends with
+  a description (species, level, HP, catch-policy verdict, balls) and the exact resume call; the model fights /
+  catches / switches / flees, then calls `go_to` again — with no destination it resumes the trip in progress
+  (`AgentClient._trip`, shown in the observation as `TRIP IN PROGRESS`). `auto_trainers=true` keeps the old
+  auto-fight for trainers on long marches.
+- Travel modes (`NavMixin.TRAVEL_MODES`): `yield` (go_to, shop, pc_*), `flee` (heal() and the grind restock trip: wild
+  battles are fled, no low-HP stop), `autopilot` (legacy catch/XP/flee heuristic, kept for grind's route relocation
+  and the Bill / S.S. Anne quests until #203 reworks them).
+- Known: battles triggered inside `walk_to`'s puzzle solver still use autopilot. Live tests `get_ss_ticket` /
+  `get_cut` fail on main as well (not caused by this change).
+
 ### Fixed — Self-Destruct/Explosion training loop (run 20261114-145026)
 - `_best_damaging_move` ranked by raw power, so a Geodude with Self-Destruct (200) always picked it: the trainee
   fainted every fight, gained no XP, was revived, and grind looped for hours (4 × 100-min time limits).

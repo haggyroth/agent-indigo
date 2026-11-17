@@ -199,9 +199,20 @@ def test_balance_training_keeps_the_ace_from_stealing_xp(live, monkeypatch):
     assert max(p.level for p in party[1:]) > 5                                  # the trainees actually levelled
 
 
+def _pc(live, tool, **args):
+    """Call a pc_* tool; if go_to handed us a wild encounter on the way to the Center (#202), flee and resume."""
+    out = ""
+    for _ in range(12):
+        out = live.c._execute(tool, json.dumps(args))
+        if "appeared at" not in out or live.r.detect_context() != GameContext.IN_BATTLE:
+            break
+        live.c._flee_battle()
+    return out
+
+
 def test_pc_deposit_list_and_withdraw_through_the_real_menus(live):
     live.load("threemon")
-    out = live.c._execute("pc_deposit", json.dumps({"pokemon": "Pikachu"}))
+    out = _pc(live, "pc_deposit", pokemon="Pikachu")
     assert out.startswith("Deposited") and len(live.r.read_party()) == 2, out
     assert live.r.detect_context() == GameContext.OVERWORLD
     assert "Pikachu" in live.c._execute("pc_boxes", "{}")
@@ -212,7 +223,7 @@ def test_pc_deposit_list_and_withdraw_through_the_real_menus(live):
 
 def test_pc_withdraw_from_another_box_and_grid_slot(live):
     live.load("threemon")
-    assert live.c._execute("pc_deposit", json.dumps({"pokemon": "Caterpie"})).startswith("Deposited")
+    assert _pc(live, "pc_deposit", pokemon="Caterpie").startswith("Deposited")
     base = live.r._storage_ptr()
     src, dst = base + 4, base + 4 + (1 * 30 + 14) * 80          # box 1 slot 0 → box 2 slot 14 (col 2, row 2)
     for i in range(80):

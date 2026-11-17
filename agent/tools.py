@@ -61,17 +61,23 @@ TOOLS = [
                        "('Pokemon Center', 'Mart', 'Gym'), routing across connections and doors for you. "
                        "It does NOT heal, restock, catch or level anyone — those are your job and come "
                        "first: it refuses to start a trip while your party is hurt or out of attack PP "
-                       "(heal() first; force=true overrides) and reminds you what else is overdue. It "
-                       "flees ordinary wild battles to keep moving (unless a catch or some XP is wanted) "
-                       "and fights trainers. It stops — call again to resume — on a TRAINER battle you "
-                       "lose, low HP, a new species worth catching, or a blocked way.",
+                       "(heal() first; force=true overrides) and reminds you what else is overdue. "
+                       "When a wild Pokémon appears (or a trainer spots you) the call ENDS and tells you what "
+                       "it is — YOU fight (use_move), catch, switch or flee_battle, then call go_to again "
+                       "(with no destination it resumes the trip in progress). Pass auto_trainers=true to let "
+                       "it fight trainers for you on a long trainer-heavy march (it then stops on a loss). "
+                       "It also stops on a blocked way.",
         "parameters": {"type": "object", "properties": {
             "destination": {"type": "string",
                             "description": "Map name (e.g. 'Viridian City') or waypoint "
-                                           "('Pokemon Center', 'Mart', 'Gym')."},
+                                           "('Pokemon Center', 'Mart', 'Gym'). Omit to resume the "
+                                           "trip that an encounter interrupted."},
             "force": {"type": "boolean",
                       "description": "skip the pre-flight check (hurt / out of PP). Rarely right."},
-        }, "required": ["destination"]},
+            "auto_trainers": {"type": "boolean",
+                              "description": "auto-fight trainers met on the way instead of handing each "
+                                             "to you (wild Pokémon are always handed to you)."},
+        }, "required": []},
     }},
     {"type": "function", "function": {
         "name": "challenge_leader",

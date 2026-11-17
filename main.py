@@ -448,7 +448,8 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
 def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                       run: _RunState, reader: LeafGreenReader,
                       tilemap: TilemapReader, ltm: LongTermMemory,
-                      stm: ShortTermMemory, map_key: tuple[int, int]) -> str:
+                      stm: ShortTermMemory, map_key: tuple[int, int],
+                      trip: dict | None = None) -> str:
     """Build the one-line observation the LLM sees each tick.
 
     Pure string assembly from live state + memory; the only side effect is
@@ -505,6 +506,9 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                                      dex=_dex))
             if _block:
                 obs_parts.append(_block)
+        if trip and not in_battle and state.context == GameContext.OVERWORLD:
+            obs_parts.append(f"TRIP IN PROGRESS → {trip['target']} (an encounter interrupted it): "
+                             f"call go_to() with no destination — or go_to({trip['dest']!r}) — to resume.")
         if in_battle:
             # Moves/PP of the ACTIVE battler (gBattleMons[0]) — party[0] is not necessarily the one
             # fighting after a switch — with a Disabled move's PP zeroed so it is never suggested.
@@ -936,7 +940,8 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             # ── Build observation string ─────────────────────────────────────
             obs = build_observation(state=state, diff=diff, in_battle=in_battle,
                                     run=run, reader=reader, tilemap=tilemap,
-                                    ltm=ltm, stm=stm, map_key=map_key)
+                                    ltm=ltm, stm=stm, map_key=map_key,
+                                    trip=getattr(client, "_trip", None))
             if verbose:
                 console.print(f"[yellow]OBS:[/] {obs[:140]}")
 
