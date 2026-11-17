@@ -30,10 +30,12 @@ def test_attack_pp_nearly_gone_is_a_must_heal_status_moves_dont_count():
 
 def test_shop_catch_train_and_level_are_advice_not_blockers():
     needs = assess([mon(10), mon(2)], balls=1, potions=0, money=2000, gyms_beaten=[])
-    assert set(codes(needs)) == {"shop", "catch", "train", "level"} and not blocking(needs)
+    assert set(codes(needs)) == {"shop", "catch", "train", "level", "hunt"} and not blocking(needs)   # hunt: Brock's gym
 
 
-def test_shop_advice_needs_money_and_a_healthy_ready_team_is_quiet():
+def test_shop_advice_needs_money_and_a_healthy_ready_team_is_quiet(monkeypatch):
+    import knowledge.team as team_mod
+    monkeypatch.setattr(team_mod, "gaps", lambda *a, **k: [])        # team composition is covered in test_team.py
     assert "shop" not in codes(assess([mon(14)] * 4, 0, 0, 100, ["Brock"]))
     team = [mon(24), mon(22), mon(21), mon(21)]
     assert assess(team, 9, 5, 800, ["Brock", "Misty"]) == []

@@ -84,6 +84,15 @@ class PartyMixin:
                     f"open_menu('Pokemon') and do it by hand. Order now: {self._party_names()}.")
         return f"Swapped slots {a + 1} and {b + 1}. Party order: {self._party_names()}."
 
+    def _wanted_species(self, party=None) -> dict:
+        """{species id: reason} the team is missing (knowledge.team) — fed to catch_policy.evaluate. {} on any hiccup."""
+        try:
+            from knowledge.team import wanted_species
+            return wanted_species(party if party is not None else self.reader.read_party(), None,
+                                  self.ltm.data.get("gyms_beaten", []))
+        except Exception:
+            return {}
+
     def _party_names(self) -> str:
         return ", ".join(f"{i + 1}. {p.nickname or p.species_name} L{p.level}"
                          for i, p in enumerate(self.reader.read_party()))
