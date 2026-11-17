@@ -32,8 +32,27 @@ def next_gym_target(gyms_beaten) -> tuple[str, int] | None:
     return nxt["leader"], max(5, GYM_ACE_LEVEL.get(nxt["leader"], 20) - 1)
 
 
+SAVE_EVERY_BATTLES = 25         # fights since the last cartridge save before it is worth mentioning again
+
+
+def battles_total(data: dict) -> int:
+    """Fights fought so far, from the long-term counters (won + lost + fled + caught)."""
+    return sum(data.get(k, 0) for k in ("battles_won", "battles_lost", "battles_fled", "battles_caught"))
+
+
+def save_note(badges: int, battles: int, saved_badges, saved_battles: int) -> str:
+    """Why a cartridge save is due ('' when it is not): never saved, a new badge, or a lot of fights since the last one."""
+    if saved_badges is None:
+        return "" if battles < 5 and not badges else "you have never saved the game"
+    if badges > saved_badges:
+        return f"you earned {badges - saved_badges} badge(s) since the last save"
+    if battles - saved_battles >= SAVE_EVERY_BATTLES:
+        return f"{battles - saved_battles} battles since the last save"
+    return ""
+
+
 def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=(), dex=None, tms=None,
-           boxes=None) -> list[Need]:
+           boxes=None, save_due: str = "") -> list[Need]:
     needs: list[Need] = []
     if not party:
         return needs
@@ -89,6 +108,9 @@ def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=
         from knowledge.bag import tm_advice
         for adv in tm_advice(party, tms):
             needs.append(Need("should", "teach", f"TM upgrade — {adv.text}"))
+    if save_due and not blocking(needs):
+        needs.append(Need("should", "save", f"save_game() — {save_due}; a real cartridge save survives a crash or a restart "
+                                            "(save_state only keeps emulator slots)"))
     if dex and dex[0] < 151 and not blocking(needs) and balls >= 3:
         needs.append(Need("should", "dex", f"Pokédex {dex[0]}/151 caught ({dex[1]} seen) — a SECONDARY goal: also catch "
                                            "species you don't own yet (a full party sends them to the PC box). Beating "

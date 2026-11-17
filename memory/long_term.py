@@ -16,6 +16,7 @@ DEFAULTS = {
     "total_battles": 0,   "battles_won": 0,
     "battles_lost": 0,
     "battles_fled": 0,    "battles_caught": 0,
+    "saved_badges": None, "saved_battles": 0,    # badges / battles when the game was last saved to the cartridge (save_game)
 }
 
 class LongTermMemory:

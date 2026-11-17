@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `save_game`: a real cartridge save, and readiness says when one is due (#215)
+- **`save_game()`** drives Start → Save → YES → YES (overwrite) and CONFIRMS the save by the game's own counter: `gSaveCounter`
+  (0x0203AA34, found by diffing EWRAM across two saves — one u32 rose by exactly 1 each time) must rise. The screen text isn't
+  readable, so this is the only honest check; a save that didn't happen is reported as such. It is separate from `save_state`'s
+  emulator slots and works from the overworld only.
+- **Readiness:** `save_game() — you earned 1 badge(s) since the last save` / `never saved` / `25 battles since the last save`. Long-term
+  memory keeps `saved_badges` / `saved_battles`; the item never outranks a heal/shop "must".
+- Tests: `tests/test_save_readiness.py`; a live test saves twice (counter +1 each), checks the memory record and the in-battle refusal.
+- Not done under #215: Safari Zone quests, Game Corner prizes.
+
 ### Added — `shop(item, quantity)`: buy a specific item from whoever sells it (#215)
 - **Where everything is sold, from the decomp** (`tools/gen_shop_stock.py` → `knowledge/shop_stock.py`): every clerk with a buy menu
   (map, position, stock), prices, item names and readable map names. The Celadon Dept. Store turns out to matter: 2F sells TMs

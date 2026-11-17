@@ -178,6 +178,9 @@ class Addr:
     # gBattleTypeFlags (real one) — set at battle init, persists after. Verified
     # live: wild = 0x04 (IS_MASTER), trainer = 0x0C (IS_MASTER | TRAINER). Read at
     # battle START to classify the battle. Bit values per pokefirered.
+    # gSaveCounter (save.c): +1 for every successful in-game save. Found by diffing EWRAM across two saves (a single u32 rose by
+    # exactly 1 each time); the only way to CONFIRM a cartridge save, since the screen text is not readable.
+    SAVE_COUNTER        = 0x0203AA34
     BATTLE_TYPE_FLAGS   = 0x02022B4C
     BATTLE_TYPE_TRAINER = 0x08   # gBattleTypeFlags & this != 0 → a trainer battle
 

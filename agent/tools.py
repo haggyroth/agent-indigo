@@ -322,6 +322,13 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {}},
     }},
     {"type": "function", "function": {
+        "name": "save_game",
+        "description": "Write a REAL cartridge save (the in-game SAVE: Start → Save → Yes → Yes), confirmed by the game's save "
+                       "counter. Survives a crash or restart, unlike save_state's emulator slots. The READINESS block says when "
+                       "one is due (a new badge, many battles since the last, or never). Overworld only.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
         "name": "save_state",
         "description": "Save state to a slot. Call before gym leaders and Elite Four.",
         "parameters": {"type": "object", "properties": {

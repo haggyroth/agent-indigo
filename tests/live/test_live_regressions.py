@@ -510,3 +510,17 @@ def test_shop_item_buys_a_tm_at_the_celadon_dept_store(live):
     out = live.c._execute("shop", json.dumps({"item": "Super Repel", "quantity": 2}))
     assert out.startswith("Bought 2× Super Repel (¥1000)"), out
     assert dict(live.r.read_items_pocket()).get(83) == reps + 2 and live.r.read_money() == 2000
+
+
+def test_save_game_writes_a_real_save_and_records_it(live):
+    """#215: Start → Save → YES → YES (overwrite), confirmed by gSaveCounter rising; ltm remembers badges/battles at the save."""
+    live.load("threemon")
+    assert live.c._execute("save_game", "{}") .startswith("Saved the game (save #")
+    n1 = live.m.read32(Addr.SAVE_COUNTER)
+    out = live.c._execute("save_game", "{}")
+    assert live.m.read32(Addr.SAVE_COUNTER) == n1 + 1 and out.startswith(f"Saved the game (save #{n1 + 1})"), out
+    assert live.r.detect_context() == GameContext.OVERWORLD
+    assert live.c.ltm.data["saved_badges"] == live.c.ltm.data["badges_earned"]
+    assert live.wild_battle()
+    assert "Save from the free overworld" in live.c._execute("save_game", "{}")
+    assert live.m.read32(Addr.SAVE_COUNTER) == n1 + 1                       # and nothing was written in the battle
