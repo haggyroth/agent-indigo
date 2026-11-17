@@ -24,7 +24,9 @@ def resolve_mon(ref, party) -> Pick:
         if 0 <= i < len(party):
             return Pick(i)
         return Pick(None, f"There is no slot {key} — you have {len(party)} Pokémon ({roster(party)}).")
-    names = [{(getattr(p, "nickname", "") or "").lower(), (p.species_name or "").lower()} - {""} for p in party]
+    # also accept the exact 'Nickname(Species)' label the battle roster prints (knowledge.matchup.label)
+    names = [{(getattr(p, "nickname", "") or "").lower(), (p.species_name or "").lower(),
+              f"{getattr(p, 'nickname', '') or ''}({p.species_name or ''})".lower()} - {"", "()"} for p in party]
     for matches in ([i for i, n in enumerate(names) if key in n], [i for i, n in enumerate(names) if any(key in x for x in n)]):
         if len(matches) == 1:
             return Pick(matches[0])

@@ -54,3 +54,11 @@ def test_switch_options_lists_only_the_living_and_not_the_active():
     assert out == "Can switch to: 4:Sky High(Pidgey) (7/22)"
     assert switch_options([IVY, PIKA], 14) == "Nobody else is able to fight."
     assert label(mon("RATTATA", 19, 1, 1)) == "Rattata"
+
+
+def test_roster_labels_are_valid_switch_targets():
+    """The model copies 'Sir Wiggle(Kakuna)' from the roster line straight into switch_pokemon."""
+    from knowledge.targets import resolve_mon
+    party = [IVY, PIKA, KAK, PID]
+    for p in party:
+        assert resolve_mon(label(p), party).index == party.index(p)
