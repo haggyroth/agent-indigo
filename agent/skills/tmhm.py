@@ -188,9 +188,9 @@ class TMHMMixin:
         if knowers and not pokemon:
             return f"{knowers[0]} already knows {move}."
         if pokemon:
-            slot = self._resolve_party_target(pokemon, party)
+            slot, err = self._pick_party(pokemon, party)
             if slot is None:
-                return f"Can't find {pokemon!r} in your party."
+                return err
             slots = [slot]
         else:
             slots = list(range(len(party)))

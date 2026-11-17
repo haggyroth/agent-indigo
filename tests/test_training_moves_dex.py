@@ -175,5 +175,5 @@ def test_xp_share_hint():
     from knowledge.battle import xp_share_hint
     party = [mon(10, 6, name="Caterpie"), mon(1, 40, name="Bulbasaur")]
     assert "switch_pokemon('Bulbasaur')" in xp_share_hint(party, party[0].species_id, 20)
-    assert "set_lead('Caterpie')" in xp_share_hint(party, party[1].species_id, 20)
+    assert "reorder_party('Caterpie')" in xp_share_hint(party, party[1].species_id, 20)
     assert xp_share_hint([mon(1, 40, name="A"), mon(2, 36, name="B")], 1) == ""

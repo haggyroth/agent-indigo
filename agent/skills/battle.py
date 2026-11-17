@@ -601,7 +601,7 @@ class BattleMixin:
                 pass
             if party_before >= 6:
                 return ("Gotcha! Caught the wild Pokémon — your party was full, so it was sent to the PC "
-                        f"box — see pc_boxes, and pc_swap / pc_withdraw to bring it into the team.{extra}")
+                        f"box — see pc('list'), and pc('swap') / pc('withdraw') to bring it into the team.{extra}")
             return f"Gotcha! Caught the wild Pokémon — it's on your team now.{extra}"
         return ("It broke free! Weaken it more with use_move (bring its HP low, or "
                 "inflict a status like sleep), then catch() again.")
@@ -629,19 +629,16 @@ class BattleMixin:
 
     @staticmethod
     def _resolve_party_target(target: str, party) -> int | None:
-        """Map a switch target — a 1-based slot number or a species name (exact, then
-        partial) — to a 0-based party slot index, or None if it doesn't match."""
-        key = target.lower().strip()
-        if key.isdigit():
-            i = int(key) - 1
-            return i if 0 <= i < len(party) else None
-        for i, p in enumerate(party):
-            if p.species_name and p.species_name.lower() == key:
-                return i
-        for i, p in enumerate(party):
-            if p.species_name and key in p.species_name.lower():
-                return i
-        return None
+        """0-based party slot for a slot number / species / nickname, or None (see knowledge.targets for the one rule)."""
+        from knowledge.targets import resolve_mon
+        return resolve_mon(target, party).index
+
+    @staticmethod
+    def _pick_party(target: str, party) -> tuple:
+        """(0-based slot or None, the message to return when None) — names an ambiguity instead of guessing."""
+        from knowledge.targets import resolve_mon
+        pick = resolve_mon(target, party)
+        return pick.index, pick.error
 
     def _open_party_menu(self) -> bool:
         """Open the party menu from a battle by selecting POKEMON (action cursor = 2),
@@ -813,10 +810,9 @@ class BattleMixin:
             return "You only have one Pokémon — nothing to switch to. Catch a team first."
         if not forced and self._battle_trapped():
             return self._trapped_message("switch")
-        slot = self._resolve_party_target(target, party)
+        slot, err = self._pick_party(target, party)
         if slot is None:
-            roster = ", ".join(f"{i+1}:{p.species_name}" for i, p in enumerate(party) if p.species_name)
-            return f"Can't find '{target}' in your party ({roster})."
+            return err
         mon = party[slot]
         if mon.current_hp == 0:
             return f"{mon.species_name} has fainted — pick a Pokémon with HP left."

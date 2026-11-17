@@ -86,7 +86,7 @@ def test_the_surge_hint_names_a_ground_type_and_where_to_get_it():
 def test_a_counter_already_in_the_pc_is_swapped_in_not_hunted():
     box = [{"species_id": ID["Diglett"], "species_name": "Diglett", "box": 0, "slot": 7}]
     g = [x for x in gaps([IVY(), PIDGEY()], box, MISTY) if x.code == "gym"][0]
-    assert "pc_swap" in g.text and "1:7" in g.text and "Diglett's Cave" not in g.text
+    assert "pc('swap')" in g.text and "1:7" in g.text and "Diglett's Cave" not in g.text
 
 
 def test_no_gym_hint_when_the_team_already_answers_it():
@@ -116,7 +116,7 @@ def test_filling_a_gap_makes_a_catch_worthwhile_even_for_a_weak_line():
     far = evaluate([mon("Ivysaur", level=60)], ID["Diglett"], 15, wanted=wanted)       # hopelessly under-levelled
     assert not far.catch
     full = [mon("Ivysaur", level=24)] + [mon("Pidgey", level=20)] * 5
-    assert "pc_swap" in evaluate(full, ID["Diglett"], 18, wanted=wanted).reason
+    assert "pc('swap')" in evaluate(full, ID["Diglett"], 18, wanted=wanted).reason
     assert plain.reason != v.reason
 
 

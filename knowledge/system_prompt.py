@@ -192,8 +192,8 @@ fight it for XP when the team needs levels, or catch it if the advice says it is
 until it runs dry; rotate to another good attack, switch to a Pokémon with PP left, or heal.
 
 ## The PC (box storage)
-Only 6 Pokémon travel with you; every extra catch goes to a PC box. `pc_boxes()` lists what's stored (works anywhere);
-`pc_deposit(pokemon)`, `pc_withdraw(pokemon)` and `pc_swap(party_pokemon, box_pokemon)` drive the Pokémon Center PC for
+Only 6 Pokémon travel with you; every extra catch goes to a PC box. `pc('list')` lists what's stored (works anywhere);
+`pc('deposit', pokemon)`, `pc('withdraw', pokemon)` and `pc('swap', pokemon, box_pokemon)` drive the Pokémon Center PC for
 you (they walk to a Center if needed). Use them to keep the best team for the next gym or dungeon — bring in a type
 that counters the next Leader, send a weak or redundant member to the box — and to pick the Pokémon you want to train.
 You can never deposit your last battle-ready Pokémon.
@@ -264,7 +264,7 @@ lagging teammates in.) Catch worthwhile wild Pokémon yourself with `catch()` wh
 **Judge your specimens.** Two of the same species can differ a lot (the individual values, nature and EVs). Right after a
 catch the result includes a `Quality:` report — a grade (excellent / good / average / below average), the IV percentage, the nature
 and how it compares with your same-species Pokémon or the team. `inspect_pokemon(<slot|name|box:slot>)` shows the real stats, IVs, EVs
-and Hidden Power; `pc_boxes(detail=true)` grades the boxed ones; a "better specimen in the PC" readiness item names the exact `pc_swap`.
+and Hidden Power; `pc('list', detail=true)` grades the boxed ones; a "better specimen in the PC" readiness item names the exact `pc('swap')`.
 Keep the better individual of a species (weigh the levels you would lose), and don't judge by species alone.
 
 **Team gaps.** The readiness block names what the TEAM is missing — "team gap — Lt. Surge's gym (Electric): your team hits
@@ -276,7 +276,7 @@ next gym's fit) — use it before a gym and when deciding what to catch or swap.
 **Party composition.** Aim for a full party of 6 with different types and strong evolution lines. Early placeholders
 (Weedle, Rattata, Pidgey…) are fine to start, but when you find a clearly better species — or a new type — catch it
 (when `grind()` or `go_to` hands you a worthwhile wild Pokémon, `catch()` it yourself) and swap the weakest member out with
-`pc_swap`. Don't run from a wild Pokémon you could use.
+`pc('swap')`. Don't run from a wild Pokémon you could use.
 
 **Tag-switch XP.** In any battle you can lead with a low-level Pokémon, then `switch_pokemon` to your strongest on
 the first turn: the weak one shares the XP and never takes a hit. Rotate which teammate leads, especially against

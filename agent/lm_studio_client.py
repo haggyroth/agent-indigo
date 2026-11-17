@@ -337,7 +337,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             setter(None)
 
     _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
-                                 "get_ss_ticket", "get_cut", "pc_deposit", "pc_withdraw", "pc_swap", "pick_up_items",
+                                 "quest", "pc", "pick_up_items",
                                  "use_hm", "teach_move", "load_state"})
 
     def _execute_inner(self, name: str, args_json: str) -> str:
@@ -369,29 +369,21 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             case "go_to":
                 return self._go_to_tool(args.get("destination", ""), bool(args.get("force", False)),
                                         bool(args.get("auto_trainers", False)))
-            case "get_ss_ticket":
-                return self._get_ss_ticket(bool(args.get("auto_trainers", False)))
+            case "quest":
+                return self._quest_tool(str(args.get("name", "") or ""), bool(args.get("auto_trainers", False)))
             case "inspect_pokemon":
                 return self._inspect_pokemon(str(args["pokemon"]))
             case "team_report":
                 from knowledge.team import team_report
                 return team_report(self.reader.read_party(), self.reader.read_boxes(),
                                    self.ltm.data.get("gyms_beaten", []))
-            case "pc_boxes":
-                return self._pc_boxes(bool(args.get("detail", False)))
-            case "pc_deposit":
-                return self._pc_deposit(str(args["pokemon"]), bool(args.get("force", False)))
-            case "pc_withdraw":
-                return self._pc_withdraw(str(args["pokemon"]))
-            case "pc_swap":
-                return self._pc_swap(str(args["party_pokemon"]), str(args["box_pokemon"]),
+            case "pc":
+                return self._pc_tool(str(args.get("action", "") or ""), str(args.get("pokemon", "") or ""),
+                                     str(args.get("box_pokemon", "") or ""), bool(args.get("detail", False)),
                                      bool(args.get("force", False)))
             case "reorder_party":
-                return self._reorder_party(str(args["first"]), str(args["second"]))
-            case "set_lead":
-                return self._set_lead(str(args["pokemon"]))
-            case "get_cut":
-                return self._get_cut(bool(args.get("auto_trainers", False)))
+                second = str(args.get("second", "") or "")
+                return (self._reorder_party(str(args["first"]), second) if second else self._set_lead(str(args["first"])))
             case "teach_move":
                 return self._teach_move(str(args["tm"]), str(args.get("pokemon", "") or ""),
                                         str(args.get("forget", "") or ""), bool(args.get("confirm", False)))

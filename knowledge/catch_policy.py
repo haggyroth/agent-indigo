@@ -59,12 +59,12 @@ def evaluate(party, species_id: int, level: int, max_team: int = 6, dex_owned: b
     weak = weakest_line(party)
     upgrade = bool(weak and line_best >= weak[0] + UPGRADE_MARGIN)
     if wanted and species_id in wanted and debt <= PREMIUM_DEBT:
-        tail = " — the party is full, so it goes to the PC box; pc_swap it in" if len(party) >= max_team else ""
+        tail = " — the party is full, so it goes to the PC box; pc('swap') it in" if len(party) >= max_team else ""
         return Verdict(True, f"fills a team gap: {wanted[species_id]}{tail}", debt)
     if len(party) >= max_team:
         if upgrade and debt <= PREMIUM_DEBT:
             return Verdict(True, f"a stronger line than your {weak[1]} (best form BST {line_best} vs {weak[0]}) "
-                                 "— the party is full, so it goes to the PC box; pc_swap it in", debt)
+                                 "— the party is full, so it goes to the PC box; pc('swap') it in", debt)
         if dex_owned is False:
             # Secondary objective: complete the Pokédex. A full party sends the catch to the PC box, where it
             # costs no levelling — worth a ball for the new entry.

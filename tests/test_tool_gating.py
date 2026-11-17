@@ -23,13 +23,13 @@ def test_a_battle_offers_only_battle_tools():
     n = names(GameContext.IN_BATTLE)
     assert n == set(BATTLE_TOOLS)
     assert {"use_move", "switch_pokemon", "catch", "flee_battle", "use_item"} <= n
-    assert not n & {"go_to", "walk_to", "heal", "grind", "pc_swap", "teach_move", "get_cut", "shop"}
+    assert not n & {"go_to", "walk_to", "heal", "grind", "pc", "teach_move", "quest", "shop"}
 
 
 def test_the_overworld_drops_battle_only_and_naming_tools_but_keeps_the_rest():
     n = names(GameContext.OVERWORLD)
     assert not n & {"use_move", "switch_pokemon", "catch", "flee_battle", "enter_name"}
-    assert {"go_to", "walk_to", "heal", "grind", "pc_swap", "use_item", "teach_move", "inspect_pokemon", "press_button",
+    assert {"go_to", "walk_to", "heal", "grind", "pc", "use_item", "teach_move", "inspect_pokemon", "press_button",
             "advance_dialog", "close_menus", "answer_prompt", "save_state", "load_state"} <= n
 
 

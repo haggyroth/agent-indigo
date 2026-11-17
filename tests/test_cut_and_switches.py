@@ -41,7 +41,7 @@ def test_get_cut_needs_the_ticket_and_is_idempotent():
     assert "already knows Cut" in c._get_cut()
     c = _client(read_party=lambda: [SimpleNamespace(move_ids=[33])], detect_context=lambda: None,
                 read_flag=lambda n: False, read_key_items=lambda: [])
-    assert "get_ss_ticket" in c._get_cut()
+    assert "quest('ss_ticket')" in c._get_cut()
 
 
 def test_unreadable_switch_vars_fall_back_to_a_message():
@@ -56,4 +56,4 @@ def test_locks_already_open_short_circuits():
 
 def test_cut_gate_hint_points_at_get_cut():
     from knowledge.gates import MAP_GATES
-    assert "get_cut()" in MAP_GATES[(9, 6)][0].hint
+    assert "quest('cut')" in MAP_GATES[(9, 6)][0].hint

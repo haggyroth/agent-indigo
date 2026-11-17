@@ -35,7 +35,7 @@ def resolve_boxed(who: str, boxes: list) -> tuple[dict | None, str]:
     if ":" in key and key.replace(":", "").replace(" ", "").isdigit():
         b, sl = (int(x) for x in key.split(":"))
         mon = next((m for m in boxes if m["box"] == b - 1 and m["slot"] == sl), None)
-        return (mon, "") if mon else (None, f"Nothing at {who!r} — box:slot is 1-based box, 0-based slot (see pc_boxes).")
+        return (mon, "") if mon else (None, f"Nothing at {who!r} — box:slot is 1-based box, 0-based slot (see pc('list')).")
     exact = [m for m in boxes if key in (m["nickname"].lower(), m["species_name"].lower())]
     cands = exact or [m for m in boxes if key and (key in m["nickname"].lower() or key in m["species_name"].lower())]
     if not cands:
@@ -194,7 +194,7 @@ class PCMixin:
             for m in by_box[b]:
                 lines.append(self._pc_detail_line(m))
         if not detail:
-            lines.append("(pc_boxes(detail=true) shows box:slot, types, moves and HM ability; pc_withdraw takes a name or 'box:slot'.)")
+            lines.append("(pc('list', detail=true) shows box:slot, types, moves and HM ability; pc('withdraw') takes a name or 'box:slot'.)")
         return "\n".join(lines)
 
     @staticmethod
@@ -235,9 +235,9 @@ class PCMixin:
 
     def _pc_deposit(self, who: str, force: bool = False) -> str:
         party = self.reader.read_party()
-        i = self._resolve_party_target(str(who), party)
+        i, err = self._pick_party(str(who), party)
         if i is None:
-            return f"Couldn't find {who!r} in your party: {', '.join(p.species_name for p in party)}."
+            return err
         name = party[i].nickname or party[i].species_name
         problem = self._deposit_problem(party, i, force)
         if problem:
@@ -274,7 +274,7 @@ class PCMixin:
         finally:
             self._pc_close()
         if len(self.reader.read_party()) != len(party) - 1:
-            return f"The deposit of {name} didn't go through (box {target + 1} had room) — try pc_deposit again."
+            return f"The deposit of {name} didn't go through (box {target + 1} had room) — try pc('deposit') again."
         where = f" into Box {target + 1}" + (" (the earlier boxes are full)" if target else "")
         from agent import events
         events.emit("pc", f"deposited {name}{where}")
@@ -284,10 +284,10 @@ class PCMixin:
         boxes = self.reader.read_boxes()
         pick, why = resolve_boxed(who, boxes)
         if pick is None:
-            return f"{why} {self._pc_boxes()}" if why.startswith(("No Pokémon", "Nothing")) else why
+            return f"{why} {self._pc_boxes}" if why.startswith(("No Pokémon", "Nothing")) else why
         party = self.reader.read_party()
         if len(party) >= 6:
-            return "Your party is full (6) — pc_deposit one first, or use pc_swap."
+            return "Your party is full (6) — pc('deposit') one first, or use pc('swap')."
         name = pick["nickname"] or pick["species_name"]
         err = self._open_pc(mode=0)
         if err:
@@ -306,10 +306,27 @@ class PCMixin:
         finally:
             self._pc_close()
         if len(self.reader.read_party()) != len(party) + 1:
-            return f"The withdrawal of {name} didn't go through — try pc_withdraw again."
+            return f"The withdrawal of {name} didn't go through — try pc('withdraw') again."
         from agent import events
         events.emit("pc", f"withdrew {name} (L{pick['level']}) from Box {pick['box'] + 1}")
         return f"Withdrew {name} (L{pick['level']}) from Box {pick['box'] + 1}. Party now: {self._party_names()}."
+
+    def _pc_tool(self, action: str, pokemon: str = "", box_pokemon: str = "", detail: bool = False, force: bool = False) -> str:
+        """pc(action, …) — the one front door over list / deposit / withdraw / swap."""
+        action = action.lower().strip()
+        if action == "list":
+            return self._pc_boxes(detail)
+        if action in ("deposit", "withdraw", "swap") and not pokemon:
+            return f"pc('{action}') needs `pokemon`" + (" and `box_pokemon`." if action == "swap" else ".")
+        if action == "deposit":
+            return self._pc_deposit(pokemon, force)
+        if action == "withdraw":
+            return self._pc_withdraw(pokemon)
+        if action == "swap":
+            if not box_pokemon:
+                return "pc('swap') needs `box_pokemon` too: the boxed Pokémon to bring out (species, nickname or 'box:slot')."
+            return self._pc_swap(pokemon, box_pokemon, force)
+        return "pc(action) is one of: list, deposit, withdraw, swap."
 
     def _pc_swap(self, party_mon: str, box_mon: str, force: bool = False) -> str:
         """Put a party member into the PC and take a boxed one out in its place. BOTH sides are resolved (and the
@@ -318,11 +335,11 @@ class PCMixin:
         boxes = self.reader.read_boxes()
         pick, why = resolve_boxed(box_mon, boxes)
         if pick is None:
-            return f"{why} Nothing was deposited." + (f" {self._pc_boxes()}" if why.startswith("No Pokémon") else "")
+            return f"{why} Nothing was deposited." + (f" {self._pc_boxes}" if why.startswith("No Pokémon") else "")
         party = self.reader.read_party()
-        i = self._resolve_party_target(str(party_mon), party)
+        i, err = self._pick_party(str(party_mon), party)
         if i is None:
-            return f"Couldn't find {party_mon!r} in your party: {', '.join(p.species_name for p in party)}. Nothing was deposited."
+            return f"{err} Nothing was deposited."
         problem = self._deposit_problem(party, i, force)
         if problem:
             return problem + " Nothing was deposited."
@@ -331,5 +348,5 @@ class PCMixin:
             return out
         res = self._pc_withdraw(f"{pick['box'] + 1}:{pick['slot']}")
         if not res.startswith("Withdrew"):
-            res += " (The deposit DID happen — your party is one short; call pc_withdraw to finish the swap.)"
+            res += " (The deposit DID happen — your party is one short; call pc('withdraw') to finish the swap.)"
         return out + " " + res

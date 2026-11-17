@@ -43,9 +43,9 @@ def test_ss_ticket_travel_hands_an_encounter_over_and_names_itself_as_the_resume
         return c._yield_encounter(dest, False, None, resume_call)
     c._go_to = go
     out = c._get_ss_ticket()
-    assert "wild RATTATA L7" in out and "get_ss_ticket()" in out and "go_to(" not in out
-    assert seen == {"dest": "Bill's Sea Cottage", "mode": "yield", "auto": False, "call": "get_ss_ticket()"}
-    assert c._trip["call"] == "get_ss_ticket()"
+    assert "wild RATTATA L7" in out and "quest('ss_ticket')" in out and "go_to(" not in out
+    assert seen == {"dest": "Bill's Sea Cottage", "mode": "yield", "auto": False, "call": "quest('ss_ticket')"}
+    assert c._trip["call"] == "quest('ss_ticket')"
 
 
 def test_auto_trainers_is_passed_through_to_the_trip():
@@ -66,9 +66,9 @@ def test_auto_trainers_is_passed_through_to_the_trip():
 
 
 def test_quest_battle_is_none_outside_a_battle_and_a_trainer_brief_inside_one():
-    assert client(World())._quest_battle("get_cut()", "the Captain") is None
-    out = client(World(ctx=GameContext.IN_BATTLE, trainer=True))._quest_battle("get_cut()", "the Captain")
-    assert "TRAINER" in out and "get_cut()" in out
+    assert client(World())._quest_battle("quest('cut')", "the Captain") is None
+    out = client(World(ctx=GameContext.IN_BATTLE, trainer=True))._quest_battle("quest('cut')", "the Captain")
+    assert "TRAINER" in out and "quest('cut')" in out
 
 
 def test_press_on_tile_clears_a_battle_as_plain_transport_and_hands_back_what_it_cannot():

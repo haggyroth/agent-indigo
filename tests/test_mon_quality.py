@@ -129,7 +129,7 @@ def test_a_clearly_better_boxed_specimen_is_offered_as_an_exact_swap():
     party = [mon(PIDGEY, (8, 5, 10, 6, 9, 7), moves=("Gust", "Tackle"), level=14)]
     boxes = [box(PIDGEY, (31, 28, 29, 30, 26, 27), 4, level=7), box(PIDGEY, (9, 6, 10, 7, 9, 8), 5)]
     out = upgrade_swaps(party, boxes)
-    assert len(out) == 1 and "pc_swap('Pidgey', '1:4')" in out[0] and "7 levels lower" in out[0]
+    assert len(out) == 1 and "pc(action='swap', pokemon='Pidgey', box_pokemon='1:4')" in out[0] and "7 levels lower" in out[0]
     assert upgrade_swaps(party, [box(PIDGEY, (9, 6, 10, 7, 9, 8), 5)]) == []              # not clearly better
     assert upgrade_swaps(party, [box(ID["Rattata"], (31,) * 6, 6)]) == []                 # another species is not a swap
 
@@ -176,4 +176,4 @@ def test_readiness_flags_a_better_specimen_in_the_pc_as_a_should_item():
     needs = readiness(party, 9, 9, 0, ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina", "Blaine", "Giovanni"],
                       boxes=boxes)
     up = [n for n in needs if n.code == "upgrade"]
-    assert len(up) == 1 and up[0].level == "should" and "pc_swap" in up[0].text
+    assert len(up) == 1 and up[0].level == "should" and "pc(action='swap'" in up[0].text

@@ -516,7 +516,7 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 _items = reader.read_items_pocket()
             except Exception:
                 _tms, _items = None, []
-            try:       # the PC contents only matter (and are only read) where the PC is: "you already own one — pc_swap it in"
+            try:       # the PC contents only matter (and are only read) where the PC is: "you already own one — pc('swap') it in"
                 _boxes = reader.read_boxes() if MAP_KIND.get((state.map_bank, state.map_id)) == "pokecenter" else None
             except Exception:
                 _boxes = None
@@ -712,8 +712,8 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
             except Exception:
                 stored = 0
             if stored:
-                obs_parts.append(f"PC: {stored} Pokémon stored in the boxes — pc_boxes(detail=true) to look, "
-                                 "pc_swap / pc_withdraw to bring one into the party.")
+                obs_parts.append(f"PC: {stored} Pokémon stored in the boxes — pc('list', detail=true) to look, "
+                                 "pc('swap') / pc('withdraw') to bring one into the party.")
     # Inside a gym: point the agent at the Leader — UNLESS this Leader is
     # already beaten, in which case say so and tell it to leave (the agent
     # looped in/out of Pewter Gym re-challenging Brock). go_to is useless

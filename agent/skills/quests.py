@@ -1,11 +1,11 @@
 """Story quests that gate progress and need a fixed interaction script.
 
-get_cut(): the S.S. Anne's Captain gives HM01 Cut. Vermilion's harbor lets you aboard with the SS Ticket;
+quest('cut'): the S.S. Anne's Captain gives HM01 Cut. Vermilion's harbor lets you aboard with the SS Ticket;
 the Captain's Office is on 2F (graph route Vermilion → Exterior → 1F → 2F → office). Talk to him (he is
 seasick; the game rubs his back for you), take HM01 (flag 0x237), then teach_move('HM01'). Cut trees
 that block the way (the Vermilion Gym door) are then cleared by go_to itself (see nav._go_to).
 
-get_ss_ticket(): Bill's Sea Cottage (Route 25). Until FLAG_GOT_SS_TICKET is set, Cerulean's south exit is
+quest('ss_ticket'): Bill's Sea Cottage (Route 25). Until FLAG_GOT_SS_TICKET is set, Cerulean's south exit is
 blocked by a Slowbro + Lass and its east exit by a policeman (decomp `CeruleanCity_EventScript_BlockExits`),
 so nothing past Cerulean — Vermilion, Cut, Surge — is reachable. The script, from the decomp scripts
 (Route25_SeaCottage/scripts.inc) and verified live:
@@ -44,6 +44,26 @@ class QuestMixin:
         trainer = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
         return self._yield_encounter(label, trainer, None, call)
 
+    def _quest_tool(self, name: str = "", auto_trainers: bool = False) -> str:
+        """quest(name?) — the registry front door (knowledge.quests): no name lists the quests and where you stand."""
+        from knowledge.quests import listing, resolve
+        done = set()
+        if self._has_ss_ticket():
+            done.add("ss_ticket")
+        if self._knows_cut():
+            done.add("cut")
+        if not str(name or "").strip():
+            return listing(done)
+        q = resolve(name)
+        if q is None:
+            return f"No quest called {name!r}. " + listing(done)
+        if q.key in done:
+            return f"{q.title}: already done."
+        missing = [n for n in q.needs if n not in done]
+        if missing:
+            return f"quest('{q.key}') needs quest('{missing[0]}') first."
+        return self._get_ss_ticket(auto_trainers) if q.key == "ss_ticket" else self._get_cut(auto_trainers)
+
     def _has_ss_ticket(self) -> bool:
         return (SS_TICKET_ITEM in self.reader.read_key_items()
                 or bool(self.reader.read_flag(FLAG_GOT_SS_TICKET)))
@@ -60,7 +80,7 @@ class QuestMixin:
             if self.reader.read_current_map() == COTTAGE:
                 break
             out = self._go_to("Bill's Sea Cottage", mode="yield", auto_trainers=auto_trainers,
-                              resume_call="get_ss_ticket()")
+                              resume_call="quest('ss_ticket')")
             if self.reader.read_current_map() == COTTAGE:
                 break
             if self.reader.detect_context() == GameContext.IN_BATTLE:
@@ -68,23 +88,23 @@ class QuestMixin:
             if "heal()" in out or "Lost a trainer" in out:
                 heal = self._heal()
                 if not heal.startswith(("Healed", "Party is already")):
-                    return f"Couldn't heal on the way to Bill's cottage ({heal}) — heal(), then get_ss_ticket() again."
+                    return f"Couldn't heal on the way to Bill's cottage ({heal}) — heal(), then quest('ss_ticket') again."
                 continue
             if "Blocked" in out or "gated" in out:
                 return f"Can't reach Bill's Sea Cottage: {out}"
         if self.reader.read_current_map() != COTTAGE:
-            return "Didn't reach Bill's Sea Cottage yet — call get_ss_ticket() again to continue (it resumes)."
+            return "Didn't reach Bill's Sea Cottage yet — call quest('ss_ticket') again to continue (it resumes)."
 
         # 2. Clefairy-Bill → teleporter. (Skipped on a re-run if he's already gone.)
         if self.reader.read_objects_by_gfx([CLEFAIRY_GFX]) and not self.reader.read_objects_by_gfx([BILL_GFX]):
             if not self._press_on_tile(*CLEFAIRY_SPOT, yesno=True):
-                if (b := self._quest_battle("get_ss_ticket()", "Bill's cottage")):
+                if (b := self._quest_battle("quest('ss_ticket')", "Bill's cottage")):
                     return b
                 return "Couldn't reach the Clefairy (Bill) in the cottage — walk_to (10,7), face up, press A, answer YES."
         # 3. The computer runs the cell separator; wait for human Bill to appear.
         if not self.reader.read_objects_by_gfx([BILL_GFX]):
             if not self._press_on_tile(*COMPUTER_SPOT):
-                if (b := self._quest_battle("get_ss_ticket()", "Bill's cottage")):
+                if (b := self._quest_battle("quest('ss_ticket')", "Bill's cottage")):
                     return b
                 return "Couldn't reach Bill's computer at (4,5) — walk_to (4,6), face up, press A."
             for _ in range(30):
@@ -93,20 +113,20 @@ class QuestMixin:
                 self._advance_to_control(tries=30)
         bill = self.reader.read_objects_by_gfx([BILL_GFX])
         if not bill:
-            return "Ran Bill's computer but he didn't appear — call get_ss_ticket() again."
+            return "Ran Bill's computer but he didn't appear — call quest('ss_ticket') again."
         # 4. Talk to Bill (stand below him), take the ticket.
         bx, by = bill[0]
         for stand, face in (((bx, by + 1), "Up"), ((bx - 1, by), "Right"), ((bx + 1, by), "Left")):
             if self._press_on_tile(stand, face):
                 break
-            if (b := self._quest_battle("get_ss_ticket()", "Bill's cottage")):
+            if (b := self._quest_battle("quest('ss_ticket')", "Bill's cottage")):
                 return b
         for _ in range(12):
             if self._has_ss_ticket():
                 break
             self._advance_to_control(tries=30)
         if not self._has_ss_ticket():
-            return "Talked to Bill but no ticket yet — call get_ss_ticket() again."
+            return "Talked to Bill but no ticket yet — call quest('ss_ticket') again."
         self._advance_to_control(tries=24)
         return ("Got the SS Ticket from Bill! Cerulean's south and east exits are open now — "
                 "go_to Vermilion City (heal first if hurt).")
@@ -122,12 +142,12 @@ class QuestMixin:
             return "You're in a battle — finish it first."
         if not self.reader.read_flag(FLAG_GOT_HM01):
             if not self._has_ss_ticket():
-                return "You need the SS Ticket to board the S.S. Anne — call get_ss_ticket() first."
+                return "You need the SS Ticket to board the S.S. Anne — call quest('ss_ticket') first."
             for _ in range(14):
                 if self.reader.read_current_map() == CAPTAIN_OFFICE:
                     break
                 out = self._go_to("S.S. Anne Captain's Office", mode="yield", auto_trainers=auto_trainers,
-                                  resume_call="get_cut()")
+                                  resume_call="quest('cut')")
                 if self.reader.read_current_map() == CAPTAIN_OFFICE:
                     break
                 if self.reader.detect_context() == GameContext.IN_BATTLE:
@@ -135,14 +155,14 @@ class QuestMixin:
                 if "heal()" in out or "Lost a trainer" in out:
                     heal = self._heal()
                     if not heal.startswith(("Healed", "Party is already")):
-                        return f"Couldn't heal on the way to the S.S. Anne ({heal}) — heal(), then get_cut() again."
+                        return f"Couldn't heal on the way to the S.S. Anne ({heal}) — heal(), then quest('cut') again."
                     continue
                 if "Can't get to" in out or "No route" in out:
                     return f"Can't reach the S.S. Anne's Captain: {out}"
             if self.reader.read_current_map() != CAPTAIN_OFFICE:
-                return "Didn't reach the Captain's Office yet — call get_cut() again to continue (it resumes)."
+                return "Didn't reach the Captain's Office yet — call quest('cut') again to continue (it resumes)."
             if not self._press_on_tile(*CAPTAIN_SPOT):
-                if (b := self._quest_battle("get_cut()", "the Captain")):
+                if (b := self._quest_battle("quest('cut')", "the Captain")):
                     return b
                 return "Couldn't reach the Captain — walk_to (5,5), face up, press A."
             for _ in range(12):
@@ -150,7 +170,7 @@ class QuestMixin:
                     break
                 self._advance_to_control(tries=30)
             if not self.reader.read_flag(FLAG_GOT_HM01):
-                return "Talked to the Captain but no HM01 yet — call get_cut() again."
+                return "Talked to the Captain but no HM01 yet — call quest('cut') again."
             self._advance_to_control(tries=24)
         out = self._teach_move("HM01", "", "")
         if not self._knows_cut():
