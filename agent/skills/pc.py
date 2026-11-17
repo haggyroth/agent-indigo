@@ -10,10 +10,41 @@ party panel = slot).
 from game.constants import Addr
 from game.state import GameContext
 
-STORAGE_CB2 = 0x0808CD99                 # gMain.callback2 while the storage screen is up
-AREA_ADDR, POS_ADDR = 0x02039820, 0x02039821
+STORAGE_CB2 = Addr.STORAGE_CB2           # gMain.callback2 while the storage screen is up
+AREA_ADDR, POS_ADDR = Addr.STORAGE_CURSOR_AREA, Addr.STORAGE_CURSOR_POS
 AREA_GRID, AREA_PARTY, AREA_TITLE, AREA_BUTTONS = 0, 1, 2, 3
-PC_TILE_BEHAVIOR = 0x83                  # MB_PC
+PC_TILE_BEHAVIOR = Addr.MB_PC
+BOX_SLOTS, BOX_COUNT = 30, 14
+
+
+def pick_deposit_box(counts: dict, current: int) -> int | None:
+    """The box a deposit should go to: the displayed one if it has room, else the next box (wrapping) with room,
+    or None when all 14 boxes are full. `counts` is {box: occupied slots}."""
+    for step in range(BOX_COUNT):
+        b = (current + step) % BOX_COUNT
+        if counts.get(b, 0) < BOX_SLOTS:
+            return b
+    return None
+
+
+def resolve_boxed(who: str, boxes: list) -> tuple[dict | None, str]:
+    """Match `who` against the boxed Pokémon: 'box:slot' (1-based box, e.g. '1:0'), else a nickname / species
+    (exact first, then partial). Returns (mon, '') or (None, why) — several matches are listed, never guessed
+    (the old pick-the-highest-level could grab the wrong Pokémon, or the one just deposited)."""
+    key = str(who).strip().lower()
+    if ":" in key and key.replace(":", "").replace(" ", "").isdigit():
+        b, sl = (int(x) for x in key.split(":"))
+        mon = next((m for m in boxes if m["box"] == b - 1 and m["slot"] == sl), None)
+        return (mon, "") if mon else (None, f"Nothing at {who!r} — box:slot is 1-based box, 0-based slot (see pc_boxes).")
+    exact = [m for m in boxes if key in (m["nickname"].lower(), m["species_name"].lower())]
+    cands = exact or [m for m in boxes if key and (key in m["nickname"].lower() or key in m["species_name"].lower())]
+    if not cands:
+        return None, f"No Pokémon matching {who!r} in the PC."
+    if len(cands) > 1:
+        lst = ", ".join(f"{m['box'] + 1}:{m['slot']} {m['nickname'] or m['species_name']} ({m['species_name']} L{m['level']})"
+                        for m in sorted(cands, key=lambda m: (-m["level"], m["box"], m["slot"]))[:8])
+        return None, f"{len(cands)} Pokémon match {who!r}: {lst}. Call again with the 'box:slot' of the one you want."
+    return cands[0], ""
 
 
 class PCMixin:
@@ -25,7 +56,8 @@ class PCMixin:
     # ── driving ──────────────────────────────────────────────────────────────
     def _pc_tile(self):
         self.tilemap.refresh()
-        w, h = 40, 40
+        w = getattr(self.tilemap, "_width", 0) or 40
+        h = getattr(self.tilemap, "_height", 0) or 40
         for y in range(h):
             for x in range(w):
                 if self.tilemap.metatile_behavior(x, y) == PC_TILE_BEHAVIOR:
@@ -145,31 +177,82 @@ class PCMixin:
         return self.reader.read_current_box() == box
 
     # ── the skills ───────────────────────────────────────────────────────────────────
-    def _pc_boxes(self) -> str:
+    def _pc_boxes(self, detail: bool = False) -> str:
+        """The stored Pokémon. Compact by default (per box: count and names with level); `detail` adds the
+        'box:slot' reference, types, moves and which HMs they could learn. Boxed Pokémon keep no HP — they are as
+        they were when stored, and a Pokémon Center heals them only once they are in the party."""
         boxes = self.reader.read_boxes()
         if not boxes:
             return "Your PC boxes are empty."
         by_box: dict = {}
         for m in boxes:
             by_box.setdefault(m["box"], []).append(m)
-        lines = []
+        cur = getattr(self.reader, "read_current_box", lambda: None)()
+        lines = [f"{len(boxes)} Pokémon stored" + (f" (current box: {cur + 1})." if cur is not None else ".")]
         for b in sorted(by_box):
-            items = ", ".join(f"[{m['slot']}] {m['nickname'] or m['species_name']} ({m['species_name']} L{m['level']})"
-                              for m in by_box[b])
-            lines.append(f"Box {b + 1}: {items}")
+            if not detail:
+                items = ", ".join(f"{m['nickname'] or m['species_name']} ({m['species_name']} L{m['level']})"
+                                  if m['nickname'] else f"{m['species_name']} L{m['level']}" for m in by_box[b])
+                lines.append(f"Box {b + 1} ({len(by_box[b])}/{BOX_SLOTS}): {items}")
+                continue
+            lines.append(f"Box {b + 1} ({len(by_box[b])}/{BOX_SLOTS}):")
+            for m in by_box[b]:
+                lines.append(self._pc_detail_line(m))
+        if not detail:
+            lines.append("(pc_boxes(detail=true) shows box:slot, types, moves and HM ability; pc_withdraw takes a name or 'box:slot'.)")
         return "\n".join(lines)
 
-    def _pc_deposit(self, who: str) -> str:
-        party = self.reader.read_party()
-        i = self._resolve_party_target(str(who), party)
-        if i is None:
-            return f"Couldn't find {who!r} in your party: {', '.join(p.species_name for p in party)}."
+    @staticmethod
+    def _pc_detail_line(m: dict) -> str:
+        from knowledge.leafgreen_data import POKEMON_TYPES
+        from knowledge.tmhm import HM_MOVES, ITEM_HM01
+        from knowledge.tmhm_learnsets import can_learn
+        name = m["nickname"] or m["species_name"]
+        types = "/".join(POKEMON_TYPES.get(m["species_name"].upper(), ())) or "?"
+        hms = []
+        for hm in ("Cut", "Surf", "Strength", "Flash", "Fly"):
+            if can_learn(m["species_id"], ITEM_HM01 + HM_MOVES.index(hm)):
+                hms.append(hm)
+        moves = ", ".join(m["move_names"]) or "no moves"
+        return (f"  {m['box'] + 1}:{m['slot']} {name} ({m['species_name']} L{m['level']}, {types}) — {moves}"
+                + (f" — can learn {'/'.join(hms)}" if hms else ""))
+
+    # ── guards ───────────────────────────────────────────────────────────────────
+    def _deposit_problem(self, party, i: int, force: bool = False) -> str | None:
+        """Why party member `i` must not go into the PC right now, or None."""
+        from knowledge.tmhm import HM_MOVE_NAMES
         mon = party[i]
         name = mon.nickname or mon.species_name
         if len(party) < 2:
             return "That's your only Pokémon — the PC won't take your last one."
         if not any(j != i and p.current_hp > 0 for j, p in enumerate(party)):
             return f"{name} is your only Pokémon able to battle — the PC refuses to take it. Heal the others first."
+        if not force:
+            others = {m for j, p in enumerate(party) if j != i for m in (p.move_names or [])}
+            unique = sorted(m for m in (mon.move_names or []) if m in HM_MOVE_NAMES and m not in others)
+            if unique:
+                return (f"{name} is your only Pokémon that knows {'/'.join(unique)} (an HM move you need for the "
+                        "story). Teach it to someone else first, or pass force=true to deposit it anyway.")
+        return None
+
+    def _pc_deposit(self, who: str, force: bool = False) -> str:
+        party = self.reader.read_party()
+        i = self._resolve_party_target(str(who), party)
+        if i is None:
+            return f"Couldn't find {who!r} in your party: {', '.join(p.species_name for p in party)}."
+        name = party[i].nickname or party[i].species_name
+        problem = self._deposit_problem(party, i, force)
+        if problem:
+            return problem
+        # "Deposit in which BOX?" always opens on Box 1 (the decomp resets sDepositBoxId to 0 every time the storage
+        # screen starts) and the game REFUSES a full box ("BOX is full") instead of moving on. So pick the first
+        # box with room from the stored counts and steer the chooser there with Left/Right before confirming.
+        counts: dict = {}
+        for m in self.reader.read_boxes():
+            counts[m["box"]] = counts.get(m["box"], 0) + 1
+        target = pick_deposit_box(counts, 0)
+        if target is None:
+            return f"All {BOX_COUNT} PC boxes are full ({BOX_COUNT * BOX_SLOTS} Pokémon) — release some before depositing."
         err = self._open_pc(mode=1)
         if err:
             return err
@@ -181,8 +264,11 @@ class PCMixin:
             if self._storage_cursor() != (AREA_PARTY, i):
                 return "Couldn't place the cursor on that party member."
             self._press("A", 70)                              # context menu: STORE first
-            self._press("A", 100)                             # → "Deposit in which BOX?"
-            self._press("A", 130)                             # confirm the current box
+            self._press("A", 100)                             # → "Deposit in which BOX?" (starts on Box 1)
+            back = target > BOX_COUNT // 2
+            for _ in range(BOX_COUNT - target if back else target):
+                self._press("Left" if back else "Right", 40)
+            self._press("A", 130)                             # confirm the chosen (non-full) box
             for _ in range(12):
                 if len(self.reader.read_party()) == len(party) - 1:
                     break
@@ -190,22 +276,15 @@ class PCMixin:
         finally:
             self._pc_close()
         if len(self.reader.read_party()) != len(party) - 1:
-            return f"The deposit of {name} didn't go through — try pc_deposit again."
-        return f"Deposited {name} into the PC. Party now: {self._party_names()}."
+            return f"The deposit of {name} didn't go through (box {target + 1} had room) — try pc_deposit again."
+        where = f" into Box {target + 1}" + (" (the earlier boxes are full)" if target else "")
+        return f"Deposited {name}{where}. Party now: {self._party_names()}."
 
     def _pc_withdraw(self, who: str) -> str:
         boxes = self.reader.read_boxes()
-        key = str(who).strip().lower()
-        pick = None
-        if ":" in key and key.replace(":", "").replace(" ", "").isdigit():
-            b, sl = (int(x) for x in key.split(":"))
-            pick = next((m for m in boxes if m["box"] == b - 1 and m["slot"] == sl), None)
-        else:
-            cands = [m for m in boxes if key in (m["nickname"].lower(), m["species_name"].lower())] or \
-                    [m for m in boxes if key and (key in m["nickname"].lower() or key in m["species_name"].lower())]
-            pick = max(cands, key=lambda m: m["level"], default=None)
+        pick, why = resolve_boxed(who, boxes)
         if pick is None:
-            return f"No Pokémon matching {who!r} in the PC. {self._pc_boxes()}"
+            return f"{why} {self._pc_boxes()}" if why.startswith(("No Pokémon", "Nothing")) else why
         party = self.reader.read_party()
         if len(party) >= 6:
             return "Your party is full (6) — pc_deposit one first, or use pc_swap."
@@ -230,17 +309,25 @@ class PCMixin:
             return f"The withdrawal of {name} didn't go through — try pc_withdraw again."
         return f"Withdrew {name} (L{pick['level']}) from Box {pick['box'] + 1}. Party now: {self._party_names()}."
 
-    def _pc_swap(self, party_mon: str, box_mon: str) -> str:
-        """Put a party member into the PC and take a boxed one out in its place. The boxed Pokémon is validated
-        first so a typo can't leave the party short a member."""
-        key = str(box_mon).strip().lower()
-        known = self.reader.read_boxes()
-        if not any(key in (m["nickname"].lower(), m["species_name"].lower())
-                   or key in m["nickname"].lower() or key in m["species_name"].lower()
-                   or key == f"{m['box'] + 1}:{m['slot']}" for m in known):
-            return f"No Pokémon matching {box_mon!r} in the PC, so nothing was deposited. {self._pc_boxes()}"
-        out = self._pc_deposit(party_mon)
+    def _pc_swap(self, party_mon: str, box_mon: str, force: bool = False) -> str:
+        """Put a party member into the PC and take a boxed one out in its place. BOTH sides are resolved (and the
+        deposit vetted) before anything is touched, and the withdrawal goes by the boxed Pokémon's exact
+        box:slot — a name could match the Pokémon that was just deposited."""
+        boxes = self.reader.read_boxes()
+        pick, why = resolve_boxed(box_mon, boxes)
+        if pick is None:
+            return f"{why} Nothing was deposited." + (f" {self._pc_boxes()}" if why.startswith("No Pokémon") else "")
+        party = self.reader.read_party()
+        i = self._resolve_party_target(str(party_mon), party)
+        if i is None:
+            return f"Couldn't find {party_mon!r} in your party: {', '.join(p.species_name for p in party)}. Nothing was deposited."
+        problem = self._deposit_problem(party, i, force)
+        if problem:
+            return problem + " Nothing was deposited."
+        out = self._pc_deposit(str(i + 1), force)
         if not out.startswith("Deposited"):
             return out
-        res = self._pc_withdraw(box_mon)
+        res = self._pc_withdraw(f"{pick['box'] + 1}:{pick['slot']}")
+        if not res.startswith("Withdrew"):
+            res += " (The deposit DID happen — your party is one short; call pc_withdraw to finish the swap.)"
         return out + " " + res

@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — PC driver (#206)
+- **Full-box deposits.** The game's "Deposit in which BOX?" chooser always starts on Box 1 (the decomp resets
+  `sDepositBoxId` each time the storage screen opens) and refuses a full box instead of moving on, so a 30/30 Box 1 made
+  every `pc_deposit` fail with a vague retry message. The deposit now picks the first box with room from the stored
+  counts and steers the chooser there with Left/Right (`pick_deposit_box`); "all 14 boxes are full" is reported plainly.
+- **No more guessing.** `pc_swap` resolves both sides and vets the deposit before touching anything, and withdraws the
+  boxed Pokémon by its exact `box:slot` (a name could match the Pokémon that was just deposited). A name matching several
+  boxed Pokémon returns the list ("2 Pokémon match 'pidgey': 2:11 Pidgey (L14), 1:4 Pidgey (L8) — use box:slot")
+  instead of grabbing the highest level. If the withdrawal fails after the deposit it says the party is one short.
+- **HM guard.** `pc_deposit` / `pc_swap` refuse to store the only Pokémon that knows an HM move unless `force=true`.
+- **The model can see the boxes.** `pc_boxes` is compact by default (per box count, names, levels);
+  `pc_boxes(detail=true)` adds box:slot, types, moves and which HMs each could learn. A Pokémon Center observation line
+  says how many Pokémon are stored. `read_boxes` reads one memory block per box (14 reads instead of 420).
+- PC screen addresses moved into `game.constants.Addr` (`STORAGE_CB2`, `STORAGE_CURSOR_AREA/POS`, `MB_PC`).
+
 ### Changed — moves are ranked by what they actually do (#204)
 - `tools/gen_move_effects.py` → `knowledge/move_effects.py`: every move's decomp `effect`, accuracy, priority, secondary
   chance and target. `knowledge/move_semantics.py` turns that into `move_score` (expected damage per turn), `role_tag`

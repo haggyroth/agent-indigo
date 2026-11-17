@@ -205,32 +205,41 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "pc_boxes",
-        "description": "List every Pokémon stored in the PC boxes (box, slot, nickname, species, level). Reads memory — "
-                       "no menu needed, works anywhere. Use it to decide who to withdraw.",
-        "parameters": {"type": "object", "properties": {}},
+        "description": "List the Pokémon stored in the PC boxes (per box: names and levels). Reads memory — no menu "
+                       "needed, works anywhere. detail=true adds each one's box:slot, types, moves and which HMs it "
+                       "could learn — use it to pick who to withdraw (e.g. a Surf or Fly carrier, a type counter). "
+                       "Boxed Pokémon keep no HP.",
+        "parameters": {"type": "object", "properties": {
+            "detail": {"type": "boolean", "description": "include box:slot, types, moves, HM ability"}}},
     }},
     {"type": "function", "function": {
         "name": "pc_deposit",
         "description": "Store a party Pokémon in the PC (drives Pokémon Center PC → SOMEONE'S PC → DEPOSIT for you; "
                        "travels to a Center if needed). `pokemon` is a 1-based slot or species/nickname. Can't deposit "
-                       "your last battle-ready Pokémon.",
+                       "your last battle-ready Pokémon, and won't send away the only one that knows an HM move unless "
+                       "force=true. Goes into the first box with room (the displayed box if it isn't full).",
         "parameters": {"type": "object", "properties": {
-            "pokemon": {"type": "string", "description": "party slot number or name"}}, "required": ["pokemon"]},
+            "pokemon": {"type": "string", "description": "party slot number or name"},
+            "force": {"type": "boolean", "description": "deposit even if it is the only HM-move carrier"}},
+            "required": ["pokemon"]},
     }},
     {"type": "function", "function": {
         "name": "pc_withdraw",
         "description": "Take a Pokémon out of the PC into your party (needs a free slot; drives the PC menus, switches "
-                       "boxes). `pokemon` is a species/nickname, or 'box:slot' like '1:0' (see pc_boxes).",
+                       "boxes). `pokemon` is a species/nickname, or 'box:slot' like '1:0' (see pc_boxes). If several "
+                       "Pokémon match a name you get the list back — pick one by its 'box:slot'.",
         "parameters": {"type": "object", "properties": {
             "pokemon": {"type": "string", "description": "species, nickname or 'box:slot'"}}, "required": ["pokemon"]},
     }},
     {"type": "function", "function": {
         "name": "pc_swap",
         "description": "Swap a party member for a boxed Pokémon in one go: deposit `party_pokemon`, then withdraw "
-                       "`box_pokemon`. Use it to rebuild the team (e.g. bring in a Fire type, send a weak one to the PC).",
+                       "`box_pokemon` (both are checked first; a name matching several boxed Pokémon returns the list — use "
+                       "'box:slot'). Use it to rebuild the team (e.g. bring in a Fire type, send a weak one to the PC).",
         "parameters": {"type": "object", "properties": {
             "party_pokemon": {"type": "string", "description": "party slot number or name to send to the PC"},
-            "box_pokemon": {"type": "string", "description": "boxed species, nickname or 'box:slot' to bring out"}},
+            "box_pokemon": {"type": "string", "description": "boxed species, nickname or 'box:slot' to bring out"},
+            "force": {"type": "boolean", "description": "deposit even if it is the only HM-move carrier"}},
             "required": ["party_pokemon", "box_pokemon"]},
     }},
     {"type": "function", "function": {

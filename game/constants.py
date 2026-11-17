@@ -260,6 +260,13 @@ class Addr:
     FLYMAP_CURSOR_Y    = 0x0202063C     # low 8 bits (attr0)
     VARS_OFFSET        = 0x1000         # + [SAVEBLOCK1_PTR]; var n (≥0x4000) = u16 at index n-0x4000
     POKEMON_STORAGE_PTR = 0x03005010    # gPokemonStoragePtr -> PokemonStorage (currentBox u8; boxes[14][30] x 80 bytes)
+    # PC storage screen (live-found, this ROM). gMain.callback2 while the screen is up; the cursor lives in
+    # two bytes: area (0 box grid, 1 party panel, 2 box title, 3 top buttons) and position (grid 0-29 = col + 6·row,
+    # buttons 0 = PARTY POKéMON / 1 = CLOSE BOX, party panel = slot).
+    STORAGE_CB2        = 0x0808CD99
+    STORAGE_CURSOR_AREA = 0x02039820
+    STORAGE_CURSOR_POS = 0x02039821
+    MB_PC              = 0x83           # metatile behavior of the Pokémon Center PC tile
     SAVEBLOCK2_PTR     = 0x0300500C     # gSaveBlock2Ptr (pokedex lives at +0x18)
     DEX_OWNED_OFFSET   = 0x28           # SaveBlock2 + 0x18 + 0x10 : u8 owned[52]
     DEX_SEEN_OFFSET    = 0x5C           # SaveBlock2 + 0x18 + 0x44 : u8 seen[52]
