@@ -26,10 +26,16 @@ def test_stab_breaks_tie_toward_same_type():
 
 def test_strong_neutral_beats_weak_super_effective():
     # Powder Snow (Ice, 40) is 2x on Pidgey (Normal/Flying) -> ~80 expected.
-    # Return (Normal, 102) is neutral -> 102. Power-aware ranking picks Return.
-    out = battle_summary(["Powder Snow", "Return"], "PIDGEY", 1.0, pp_list=[25, 20])
-    assert "Best move: Return" in out
+    # Body Slam (Normal, 85, neutral) -> 85. Power-aware ranking picks Body Slam.
+    out = battle_summary(["Powder Snow", "Body Slam"], "PIDGEY", 1.0, pp_list=[25, 15])
+    assert "Best move: Body Slam" in out
     assert "no super effective option" in out
+
+
+def test_return_is_weak_for_a_freshly_caught_pokemon():
+    # Return's power is friendship-based (~28 at the default 70): it no longer outranks a 2x Powder Snow (#204).
+    out = battle_summary(["Powder Snow", "Return"], "PIDGEY", 1.0, pp_list=[25, 20])
+    assert "Best move: Powder Snow" in out
 
 
 def test_strong_super_effective_still_wins():

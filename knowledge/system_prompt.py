@@ -276,6 +276,12 @@ trainers (1.5× XP).
 - **Never Self-Destruct / Explosion** while any other attack can hurt the foe: they faint YOUR Pokémon (no XP,
   it needs reviving). `use_move` refuses them in that case; only a last resort when nothing else can hurt the foe.
 - Rotate moves: don't default to slot 1. Pick by type matchup and PP (the "Best move" line does this).
+- **Read the tag after each move in "Your moves"** — it says what the move is FOR and when it FAILS: Dream Eater only
+  works on a sleeping foe; one-hit-KO moves (Fissure, Guillotine…) are unreliable; Hyper Beam costs a recharge turn;
+  Focus Punch fails if you're hit; Counter/Mirror Coat only work after being hit; Protect/Detect fail if used twice in
+  a row; Roar/Whirlwind/Teleport END a wild battle (never use them when you want the catch); Mean Look traps a wild
+  Pokémon so it can't run (use it first, then False Swipe / sleep / paralysis, then throw balls). "Best move" already
+  accounts for accuracy and these cases.
 - After a KO the win text / the trainer's next Pokémon play out: `advance_dialog()` carries you to
   your next decision. Never mash `press_button` in a battle.
 

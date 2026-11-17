@@ -45,7 +45,7 @@ class ScriptedPolicy:
         trainer = bool(self.m.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
         _ids, names, pp, _d, _t = self.c._active_moves_view()
         atk, dfn = self.c._battle_types()
-        mv = self.c._best_damaging_move(names, pp, atk, dfn)
+        mv = self.c._best_damaging_move(names, pp, atk, dfn, self.c._battle_ctx())
         if mv:
             return "use_move", {"move": mv}
         if not any(n and q > 0 for n, q in zip(names, pp)):

@@ -40,9 +40,10 @@ def test_best_move_none_when_all_out_of_pp():
 
 
 def test_best_move_is_type_aware():
-    # Vine Whip and Tackle tie on power; vs Rock/Ground (Geodude) Vine Whip is 4x.
+    # Vine Whip and Tackle tie on power (Tackle is 95% accurate, so type-blind Vine Whip edges it); vs
+    # Rock/Ground (Geodude) Vine Whip is 4x.
     mon = _mon(["Tackle", "Growl", "Leech Seed", "Vine Whip"], [35, 40, 10, 10])
-    assert AgentClient._best_damaging_move(*mon) == "Tackle"          # type-blind tie → first
+    assert AgentClient._best_damaging_move(*mon) == "Vine Whip"       # accuracy breaks the power tie
     assert AgentClient._best_damaging_move(*mon, ("GRS", "POI"), ("ROC", "GRD")) == "Vine Whip"
 
 

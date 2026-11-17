@@ -508,7 +508,7 @@ class OverworldMixin:
                 continue
             _ids, names, pp, _d, _t = self._active_moves_view()
             atk, dfn = self._battle_types()
-            mv = self._best_damaging_move(names, pp, atk, dfn)
+            mv = self._best_damaging_move(names, pp, atk, dfn, self._battle_ctx())
             if mv:
                 self._use_move(mv)
             else:
