@@ -3,7 +3,6 @@ import io
 from types import SimpleNamespace as NS
 
 import pytest
-from rich.console import Console
 
 from agent import events
 from game.constants import Addr
@@ -122,6 +121,8 @@ def test_observe_never_raises_and_tolerates_no_reader():
 
 
 def test_verbosity_levels_and_escaping():
+    pytest.importorskip("rich")
+    from rich.console import Console
     buf = io.StringIO()
     con = Console(file=buf, force_terminal=False, width=200)
     events.configure(con, None, "quiet")
