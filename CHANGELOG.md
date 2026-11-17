@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — the model is only offered the tools that fit the screen (#213)
+- **Context-gated tool lists** (`agent.tools.tools_for`, re-read every tool round so a `go_to` that turns into a battle switches
+  lists mid-step): a **battle** gets 11 tools (the battle skills, `use_item`, `inspect_pokemon`, `team_report`, and the button /
+  dialog / prompt escape hatches) ≈ 1.2k tokens; the **free overworld** drops the battle-only and naming-screen tools ≈ 3.9k tokens;
+  **every other context** (menus, dialog, transitions, unknown, or an unreadable screen) is offered everything. Down from ≈ 5.6k tokens
+  of schema on every call. The list is stable within a context, so a provider's prompt cache survives a whole fight or walk. In battle
+  `use_item` carries a battle-specific description (the field version lists stones / Rare Candy).
+- **Descriptions trimmed** for the 22 longest tools (guidance that lives in the system prompt or the situational observation lines was
+  repeated in every schema); a test caps any description at 650 characters and the per-context token budgets.
+- **CLAUDE.md's tool list is generated** (`tools/gen_tool_docs.py` → a table between markers: tool, where it is offered, arguments, what it
+  does) and a test fails if it goes stale — the old hand-written list was missing ~25 shipped tools (part of #211).
+- Consistency test: every schema has a dispatcher case. Unchanged on purpose (still on #213): merging `set_lead` / `reorder_party` and the
+  `pc_*` tools into one each, a `quest(name)` registry replacing `get_ss_ticket` / `get_cut`, and one shared party/box target resolver —
+  they rename tools the prompt, the scripted policy and the logs all mention, so they deserve their own PR once gating has been watched.
+
 ### Removed — dead code from the pre-Nov-13 audit (#214)
 - **Deleted, no remaining use:** `tools/diagnostic.py` and `tools/diagnostic_tilemap.py` (≈650 lines, HTTP-backend-only, built on
   addresses the code no longer trusts); dead methods in the move-learn, PC, overworld and quest skills (`_accept_forget_slot0`,

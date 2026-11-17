@@ -63,6 +63,8 @@ section — don't repeat the thing you just finished.
 {route}
 {building_block}
 ## Movement Rules — use the navigation tools, not tile-by-tile presses
+(You are only offered the tools that fit the screen: battle tools in a battle, travel / chore / party tools on the overworld.
+If a tool you used a moment ago is missing, the screen changed — read the observation.)
 - **`go_to("<place>")` is your main travel tool.** It auto-routes across maps
   (connections + building/cave doors) to a town/route by name ("Pewter City",
   "Route 2") OR a waypoint ("Pokemon Center", "Mart", "Gym"). It walks until something

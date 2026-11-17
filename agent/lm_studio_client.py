@@ -4,7 +4,7 @@ import re
 import time
 from pathlib import Path
 from openai import OpenAI
-from agent.tools import TOOLS, normalize_button
+from agent.tools import tools_for, normalize_button
 from agent.history import trim_messages, strip_control_tokens
 from game.memory_reader import LeafGreenReader
 from game.mgba_client import MGBAClient
@@ -201,7 +201,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             try:
                 resp = self.llm.chat.completions.create(
                     model=MODEL_NAME, messages=self.messages,
-                    tools=TOOLS, tool_choice="auto",
+                    tools=tools_for(self._tool_context()), tool_choice="auto",
                     temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
                     timeout=LLM_TIMEOUT or None,   # bound a single call (see config)
                 )
@@ -269,6 +269,14 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                     actions.append(tc.function.name)
 
         return last_reasoning, actions
+
+    def _tool_context(self):
+        """The screen the tool list is gated on (re-read every round: a go_to can turn into a battle mid-step). Any
+        failure to read it means 'offer everything'."""
+        try:
+            return self.reader.detect_context()
+        except Exception:
+            return None
 
     def _log_tool(self, name: str, args_json: str, result, secs: float) -> None:
         """Run-log one tool execution with a cheap post-call state snapshot."""
