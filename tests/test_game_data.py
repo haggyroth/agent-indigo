@@ -47,5 +47,30 @@ def test_elite_four_ace_levels_match_decomp(trainer, species, party_fn):
     txt = (DECOMP / "src/data/trainer_parties.h").read_text()
     body = re.search(rf"{party_fn}\[\] = \{{(.*?)\n\}};", txt, re.S).group(1)
     levels = [int(l) for l, s in re.findall(r"\.lvl = (\d+),\s*\.species = SPECIES_(\w+)", body) if s == species]
-    claimed = int(re.search(r"L(\d+)", next(e for e in ELITE_FOUR if e["trainer"] == trainer)["key_threat"]).group(1))
-    assert claimed == max(levels)
+    from knowledge.gym_advice import ace_levels
+    assert ace_levels()[trainer] == max(levels)
+
+
+# ── advice text is generated from the decomp parties (#211) ─────────────────────────────────────────
+def test_briefs_are_built_from_the_generated_parties():
+    from knowledge.gym_advice import ace, brief, weak_to
+    assert ace("Koga") == ("Weezing", 43) and ace("Lance") == ("Dragonite", 60)
+    b = brief("Koga")
+    assert "Weezing L43" in b and "Ground" in b and "Self-Destruct" in b
+    assert any(t == "ICE" for t, _n, _m in weak_to("Lance"))
+    assert "Blastoise" in brief("Gary")
+
+
+def test_navigation_prose_never_contradicts_the_generated_levels():
+    """Any 'Species L<n>' in the hand-written navigation text must be a level the decomp gives that species."""
+    from game.constants import SPECIES_NAMES
+    from knowledge import navigation
+    from knowledge.gym_teams import TRAINER_TEAMS
+    by_name = {}
+    for team in TRAINER_TEAMS.values():
+        for sid, lvl, _m in team:
+            by_name.setdefault(SPECIES_NAMES[sid], set()).add(lvl)
+    text = " ".join(str(v) for v in vars(navigation).values() if isinstance(v, (str, list, dict, tuple)))
+    for name, lvl in re.findall(r"([A-Z][a-z]+) L(\d+)", text):
+        if name in by_name:
+            assert int(lvl) in by_name[name], f"navigation says {name} L{lvl}; the decomp has {sorted(by_name[name])}"

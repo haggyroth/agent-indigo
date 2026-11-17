@@ -73,4 +73,28 @@ TRAINER_TEAMS: dict[str, list[tuple[int, int, tuple[str, ...]]]] = {
         (142, 58, ('Hyper Beam', 'Ancient Power', 'Wing Attack', 'Scary Face')),
         (149, 60, ('Hyper Beam', 'Safeguard', 'Outrage', 'Wing Attack')),
     ],
+    'Gary (Squirtle)': [
+        (18, 59, ('Aerial Ace', 'Feather Dance', 'Sand Attack', 'Whirlwind')),
+        (65, 57, ('Psychic', 'Future Sight', 'Recover', 'Reflect')),
+        (112, 59, ('Take Down', 'Earthquake', 'Rock Tomb', 'Scary Face')),
+        (59, 59, ('Extreme Speed', 'Flamethrower', 'Roar', 'Bite')),
+        (103, 61, ('Giga Drain', 'Egg Bomb', 'Sleep Powder', 'Light Screen')),
+        (9, 63, ('Hydro Pump', 'Rain Dance', 'Skull Bash', 'Bite')),
+    ],
+    'Gary (Bulbasaur)': [
+        (18, 59, ('Aerial Ace', 'Feather Dance', 'Sand Attack', 'Whirlwind')),
+        (65, 57, ('Psychic', 'Future Sight', 'Recover', 'Reflect')),
+        (112, 59, ('Take Down', 'Earthquake', 'Rock Tomb', 'Scary Face')),
+        (130, 59, ('Hydro Pump', 'Dragon Rage', 'Bite', 'Thrash')),
+        (59, 61, ('Extreme Speed', 'Flamethrower', 'Roar', 'Bite')),
+        (3, 63, ('Solar Beam', 'Synthesis', 'Sunny Day', 'Growth')),
+    ],
+    'Gary (Charmander)': [
+        (18, 59, ('Aerial Ace', 'Feather Dance', 'Sand Attack', 'Whirlwind')),
+        (65, 57, ('Psychic', 'Future Sight', 'Recover', 'Reflect')),
+        (112, 59, ('Take Down', 'Earthquake', 'Rock Tomb', 'Scary Face')),
+        (103, 59, ('Giga Drain', 'Egg Bomb', 'Sleep Powder', 'Light Screen')),
+        (130, 61, ('Hydro Pump', 'Dragon Rage', 'Bite', 'Thrash')),
+        (6, 63, ('Fire Blast', 'Aerial Ace', 'Slash', 'Fire Spin')),
+    ],
 }

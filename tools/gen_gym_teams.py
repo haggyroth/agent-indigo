@@ -17,7 +17,10 @@ from game.constants import MOVE_NAMES   # noqa: E402
 PARTIES = {"Brock": "LeaderBrock", "Misty": "LeaderMisty", "Lt. Surge": "LeaderLtSurge", "Erika": "LeaderErika",
            "Koga": "LeaderKoga", "Sabrina": "LeaderSabrina", "Blaine": "LeaderBlaine", "Giovanni": "LeaderGiovanni",
            "Lorelei": "EliteFourLorelei", "Bruno": "EliteFourBruno", "Agatha": "EliteFourAgatha",
-           "Lance": "EliteFourLance"}
+           "Lance": "EliteFourLance",
+           # The Champion carries the starter that beats yours: "Gary (Squirtle)" is the team you meet if you picked Charmander.
+           "Gary (Squirtle)": "ChampionFirstSquirtle", "Gary (Bulbasaur)": "ChampionFirstBulbasaur",
+           "Gary (Charmander)": "ChampionFirstCharmander"}
 
 
 def main():
