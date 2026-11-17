@@ -548,48 +548,6 @@ class OverworldMixin:
             return "Healed, but no tall grass is reachable from here — go_to a grassy route, then grind() again."
         return None
 
-    def _grind_try_catch(self) -> str | None:
-        """Inside a grind/train loop: if this WILD foe is worth a ball (knowledge.catch_policy), weaken it
-        gently (never the killing blow: below ~60% HP use the weakest attack, stop at ~35%), then throw
-        balls with an autopilot nickname. Returns a note when it caught something, else None (the caller
-        then just fights the battle normally)."""
-        from game.state import GameContext
-        from knowledge.catch_policy import evaluate
-        from knowledge.leafgreen_data import MOVE_POWER
-        from knowledge.nicknames import auto_name
-        party = self.reader.read_party()
-        foe = self.reader.read_enemy_lead()
-        if (not foe or not foe.species_id or not foe.max_hp or (foe.species_name or "").startswith("#")
-                or self._ball_count() <= 0):
-            return None
-        dex = getattr(self.reader, "read_dex_owned", lambda _s: None)(foe.species_id)
-        if not evaluate(party, foe.species_id, foe.level, dex_owned=dex).catch:
-            return None
-        species = foe.species_name
-        for _ in range(12):
-            if self.reader.detect_context() != GameContext.IN_BATTLE:
-                return None
-            foe = self.reader.read_enemy_lead()
-            if not foe or foe.current_hp <= 0:
-                return None
-            frac = foe.current_hp / foe.max_hp
-            if frac <= 0.35:
-                break
-            _ids, names, pp, _d, _t = self._active_moves_view()
-            usable = [(MOVE_POWER.get(n, 0), n) for n, q in zip(names, pp) if n and q > 0 and MOVE_POWER.get(n, 0) > 0]
-            if not usable:
-                return None
-            _pw, mv = (min(usable) if frac <= 0.6 else max(usable))
-            self._use_move(mv)
-        taken = [p.nickname for p in party]
-        for _ in range(4):
-            if self.reader.detect_context() != GameContext.IN_BATTLE or self._ball_count() <= 0:
-                break
-            out = self._catch(auto_name(species, taken))
-            if "Gotcha" in out:
-                return f"{species} ({out.split('Named it')[-1].strip(' .') if 'Named it' in out else 'unnamed'})"
-        return None
-
     def _grind(self, target_level: int = 0, catch: bool = True, auto_battles: int = 0) -> str:
         """See _grind_inner. A session is resumable across calls (self._grind_run); the strongest Pokémon is put back
         in front when the session ENDS (done / stopped / interrupted), not between encounters handed to the model."""

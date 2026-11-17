@@ -75,26 +75,3 @@ def test_go_to_still_goes_to_a_center_or_mart_when_hurt_and_appends_reminders():
     c = _client([Need("must", "heal", "x"), Need("should", "catch", "only 1 Pokémon — catch more")])
     out = c._go_to_tool("Pokemon Center")
     assert out.startswith("Arrived") and "catch more" in out and c.calls == ["Pokemon Center"]
-
-
-# ── XP on the way ──────────────────────────────────────────────────────────────────
-def _xp_client(needs, lead_hp=40, foe_level=8, fights=0):
-    pytest.importorskip("openai")
-    from agent.lm_studio_client import AgentClient
-    c = AgentClient.__new__(AgentClient)
-    c.reader = SimpleNamespace(read_party=lambda: [mon(14, hp=lead_hp), mon(5)],
-                               read_enemy_lead=lambda: SimpleNamespace(level=foe_level))
-    c._readiness = lambda: needs
-    c._travel_fights = fights
-    return c
-
-
-def test_travel_fights_wild_battles_for_xp_only_when_levelling_is_due_and_safe():
-    from knowledge.readiness import Need
-    train = [Need("should", "train", "x")]
-    assert _xp_client(train)._travel_wants_xp() is True
-    assert _xp_client([])._travel_wants_xp() is False                                    # nothing needed
-    assert _xp_client(train, lead_hp=10)._travel_wants_xp() is False                      # lead is hurt
-    assert _xp_client(train + [Need("must", "heal", "x")])._travel_wants_xp() is False   # must heal first
-    assert _xp_client(train, foe_level=30)._travel_wants_xp() is False                    # too strong
-    assert _xp_client(train, fights=4)._travel_wants_xp() is False                        # per-call cap

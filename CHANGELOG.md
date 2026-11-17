@@ -21,6 +21,15 @@ All notable changes to this project are documented here. Format loosely follows
 - **Routes chosen by wild level.** `tools/gen_encounters.py` → `knowledge/encounters.py` (LeafGreen land-encounter
   min/avg/max level per map); `knowledge/grind_routes.best_grass` picks the reachable grass whose levels fit the
   Pokémon being trained, and grind relocates when the trainee outgrows (or is outclassed by) the current route.
+- **Quests no longer autopilot (follow-up).** `get_ss_ticket` / `get_cut` travel in `yield` mode: a wild Pokémon or trainer
+  ends the call with the usual brief, but the resume call is the quest tool itself (`get_ss_ticket()`; stored in
+  `_trip["call"]`, shown in the `TRIP IN PROGRESS` line). New `auto_trainers=true` on both fights the Nugget Bridge / ship
+  trainers for you. The `autopilot` travel mode and everything behind it are gone: `_is_new_team_species`,
+  `_travel_wants_xp`, the in-trip auto-catch/auto-XP fights, `_grind_try_catch`, `_travel_fights/_travel_caught`.
+  Short scripted walks inside quests (`_press_on_tile`: Clefairy, Bill's computer, the Captain, Vermilion's trash cans)
+  still clear an incidental battle as plain transport (`flee` mode) and hand back to the model what they cannot.
+  `_solve_vermilion_switches` remembers the two can ids across an interruption and presses a can from either side if the
+  tile below is taken.
 - Relocation trips use `go_to`'s `flee` mode; `_restore_ace_lead` / `_grind_finish` never auto-play a battle; a stale
   session is dropped when the model goes off to travel/heal/shop (`_grind_abandon`). `_no_attack_turn` unchanged.
 

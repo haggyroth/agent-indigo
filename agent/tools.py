@@ -192,12 +192,16 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "get_ss_ticket",
         "description": "Do Bill's quest for the SS Anne ticket: travels to Bill's Sea Cottage (Route 25, "
-                       "past Nugget Bridge — trainers on the way are fought for you), helps Bill out of "
-                       "the teleporter accident and takes the ticket. REQUIRED after beating Misty: until "
-                       "you have the SS Ticket, Cerulean's south and east exits are blocked (a Slowbro "
-                       "and Lass / a policeman) and Vermilion City is unreachable. Resumable: if it stops "
-                       "(heal, interrupted), call it again.",
-        "parameters": {"type": "object", "properties": {}},
+                       "past Nugget Bridge), helps Bill out of the teleporter accident and takes the "
+                       "ticket. REQUIRED after beating Misty: until you have the SS Ticket, Cerulean's "
+                       "south and east exits are blocked (a Slowbro and Lass / a policeman) and Vermilion "
+                       "City is unreachable. A wild Pokémon or trainer on the way ENDS the call (you play it, "
+                       "then call get_ss_ticket again — it resumes); auto_trainers=true fights the Nugget "
+                       "Bridge trainers for you instead. Also stops to heal when asked.",
+        "parameters": {"type": "object", "properties": {
+            "auto_trainers": {"type": "boolean",
+                              "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
+        }, "required": []},
     }},
     {"type": "function", "function": {
         "name": "pc_boxes",
@@ -250,11 +254,15 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "get_cut",
         "description": "Get HM01 Cut from the S.S. Anne's Captain and teach it. Needs the SS Ticket "
-                       "(get_ss_ticket first). Travels aboard at Vermilion's harbor (trainers fought for "
-                       "you), cures the seasick Captain for HM01, then teaches Cut to a Pokémon that can "
-                       "learn it. REQUIRED before Vermilion Gym: its door is blocked by a Cut tree. "
-                       "Resumable: if it stops (heal, interrupted), call it again.",
-        "parameters": {"type": "object", "properties": {}},
+                       "(get_ss_ticket first). Travels aboard at Vermilion's harbor, cures the seasick Captain for HM01, then "
+                       "teaches Cut to a Pokémon that can learn it. REQUIRED before Vermilion Gym: its door "
+                       "is blocked by a Cut tree. A wild Pokémon or trainer on the way ENDS the call (you "
+                       "play it, then call get_cut again — it resumes); auto_trainers=true fights the ship's "
+                       "trainers for you instead.",
+        "parameters": {"type": "object", "properties": {
+            "auto_trainers": {"type": "boolean",
+                              "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
+        }, "required": []},
     }},
     {"type": "function", "function": {
         "name": "teach_move",

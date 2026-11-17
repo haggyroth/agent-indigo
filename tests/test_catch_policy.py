@@ -48,17 +48,6 @@ def test_unknown_species_is_refused():
     assert not evaluate(party((BULBASAUR, "Bulbasaur", 8)), 99999, 5).catch
 
 
-def test_go_to_only_stops_on_worthwhile_species():
-    import pytest
-    pytest.importorskip("openai")
-    from agent.lm_studio_client import AgentClient
-    team = party((IVYSAUR, "Ivysaur", 19))
-    weak = P(species_id=KAKUNA, species_name="Kakuna", level=5)
-    ok = P(species_id=GEODUDE, species_name="Geodude", level=17)
-    assert AgentClient._is_new_team_species(team, weak) is False
-    assert AgentClient._is_new_team_species(team, ok) is True
-
-
 # ── party composition: upgrades and a bigger debt allowance (the team stalled at 4 weak members) ──
 def test_a_stronger_line_than_the_weakest_member_is_an_upgrade_even_far_behind():
     team = party((IVYSAUR, "Ivysaur", 30), (CATERPIE, "Caterpie", 10), (PIDGEY, "Pidgey", 12))

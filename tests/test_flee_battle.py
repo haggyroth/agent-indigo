@@ -62,13 +62,13 @@ def test_travel_trainer_win_continues_travel():
     # Clean win (outcome WON, back in overworld, lead healthy) → keep travelling (None).
     c = _trainer_client(outcome=Addr.B_OUTCOME_WON, ctx_after=GameContext.OVERWORLD,
                         party=[_mon(45)])
-    assert c._handle_travel_battle("Cerulean City") is None
+    assert c._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True) is None
 
 
 def test_travel_trainer_loss_bails():
     c = _trainer_client(outcome=Addr.B_OUTCOME_LOST, ctx_after=GameContext.TRANSITIONING,
                         party=[_mon(0), _mon(0)])
-    msg = c._handle_travel_battle("Cerulean City")
+    msg = c._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True)
     assert msg is not None and "lost" in msg.lower() and "heal" in msg.lower()
 
 
@@ -76,8 +76,8 @@ def test_second_loss_near_the_same_map_says_stop_retrying():
     c = _trainer_client(outcome=Addr.B_OUTCOME_LOST, ctx_after=GameContext.TRANSITIONING,
                         party=[_mon(0), _mon(0)])
     c.reader.read_current_map = lambda: (3, 3)
-    first = c._handle_travel_battle("Pewter City")
-    second = c._handle_travel_battle("Pewter City")
+    first = c._handle_travel_battle("Pewter City", mode="yield", auto_trainers=True)
+    second = c._handle_travel_battle("Pewter City", mode="yield", auto_trainers=True)
     assert "Do NOT retry" not in first and "heal" in first.lower()
     assert "Do NOT retry" in second and "grind" in second.lower()
 
@@ -86,20 +86,20 @@ def test_travel_trainer_all_fainted_bails_even_without_outcome():
     # Blackout race: outcome not yet set but the whole party is down → still a loss.
     c = _trainer_client(outcome=0, ctx_after=GameContext.TRANSITIONING,
                         party=[_mon(0), _mon(0)])
-    assert "lost" in c._handle_travel_battle("Cerulean City").lower()
+    assert "lost" in c._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True).lower()
 
 
 def test_travel_trainer_unfinished_hands_back():
     # Still IN_BATTLE after a full auto pass (tough trainer / forced switch) → take over.
     c = _trainer_client(outcome=0, ctx_after=GameContext.IN_BATTLE, party=[_mon(20)])
-    msg = c._handle_travel_battle("Cerulean City")
+    msg = c._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True)
     assert msg is not None and "autopilot" in msg.lower()
 
 
 def test_travel_trainer_win_but_low_hp_bails_to_heal():
     c = _trainer_client(outcome=Addr.B_OUTCOME_WON, ctx_after=GameContext.OVERWORLD,
                         party=[_mon(5)])          # 5/50 = 10% < TRAVEL_HP_FLOOR
-    msg = c._handle_travel_battle("Cerulean City")
+    msg = c._handle_travel_battle("Cerulean City", mode="yield", auto_trainers=True)
     assert msg is not None and "low" in msg.lower() and "heal" in msg.lower()
 
 
@@ -130,7 +130,7 @@ def test_yield_mode_hands_a_wild_battle_to_the_model_and_records_the_trip():
     msg = c._handle_travel_battle("Viridian City", mode="yield", resume="Viridian City")
     assert "wild RATTATA L4" in msg and "go_to('Viridian City')" in msg
     assert "use_move" in msg and "catch()" in msg and "flee_battle()" in msg
-    assert c._trip == {"dest": "Viridian City", "target": "Viridian City"}
+    assert c._trip == {"dest": "Viridian City", "target": "Viridian City", "call": None}
 
 
 def test_yield_mode_never_fights_flees_or_throws_a_ball_itself():
@@ -166,9 +166,6 @@ def test_auto_trainers_still_autofights_trainers_but_wild_is_yielded():
 def test_flee_mode_runs_from_wild_and_does_not_stop_for_low_hp():
     c = _wild_client(party=[_mon(5)])                    # 10% HP, on its way to a Center
     assert c._handle_travel_battle("Pokemon Center", mode="flee") is None
-    c2 = _wild_client(party=[_mon(5)], balls=0)
-    c2._travel_wants_xp = lambda: False
-    assert c2._handle_travel_battle("Pewter City", mode="autopilot") is not None   # legacy: stop and heal
 
 
 def test_flee_mode_falls_back_to_fighting_when_the_escape_fails():

@@ -361,7 +361,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                 return self._go_to_tool(args.get("destination", ""), bool(args.get("force", False)),
                                         bool(args.get("auto_trainers", False)))
             case "get_ss_ticket":
-                return self._get_ss_ticket()
+                return self._get_ss_ticket(bool(args.get("auto_trainers", False)))
             case "pc_boxes":
                 return self._pc_boxes()
             case "pc_deposit":
@@ -375,7 +375,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             case "set_lead":
                 return self._set_lead(str(args["pokemon"]))
             case "get_cut":
-                return self._get_cut()
+                return self._get_cut(bool(args.get("auto_trainers", False)))
             case "teach_move":
                 return self._teach_move(str(args["tm"]), str(args.get("pokemon", "") or ""),
                                         str(args.get("forget", "") or ""))

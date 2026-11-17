@@ -21,7 +21,6 @@ class NavMixin:
     # new-species encounter so the model can catch it (instead of auto-fleeing past
     # everything). This flag makes that offer once-per-battle so re-issuing go_to
     # skips it rather than re-offering forever. Reset when back in the overworld.
-    _travel_catch_offered = False
     _trip = None             # {"dest", "target"} of a go_to that handed an encounter to the model (see _yield_encounter)
 
 
@@ -65,12 +64,13 @@ class NavMixin:
         from game.state import GameContext
         self._in_puzzle = True                   # the walk to the tile must not start another puzzle
         try:
-            for _ in range(6):                   # wild battles interrupt long walks: finish + resume
-                self._walk_to(*stand)
-                if self.reader.read_player_pos() == stand:
+            for _ in range(6):                   # a battle interrupts the walk: these are short scripted walks
+                self._walk_to(*stand)            # (a gym trainer by the switches, a wild mon indoors) — play it
+                if self.reader.read_player_pos() == stand:      # as plain transport (flee / auto-fight), resume
                     break
                 if self.reader.detect_context() == GameContext.IN_BATTLE:
-                    self._handle_travel_battle("the puzzle tile")
+                    if self._handle_travel_battle("the puzzle tile", mode="flee"):
+                        break                    # couldn't clear it on autopilot: the quest hands it to the model
         finally:
             self._in_puzzle = False
         if self.reader.read_player_pos() != stand:
@@ -450,45 +450,22 @@ class NavMixin:
     # blackout, which would warp the player all the way back to a Pokémon Center).
     _TRAVEL_HP_FLOOR = 0.30
 
-    @staticmethod
-    def _is_new_team_species(party, enemy) -> bool:
-        """Whether a travel wild-battle is worth stopping on to catch: the team is
-        still small (<4), the wild mon is a REAL named species (not a battle-load
-        garbage read, #58), it's a species not already on the team, and the catch policy
-        (knowledge.catch_policy) says it's worth the training. Ball-count and
-        the once-per-battle flag are checked by the caller."""
-        if enemy is None or not getattr(enemy, "species_id", 0):
-            return False
-        name = getattr(enemy, "species_name", "") or ""
-        if not name or name.startswith("#"):
-            return False
-        if len(party) >= 4:
-            return False
-        if enemy.species_id in {p.species_id for p in party}:
-            return False
-        lvl = getattr(enemy, "level", 0)
-        if lvl:    # catch policy: don't stop for a catch that would only add grinding debt
-            from knowledge.catch_policy import evaluate
-            return evaluate(party, enemy.species_id, lvl).catch
-        return True
-
     # How a battle that interrupts travel is handled (see _go_to):
     #   "yield"     hand the encounter back to the model (the go_to tool): the call ends with a description of the
     #               battle, the model fights / catches / switches / flees, then calls go_to again to resume.
-    #   "flee"      run from wild battles, auto-fight trainers (heal(): the party is hurt and heading to a Center).
-    #   "autopilot" the old behaviour — catch / fight for XP / flee by heuristic. Still used by grind's route
-    #               relocation and the story quests until they are reworked (#203).
-    TRAVEL_MODES = ("yield", "flee", "autopilot")
+    #   "flee"      run from wild battles, auto-fight trainers (heal() and grind's relocation: plain transport).
+    TRAVEL_MODES = ("yield", "flee")
 
-    def _yield_encounter(self, target_name: str, trainer: bool, resume: str | None) -> str:
+    def _yield_encounter(self, target_name: str, trainer: bool, resume: str | None, call: str | None = None) -> str:
         """The go_to message for an encounter handed to the model: what appeared, whether it is worth a ball,
-        the tools to answer it with, and the exact call that resumes the trip."""
+        the tools to answer it with, and the exact call that resumes the trip (`call` overrides go_to — a quest
+        tool such as get_ss_ticket() resumes itself)."""
         try:
-            here = MAP_NAMES.get(self.reader.read_current_map(), "here")
+            here = MAP_NAMES.get(self.reader.read_current_map()) or "this map"
         except Exception:
-            here = "here"
-        self._trip = {"dest": resume or target_name, "target": target_name}
-        again = f"go_to({(resume or target_name)!r})"
+            here = "this map"
+        self._trip = {"dest": resume or target_name, "target": target_name, "call": call}
+        again = call or f"go_to({(resume or target_name)!r})"
         if trainer:
             return (f"A TRAINER battle started at {here} on the way to {target_name} (you can't flee it). Win it with "
                     f"use_move / switch_pokemon / use_item, then call {again} to continue.")
@@ -510,8 +487,8 @@ class NavMixin:
         return (f"A wild {what} appeared at {here} on the way to {target_name}.{verdict} Fight it (use_move), "
                 f"catch(), switch_pokemon or flee_battle(); then call {again} to continue.")
 
-    def _handle_travel_battle(self, target_name: str, mode: str = "autopilot",
-                              auto_trainers: bool = False, resume: str | None = None):
+    def _handle_travel_battle(self, target_name: str, mode: str = "yield",
+                              auto_trainers: bool = False, resume: str | None = None, call: str | None = None):
         """A battle interrupted travel. See TRAVEL_MODES. In "yield" mode every wild battle (and every trainer
         battle unless `auto_trainers`) ends the go_to call with a message for the model. Otherwise: trainer →
         auto-fight it (can't flee) so a trainer-dense dungeon is ONE go_to call, not dozens of LLM round-trips;
@@ -521,7 +498,7 @@ class NavMixin:
         from game.state import GameContext
         is_trainer = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
         if mode == "yield" and not (is_trainer and auto_trainers):
-            return self._yield_encounter(target_name, is_trainer, resume)
+            return self._yield_encounter(target_name, is_trainer, resume, call)
         low_hp_stop = mode != "flee"      # a heal trip is already on its way to the Center
         if is_trainer:
             # Auto-fight the (usually weak) travel trainer with best-move logic. Hand
@@ -562,28 +539,6 @@ class NavMixin:
                         f"low ({party[0].hp_percent:.0%}) — call heal(), then "
                         f"go_to({target_name!r}) again.")
             return None   # won cleanly — keep travelling
-        # Team-building: a wild Pokémon the catch policy likes (a new species, a stronger line than the weakest
-        # member, a new type — knowledge.catch_policy) is weakened and caught right here with an autopilot
-        # nickname, instead of being fled from (the old "offer once, then flee" never built a team past four).
-        if mode == "autopilot" and self._ball_count() > 0:
-            from game.state import GameContext as _GC
-            got = self._grind_try_catch()
-            if got:
-                self.__dict__.setdefault("_travel_caught", []).append(got)
-            if self.reader.detect_context() != _GC.IN_BATTLE:
-                return None            # caught it (or the battle ended): keep travelling
-        # XP on the way: when the team still has levelling to do (a lagging member, or the best Pokémon is
-        # under the next gym's target) and it is healthy, fight a few of the ordinary wild battles instead of
-        # running from every one — travelling shouldn't quietly replace levelling up.
-        if mode == "autopilot" and self._travel_wants_xp():
-            self._travel_fights = getattr(self, "_travel_fights", 0) + 1
-            lag = [(i, p) for i, p in self._lagging_mons() if p.current_hp > 0 and p.max_hp
-                   and p.current_hp / p.max_hp >= 0.7]
-            if lag:
-                self._train_fight((lag[0][1].species_id, lag[0][1].max_hp))
-            else:
-                self._auto_fight()
-            return None
         flee = self._flee_battle()
         if "Got away" not in flee and mode == "flee":
             self._auto_fight()                     # a heal trip: no time to bother the model — win it and carry on
@@ -744,25 +699,6 @@ class NavMixin:
     # Maps you can't walk to from Cerulean (see the guard in _go_to): the whole west side of Kanto start.
     _WEST_OF_ROUTE4 = frozenset({(3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21), (1, 0), (1, 1), (1, 2), (1, 3)})
 
-    _TRAVEL_FIGHTS_MAX = 4        # wild fights per go_to call taken for XP; the rest are fled
-
-    def _travel_wants_xp(self) -> bool:
-        if getattr(self, "_travel_fights", 0) >= self._TRAVEL_FIGHTS_MAX:
-            return False
-        try:
-            party = self.reader.read_party()
-            if not party or party[0].max_hp == 0 or party[0].current_hp / party[0].max_hp < 0.6:
-                return False
-            if any(n.level == "must" for n in self._readiness()):
-                return False                      # hurt / out of PP: get away and heal instead
-            foe = self.reader.read_enemy_lead()
-            top = max(p.level for p in party)
-            if foe and foe.level and foe.level > top + 3:
-                return False                      # too dangerous for the XP
-            return any(n.code in ("train", "level") for n in self._readiness())
-        except Exception:
-            return False
-
     def _has_must_need(self) -> bool:
         return any(n.level == "must" for n in self._readiness())
 
@@ -802,11 +738,7 @@ class NavMixin:
                 and blocking(needs)):
             return ("Not travelling yet — sort this out first:\n" + "\n".join("⛔ " + n.text for n in blocking(needs))
                     + "\nThen go_to again (or pass force=true to go anyway).")
-        self.__dict__["_travel_caught"] = []
         out = self._go_to(destination, mode="yield", auto_trainers=auto_trainers)
-        caught = self.__dict__.get("_travel_caught") or []
-        if caught:
-            out += f"\n(Caught on the way: {'; '.join(caught)}.)"
         notes = [n.text for n in self._readiness() if n.level == "should"][:3]
         if notes:
             out += "\n(Before the next leg: " + "; ".join(notes) + ")"
@@ -822,22 +754,22 @@ class NavMixin:
         city_name = next((g["city"] for g in GYMS if g["leader"] == leader), None)
         return next((k for k, v in MAP_NAMES.items() if v == city_name and k[0] == 3), None)
 
-    def _go_to(self, destination: str, mode: str = "yield", auto_trainers: bool = False) -> str:
+    def _go_to(self, destination: str, mode: str = "yield", auto_trainers: bool = False,
+               resume_call: str | None = None) -> str:
         """Travel to a named map ("Pewter City", "Route 1") or waypoint ("Pokemon
         Center", "Mart", "Gym"), auto-routing across map connections AND building/
         cave warps. Re-routes from the current map after each hop.
 
         `mode` says what happens when a battle interrupts the trip (see TRAVEL_MODES): "yield" (default) ends the
         call so the model plays the encounter and resumes; "flee" runs from wild battles (heal trips);
-        "autopilot" is the legacy catch/XP/flee heuristic. A trip also stops — resumably — when the lead's HP drops
-        low in the non-yield modes, or if a hop is blocked (e.g. a cave splits the map so the far edge isn't
+        `resume_call` names the tool that resumes the trip (a quest tool; default go_to). A trip also stops —
+        resumably — when the lead's HP drops low after an auto-fought battle, or if a hop is blocked (e.g. a cave splits the map so the far edge isn't
         walkable)."""
         from game.state import GameContext
         from knowledge.map_graph import route_to, node_for
         target_map, target_name = self._resolve_destination(destination)
         if target_map is None:
             return target_name   # error message
-        self._travel_fights = 0
 
         # Cerulean → the west (Pewter / Viridian / Pallet / Routes 1-3 / Mt. Moon) has NO walking route:
         # Route 4's east end is a pocket of one-way ledges, so you can come OUT of Mt. Moon into it but
@@ -856,7 +788,7 @@ class NavMixin:
         gym_city = self._gym_city(target_map)
         here = self.reader.read_current_map()
         if gym_city and here not in (gym_city, target_map):
-            out = self._go_to(MAP_NAMES[gym_city], mode=mode, auto_trainers=auto_trainers)
+            out = self._go_to(MAP_NAMES[gym_city], mode=mode, auto_trainers=auto_trainers, resume_call=resume_call)
             if not out.startswith("Arrived"):
                 return out
 
@@ -868,11 +800,10 @@ class NavMixin:
             if ctx not in (GameContext.OVERWORLD, GameContext.IN_BATTLE):
                 ctx = self._advance_to_control()
             if ctx == GameContext.IN_BATTLE:
-                stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination)
+                stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination, resume_call)
                 if stop:
                     return stop
                 continue   # fled; resume travelling
-            self._travel_catch_offered = False   # overworld — next battle is a fresh offer
 
             cur = self.reader.read_current_map()
             if cur == target_map:
@@ -906,7 +837,7 @@ class NavMixin:
 
             # Handle a battle that interrupted this hop.
             if self.reader.detect_context() == GameContext.IN_BATTLE:
-                stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination)
+                stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination, resume_call)
                 if stop:
                     return stop
                 continue   # escaped; resume travelling
