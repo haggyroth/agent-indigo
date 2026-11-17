@@ -36,6 +36,20 @@ class Live:
                 return
         raise AssertionError("Items pocket is full")
 
+    def set_money(self, yen: int) -> None:
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        self.m.write32(sb1 + Addr.MONEY_OFFSET, yen ^ self.r._encryption_key())
+
+    def set_flag(self, n: int, on: bool = True) -> None:
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        a = sb1 + Addr.FLAGS_OFFSET + (n >> 3)
+        v = self.m.read8(a)
+        self.m.write8(a, (v | (1 << (n & 7))) if on else (v & ~(1 << (n & 7))))
+
+    def set_badges(self, mask: int) -> None:
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        self.m.write8(sb1 + Addr.BADGES_OFFSET, mask)
+
     def heal_hp(self) -> None:
         for i in range(len(self.r.read_party())):
             b = Addr.PARTY_DATA + 100 * i

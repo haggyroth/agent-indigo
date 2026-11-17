@@ -181,17 +181,22 @@ class OverworldMixin:
             return []
         return [self.mgba.read16(lp + 2 * i) for i in range(min(n, 30))]
 
-    def _open_buy_menu(self) -> bool:
+    def _open_buy_menu(self, approach=None, face: str = "Up") -> bool:
         """Talk to the clerk, then select Buy so the interactive item list is open.
         sShopData.itemList is set as soon as the Buy/Sell menu appears (before Buy is
         chosen), so 'itemList valid' only means the shop menu is up — we then select
         Buy (top option, default cursor) and let the item list fade in before the
         caller navigates (Task_BuyMenu ignores D-pad while gPaletteFade is active)."""
-        self._walk_to(*self._MART_CLERK_APPROACH)   # lands at the counter-front tile
+        from game.constants import Addr
+        # sShopData.itemList keeps pointing at the LAST shop's list after it closes; clear it, or "list is valid" would read as
+        # "this clerk's menu is up" the instant we arrive and the buy would run against the wrong (stale) stock.
+        for off in range(4):                                  # write8 only: the legacy HTTP client has no wider writes
+            self.mgba.write8(Addr.SHOP_DATA + Addr.SHOP_ITEMLIST + off, 0)
+        self._walk_to(*(approach or self._MART_CLERK_APPROACH))   # lands at the counter-front tile
         # 1. Talk to the clerk and advance the greeting until the shop menu appears.
         shop_up = False
         for _ in range(3):
-            self.mgba.tap("Up")                       # face the clerk
+            self.mgba.tap(face)                       # face the clerk
             for _ in range(8):
                 if self._buy_list_open():
                     shop_up = True
@@ -227,7 +232,7 @@ class OverworldMixin:
             self.mgba.tick(8)
         else:
             return 0
-        before = self.reader.read_bag().get(item_id, 0)
+        before = self.reader.count_item(item_id)
         # Select the item → the "How many?" quantity box. Wait for its init to run
         # (it computes maxQuantity = money/price; 0 means it hasn't run yet).
         self._wait_idle()
@@ -261,7 +266,7 @@ class OverworldMixin:
             self.mgba.tap("A")
             self._wait_idle()
             self.mgba.tick(10)
-            got = self.reader.read_bag().get(item_id, 0) - before
+            got = self.reader.count_item(item_id) - before
             if got > 0:
                 break
         if got > 0:
@@ -284,10 +289,73 @@ class OverworldMixin:
             self.mgba.tap("B")
             self.mgba.tick(12)
 
-    def _shop(self) -> str:
+    def _shop_for(self, item: str, quantity: int = 1) -> str:
+        """shop(item=…): buy a SPECIFIC item (a TM, a stone, a vitamin, an X-item…) from whichever clerk sells it — the nearest
+        one by route. Travels there, stands on the customer's side of that clerk's counter (from the map, not a fixed tile),
+        buys, and confirms by the bag / TM case count rising."""
+        from knowledge.map_graph import node_for, route_to
+        from knowledge.shop_stock import PRICES, SHOP_NAMES
+        from agent import events
+        from knowledge.shopping import FREE_SOURCES, approach_options, item_label, resolve_item, shops_selling
+        from knowledge.tmhm import TMHM
+        iid, close = resolve_item(item)
+        if iid is None:
+            return (f"No clerk sells {item!r}." + (f" Did you mean: {', '.join(close)}?" if close else "")
+                    + " (Poké Marts sell balls, potions and cures; the Celadon Dept. Store also sells TMs, stones, vitamins and X-items.)")
+        label, price = item_label(iid), PRICES.get(iid, 0)
+        if iid in FREE_SOURCES and not self.reader.count_item(iid):
+            events.emit("note", FREE_SOURCES[iid] + " — buying anyway", log=False)
+        money = self.reader.read_money()
+        qty = max(1, int(quantity or 1))
+        if price and money < price:
+            return f"{label} costs ¥{price} and you have ¥{money}."
+        if price:
+            qty = min(qty, money // price)
+        cur = self.reader.read_current_map()
+        here = [s for s in shops_selling(iid) if (s[0], s[1]) == tuple(cur)]
+        if not here:
+            def hops(s):
+                bank, mid = cur
+                r = route_to(node_for(bank, mid, *self.reader.read_player_pos()), (s[0], s[1]))
+                return len(r) if r is not None else 10 ** 6
+            best = min(shops_selling(iid), key=hops)
+            res = self._go_to(SHOP_NAMES[(best[0], best[1])])
+            if tuple(self.reader.read_current_map()) != (best[0], best[1]):
+                return f"On the way to {SHOP_NAMES[(best[0], best[1])]} to buy {label}: {res}"
+            here = [s for s in shops_selling(iid) if (s[0], s[1]) == (best[0], best[1])]
+        clerk = here[0]
+        self.tilemap.refresh()
+        grid, w, h = self.tilemap.passable_grid()
+        floor = (lambda x, y: bool(grid and 0 <= x < w and 0 <= y < h and grid[y][x]))
+        px, py = self.reader.read_player_pos()
+        seen, todo = {(px, py)}, [(px, py)]              # tiles the player can actually walk to (not the clerk's own side)
+        while todo:
+            x, y = todo.pop()
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if (nx, ny) not in seen and floor(nx, ny):
+                    seen.add((nx, ny))
+                    todo.append((nx, ny))
+        spots = approach_options((clerk[2], clerk[3]), floor, lambda x, y: (x, y) in seen)
+        if not spots:
+            return f"Couldn't find a tile beside the clerk at ({clerk[2]},{clerk[3]}) to stand on."
+        (ax, ay), face = min(spots, key=lambda s: abs(s[0][0] - px) + abs(s[0][1] - py))
+        before = self.reader.count_item(iid)
+        if not self._open_buy_menu((ax, ay), face):
+            return f"Couldn't open the buy menu — walk to ({ax},{ay}), face the clerk and call shop(item={item!r}) again."
+        got = self._buy_one_item(iid, qty, price) if iid in self._shop_item_list() else 0
+        self._close_buy_menu()
+        if got <= 0:
+            return f"Couldn't buy {label} (it costs ¥{price}; you have ¥{self.reader.read_money()})."
+        events.emit("shop", f"bought {got}× {label} (−¥{got * price}, ¥{self.reader.read_money()} left)")
+        extra = (" Teach it with teach_move." if iid in TMHM else "") + (f" ({FREE_SOURCES[iid]}.)" if iid in FREE_SOURCES else "")
+        return f"Bought {got}× {label} (¥{got * price}). You now have {self.reader.count_item(iid)} (was {before}); ¥{self.reader.read_money()} left.{extra}"
+
+    def _shop(self, item: str = "", quantity: int = 1) -> str:
         """Restock at the Poké Mart per the badge-gated purchase policy: travel to a
         Mart if needed, open the buy menu, buy the affordable par-level list of items
-        this mart sells, and leave. The model just calls shop()."""
+        this mart sells, and leave. With `item`, buy that specific item instead (_shop_for)."""
+        if str(item or "").strip():
+            return self._shop_for(str(item), quantity)
         from knowledge.map_graph import MAP_KIND
         from knowledge.shopping import compute_shopping_list, ITEM_NAMES, ITEM_PRICES
         if MAP_KIND.get(self.reader.read_current_map()) != "mart":

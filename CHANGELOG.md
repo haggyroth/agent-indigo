@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `shop(item, quantity)`: buy a specific item from whoever sells it (#215)
+- **Where everything is sold, from the decomp** (`tools/gen_shop_stock.py` → `knowledge/shop_stock.py`): every clerk with a buy menu
+  (map, position, stock), prices, item names and readable map names. The Celadon Dept. Store turns out to matter: 2F sells TMs
+  (Roar, Hyper Beam, Dig, Brick Break, Secret Power, Attract), 4F stones, 5F vitamins and X-items.
+- **`shop(item='TM28')`** (or 'Dig', 'Protein', 'Fire Stone', 'X Attack', 'Super Repel'…, with `quantity`) picks the nearest clerk that
+  sells it by route, travels there (shop interiors are valid `go_to` names now), stands on the customer's side of THAT clerk's
+  counter — worked out from the map, including talking across a counter — buys, and confirms by the bag / TM-case count rising.
+  Too little money, or an item nobody sells, is explained before any walking. `shop()` with no item is unchanged.
+- **Stale-menu bug fixed on the way:** `sShopData.itemList` keeps pointing at the previous shop's stock, so a second purchase in the
+  same session read the old list as "this clerk's menu is up"; it is cleared before talking to a clerk.
+- TM28 Dig is also a free story reward (the Rocket Grunt in Cerulean City); the result and the system prompt say so.
+- Tests: `tests/test_shop_stock.py`; a live test flies Vermilion → Celadon (Fly, staged badge/flag) and buys a TM and two Super Repels
+  from the two clerks on 2F.
+- Not done under #215: Game Corner prizes, cartridge saves, Safari Zone quests.
+
 ### Changed — the skills' shared state is declared in one place (#214, part 3)
 - `agent/skills/state.py::SkillState` lists every field the skills keep between tool calls (trip and stall bookkeeping, the grind
   session, the benched ace, move-learn baselines, warning-once flags, the Vermilion cans…), each with its owner skill, meaning and
