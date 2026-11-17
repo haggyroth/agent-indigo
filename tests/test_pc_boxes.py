@@ -70,7 +70,7 @@ def _client(party, boxes=()):
     pytest.importorskip("openai")
     from agent.lm_studio_client import AgentClient
     c = AgentClient.__new__(AgentClient)
-    c.reader = SimpleNamespace(read_party=lambda: party, read_boxes=lambda: list(boxes))
+    c.reader = SimpleNamespace(read_party=lambda: party, read_boxes=lambda: list(boxes), read_current_box=lambda: None)
     c._open_pc = lambda mode=1: "SHOULD NOT OPEN"
     return c
 

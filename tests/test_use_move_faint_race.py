@@ -19,6 +19,9 @@ class _FaintFake:
     """The FIGHT menu is up; the instant the move is committed (hold A), the ACTIVE
     battler reads as fainted with its PP unchanged — the exact race the fix must catch.
     Models gBattleMons[0] via the read_active_battle_* reader methods use_move now uses."""
+    def read_disabled_move(self, _slot):
+        return (0, 0)
+
     def __init__(self, *, post_species=1, post_hp=0):
         self.committed = False
         self.post_species = post_species
@@ -89,6 +92,9 @@ class _ActiveMonFake:
     """The ACTIVE battler is a Pidgey with only two moves (Gust, Sand-Attack); the LEAD
     (party[0]) is an Ivysaur with four. use_move must validate/index against the ACTIVE
     mon (gBattleMons[0]) — else it targets an empty slot / rejects the real moves."""
+    def read_disabled_move(self, _slot):
+        return (0, 0)
+
     def __init__(self):
         self.cursor = None
         self.pp = [35, 15, 0, 0]

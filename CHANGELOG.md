@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — backend capabilities and tolerated failures (#214, part 1)
+- **One capability check instead of twenty.** `agent/skills/base.py::SkillBase._wait_idle()` is the only place that asks whether the
+  emulator can wait for the screen to settle (the legacy HTTP client now has a no-op `wait_until_idle`, so it is just a fake in tests
+  that lacks it). Reader calls the skills used to guard with `getattr(self.reader, …, fallback)` (`is_surfing`, `is_trapped`,
+  `read_disabled_move`, `read_dex_owned`, `read_current_map`, `read_current_box`) are plain calls; the test fakes grew the methods.
+- **Tolerated failures are logged.** `log_once(key, …)` (moved from nav into `skills/base.py`) now backs every `except Exception` in the
+  skills, the client, `main.py` and the event stream that used to swallow silently and carry on with a default: the first occurrence
+  of each is logged with its traceback, later ones stay quiet.
+- Loop-detection (`ShortTermMemory.stuck`) edge cases are covered by tests: first record, exactly-four idle steps, back-and-forth
+  walking, map and battle resets, position-less actions.
+- Still open under #214: extracting the observation builder from `main.py`, and the skills' shared state as an explicit `SkillContext`.
+
 ### Changed — tool surface, part 2 (#213): 8 tools become 3, one rule for "which Pokémon?"
 - **`pc(action, pokemon?, box_pokemon?, detail?, force?)`** replaces `pc_boxes` / `pc_deposit` / `pc_withdraw` / `pc_swap`
   (`action` = list | deposit | withdraw | swap). Missing arguments are reported before anything touches the emulator.

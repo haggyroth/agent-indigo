@@ -88,24 +88,27 @@ def test_nested_travel_is_cut_off_at_the_depth_limit():
     assert c._stop_reason == "nested" and c._go_depth == 0                    # the counter always unwinds
 
 
+from agent.skills import base as base_mod  # noqa: E402
+
+
 # ── tolerated failures are logged once, not hidden ───────────────────────────────────────────────────
 def test_gate_read_failures_still_let_travel_go_but_are_logged_once(caplog):
-    nav_mod._LOGGED.clear()
+    base_mod._LOGGED.clear()
     c = client()
     c._party_knows = lambda mid: 1 / 0
     req = NS(alt_flag=None, kind="hm", value="Cut")
-    with caplog.at_level(logging.WARNING, logger=nav_mod.__name__):
+    with caplog.at_level(logging.WARNING, logger=base_mod.logger.name):
         assert c._gate_ok(req) is True and c._gate_ok(req) is True
     msgs = [r.getMessage() for r in caplog.records if "requirement" in r.getMessage()]
     assert len(msgs) == 1 and "hm" in msgs[0]
 
 
 def test_advance_to_control_logs_a_failing_forced_switch_once(caplog):
-    nav_mod._LOGGED.clear()
+    base_mod._LOGGED.clear()
     c = client(ctx=GameContext.IN_MENU)
     c._send_next_mon = lambda: 1 / 0
     c.mgba = NS(read32=lambda a: 0, tap=lambda b: None, tick=lambda n=1: None)
-    with caplog.at_level(logging.WARNING, logger=nav_mod.__name__):
+    with caplog.at_level(logging.WARNING, logger=base_mod.logger.name):
         c._advance_to_control(tries=3)
     assert sum("_send_next_mon failed" in r.getMessage() for r in caplog.records) == 1
 

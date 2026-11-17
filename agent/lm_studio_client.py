@@ -1,3 +1,4 @@
+from agent.skills.base import log_once
 import base64
 import json
 import re
@@ -15,6 +16,7 @@ from knowledge.navigation import get_map_image_path, MAP_NAMES
 from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKENS,
                     ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT)
 from agent import events
+from agent.skills.base import SkillBase
 from agent.skills.nav import NavMixin
 from agent.skills.quests import QuestMixin
 from agent.skills.party import PartyMixin
@@ -30,7 +32,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -105,6 +107,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             with open(SCREENSHOT_PATH, "rb") as f:
                 return base64.b64encode(f.read()).decode()
         except Exception:
+            log_once("client.capture_screenshot", "client.capture_screenshot: tolerated failure (continuing with a default)")
             return None
 
     _map_b64_cache: dict[Path, str] = {}
@@ -251,6 +254,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                 try:
                     result = self._execute(tc.function.name, tc.function.arguments)
                 except Exception as e:
+                    log_once("client.step", "client.step: tolerated failure (continuing with a default)")
                     result = f"Tool {tc.function.name} failed: {e}"
                 self._log_tool(tc.function.name, tc.function.arguments, result,
                                time.time() - _t0)
@@ -276,6 +280,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
         try:
             return self.reader.detect_context()
         except Exception:
+            log_once("client._tool_context", "client._tool_context: tolerated failure (continuing with a default)")
             return None
 
     def _log_tool(self, name: str, args_json: str, result, secs: float) -> None:
@@ -287,6 +292,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                     "pos": [st.player_x, st.player_y],
                     "hp": [[p.current_hp, p.max_hp] for p in st.party]}
         except Exception:
+            log_once("client._log_tool", "client._log_tool: tolerated failure (continuing with a default)")
             pass
         self.run_log.event("tool", name=name, args=args_json, secs=round(secs, 2),
                            result=str(result)[:800], **snap)
@@ -326,6 +332,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                 where = (f" Now: {st.context.name} on map {st.map_bank}/{st.map_id} at "
                          f"({st.player_x},{st.player_y}).")
             except Exception:
+                log_once("client._execute", "client._execute: tolerated failure (continuing with a default)")
                 pass
             if e.stalled:
                 return (f"{name} was stopped: {e.reason}.{where} Whatever it was doing isn't working — "

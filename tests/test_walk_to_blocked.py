@@ -19,6 +19,12 @@ class FakeWorld:
     """Doubles as mgba + reader + tilemap. `grid[y][x]` is tilemap-passable;
     `mystery` tiles look passable but silently block the step (the hidden
     obstacle). Taps update the simulated player position."""
+    def is_surfing(self):
+        return False
+
+    def read32(self, _addr):
+        return 0
+
     def __init__(self, grid, start, mystery=(), model_turning=False):
         self.grid = grid
         self.h, self.w = len(grid), len(grid[0])

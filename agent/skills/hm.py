@@ -6,6 +6,7 @@ approach/facing, answers the prompt (MenuDriver) and CONFIRMS the outcome (surfi
 the object despawned), like every other skill. Teaching an HM is teach_move (agent/skills/tmhm.py); Fly / Flash (party
 sub-menus) are not covered here.
 """
+from agent.skills.base import log_once
 from game.constants import Addr
 from game.state import GameContext
 
@@ -40,6 +41,7 @@ class HMMixin:
         try:
             return any(move_id in (p.move_ids or []) for p in self.reader.read_party())
         except Exception:
+            log_once("hm._party_knows", "hm._party_knows: tolerated failure (continuing with a default)")
             return False
 
     def _answer_field_yes(self) -> bool:

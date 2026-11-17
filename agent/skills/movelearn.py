@@ -67,11 +67,6 @@ class MoveLearnMixin:
         self._decline_at_box()
         return f"declined {new_name} (not better than what {cur[0] if cur else 'it'} already knows)"
 
-    def _wait_idle(self) -> None:
-        fn = getattr(self.mgba, "wait_until_idle", None)
-        if fn:
-            fn()
-
     def _press_until_lms_leaves(self, button: str, val: int, cap: int = 8) -> bool:
         """Press `button` at an interactive box until learnMoveState leaves `val` — i.e.
         until that box consumed the input — then return IMMEDIATELY. After pressing we

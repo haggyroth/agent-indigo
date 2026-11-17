@@ -18,6 +18,9 @@ class _Fake:
     def detect_context(self):
         return self.ctx
 
+    def read_current_map(self):
+        return (3, 0)
+
     def read32(self, addr):
         return self.flags if addr == Addr.BATTLE_TYPE_FLAGS else 0
 

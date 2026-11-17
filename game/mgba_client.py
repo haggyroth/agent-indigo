@@ -43,6 +43,10 @@ class MGBAClient:
         self.session.post(f"{self.base}/mgba-http/button/hold",
                           params={"button": button, "duration": duration_frames})
 
+    def wait_until_idle(self, max_frames: int = 300, stable: int = 8) -> bool:
+        """The native backend's idle detector; the HTTP backend can't see the screen settle, so this is a no-op."""
+        return True
+
     def tick(self, frames: int = 9) -> None:
         """Let game time pass. The mGBA-http emulator runs in real time on its
         own, so this just sleeps ~frames/60s; the native backend steps frames.
