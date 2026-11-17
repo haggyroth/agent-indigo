@@ -24,7 +24,7 @@ def test_schemas_require_only_what_is_always_needed():
 def test_the_safari_quests_are_registered_and_offered():
     from agent.tools import TOOLS
     enum = next(t for t in TOOLS if t["function"]["name"] == "quest")["function"]["parameters"]["properties"]["name"]["enum"]
-    assert enum == ["ss_ticket", "cut", "surf", "strength"]
+    assert enum == ["ss_ticket", "cut", "surf", "strength", "coin_case"]
     text = listing({"ss_ticket"})
     assert "▶ surf" in text and "▶ strength" in text and resolve("Strength").key == "strength"
 

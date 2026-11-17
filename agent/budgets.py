@@ -6,6 +6,7 @@ BUDGETS = {
     "go_to": (240_000, 15_000),     # cross-map trips with fights en route
     "quest": (300_000, 15_000),           # Nugget Bridge + Bill's cottage; the S.S. Anne and the Captain
     "pc": (90_000, 12_000),
+    "game_corner": (600_000, 30_000),   # up to 200 slot spins (~700 frames each); the coin counter is part of "progress"
     "heal": (60_000, 12_000),
     "shop": (60_000, 12_000),
     "use_move": (30_000, 9_000),

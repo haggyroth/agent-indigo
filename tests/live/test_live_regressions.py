@@ -670,3 +670,51 @@ def test_quest_surf_takes_the_secret_house_hm_and_the_gold_teeth_on_one_visit(li
     assert live.r.read_flag(0x239) and live.r.read_flag(0x189), out           # HM03 and the Gold Teeth taken
     assert "quest('strength')" in out and live.r.read_money() == 4500 and not live.c._in_safari_zone(), out
     assert live.r.detect_context() == GameContext.OVERWORLD
+
+
+def test_game_corner_prizes_coins_and_the_coin_case(live):
+    """#215: the Prize Corner (coins → TM/item/Pokémon), the coin clerk (yen → coins) and the Coin Case man, on the real ROM."""
+    _fly_to_celadon(live)
+    live.set_flag(0x243, False)
+    assert "No Coin Case" in live.c._execute("game_corner", json.dumps({"action": "status"}))
+    out = ""
+    for _ in range(6):
+        out = live.c._execute("quest", json.dumps({"name": "coin_case"}))
+        if out.startswith("Got the Coin Case"):
+            break
+    assert out.startswith("Got the Coin Case") and live.r.read_flag(0x243), out
+    # buy coins with yen
+    live.set_money(30000)
+    live.set_coins(0)
+    out = live.c._execute("game_corner", json.dumps({"action": "buy_coins", "amount": 100}))
+    assert out.startswith("Bought 100 coins for ¥2000") and live.r.read_coins() == 100 and live.r.read_money() == 28000, out
+    # not enough coins for a prize: explained, with the cost of buying the rest
+    out = live.c._execute("shop", json.dumps({"item": "Thunderbolt"}))
+    assert "costs 4000 coins" in out and "3900 more" in out, out
+    # enough coins: the TM arrives and the coins drop by exactly its price
+    live.set_coins(4100)
+    had = dict(live.r.read_tmhm_pocket()).get(312, 0)
+    out = live.c._execute("shop", json.dumps({"item": "TM24"}))
+    assert out.startswith("Exchanged 4000 coins for TM24 Thunderbolt"), out
+    assert dict(live.r.read_tmhm_pocket()).get(312) == had + 1 and live.r.read_coins() == 100
+    assert live.r.detect_context() == GameContext.OVERWORLD
+    # a Pokémon prize goes to the party (or the PC) without a nickname detour
+    live.set_coins(200)
+    n0 = len(live.r.read_party())
+    out = live.c._execute("shop", json.dumps({"item": "Abra"}))
+    assert out.startswith("Exchanged 120 coins for Abra (L7)"), out
+    assert len(live.r.read_party()) == n0 + 1 and live.r.read_coins() == 80
+    assert live.r.detect_context() == GameContext.OVERWORLD
+
+
+def test_slot_machine_driver_plays_and_pays(live):
+    """#215: seat at a machine, bet 3, stop reels on a bias-serving frame, wait for the payout, quit — coins add up exactly."""
+    _fly_to_celadon(live)
+    live.set_flag(0x243)
+    live.set_coins(300)
+    start = live.r.read_coins()
+    out = live.c._execute("game_corner", json.dumps({"action": "slots", "amount": 12}))
+    assert out.startswith("Played ") and "spins at 3 coins" in out, out
+    assert live.r.detect_context() == GameContext.OVERWORLD and live.m.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_SLOT_MACHINE
+    net = live.r.read_coins() - start
+    assert f"{net:+d} coins" in out, out
