@@ -17,6 +17,7 @@ from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKE
                     ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT)
 from agent import events
 from agent.skills.base import SkillBase
+from agent.skills.gamecorner import GameCornerMixin
 from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.quests import QuestMixin
@@ -33,7 +34,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -312,7 +313,7 @@ class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMix
         like Growl-spam or a Bag<->Run bounce keeps changing those while nothing real advances."""
         r = self.reader
         sig = (r.read_current_map(), r.read_player_pos(),
-               tuple((p.species_id, p.level) for p in r.read_party()), r.read_money())
+               tuple((p.species_id, p.level) for p in r.read_party()), r.read_money(), r.read_coins())
         from game.state import GameContext
         if r.detect_context() == GameContext.IN_BATTLE:
             foe = r.read_enemy_lead()
@@ -426,6 +427,8 @@ class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMix
                 if self.reader.detect_context() == GameContext.IN_BATTLE:
                     return self._use_item(args["item"])
                 return self._field_use_item(args["item"], str(args.get("target", "") or ""))
+            case "game_corner":
+                return self._game_corner(str(args.get("action", "status") or "status"), int(args.get("amount", 0) or 0))
             case "save_game":
                 return self._save_game()
             case "safari":

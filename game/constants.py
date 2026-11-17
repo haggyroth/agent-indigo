@@ -56,6 +56,9 @@ class Addr:
     # action, 0x0802E439 on later turns (live-verified). Both mean "the FIGHT/BAG/
     # POKEMON/RUN menu is up and waiting for input".
     CTRL_CHOOSE_ACTION_ALT = 0x0802E439
+    # gMain.callback2 while a slot machine is on screen (CB2_RunSlotMachine; live-verified). Its game state is a heap block, found
+    # at run time by the spinning pattern (see GameCornerMixin._slot_state_addr).
+    CB2_SLOT_MACHINE = 0x0813F925
     # Safari Zone battles have their own controller (battle_controller_safari.c): its HandleInputChooseAction is up while the
     # BALL / BAIT / GO NEAR / RUN menu waits (live-verified). The 2x2 menu cursor (ACTION_CURSOR): 0 BALL, 1 BAIT, 2 GO NEAR
     # (throw a rock), 3 RUN.
@@ -215,6 +218,7 @@ class Addr:
     SAVEBLOCK2_PTR       = 0x0300500C   # deref → gSaveBlock2
     ENCRYPTION_KEY_OFFSET = 0xF20       # + [SAVEBLOCK2_PTR] → u32 XOR key
     MONEY_OFFSET         = 0x290        # + [SAVEBLOCK1_PTR] → u32 money ^ key
+    COINS_OFFSET         = 0x294        # + [SAVEBLOCK1_PTR] → u16 Game Corner coins ^ (key & 0xFFFF)
     ITEMS_OFFSET         = 0x310        # Items pocket (42 slots × 4 bytes)
     ITEMS_SLOTS          = 42
     BALLS_OFFSET         = 0x430        # Poké Balls pocket (13 slots × 4 bytes)

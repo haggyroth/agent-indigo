@@ -232,13 +232,14 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `catch` | battle | nickname? | Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's). |
 | `enter_name` | menus / naming screens | name | Type a name on the naming screen when one is open (a nickname, or the player/rival name in a new game) and confirm it. |
 | `read_game_state` | overworld | — | Read current game state: party HP, battle status, badges, location. |
+| `game_corner` | overworld | action?, amount? | The Celadon Game Corner (needs the Coin Case: quest('coin_case')). |
 | `save_game` | overworld | — | Write a REAL cartridge save (the in-game SAVE: Start → Save → Yes → Yes), confirmed by the game's save counter. |
 | `save_state` | overworld | slot? | Save state to a slot.  Call before gym leaders and Elite Four. |
 | `load_state` | overworld | slot? | Load a save state.  Used after a loss. |
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 35 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 36 tools in total.
 <!-- TOOLS:END -->
 
 The opponent is identified from memory (`gEnemyParty`), so there is no

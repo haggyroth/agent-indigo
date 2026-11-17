@@ -47,6 +47,7 @@ class SkillState:
     _grind_run = None            # the grind session in progress (None = none); abandoned by any other travel tool
     _training_swapped = False    # the ace is benched behind a lagging lead until the session ends (see _grind_finish)
     _wander_dir = "Up"           # heading while wandering the grass
+    _slot_trace = None           # a list while debugging the slot driver: one record per reel stop (state, wait, where it landed)
 
     # ── battle ──────────────────────────────────────────────────────────────────────────────────
     _status_streak = (None, 0)   # (status, turns) so a long-lasting status is not re-explained every turn

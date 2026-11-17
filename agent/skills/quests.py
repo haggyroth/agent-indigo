@@ -21,6 +21,9 @@ BILL_GFX, CLEFAIRY_GFX = 73, 113          # OBJ_EVENT_GFX_BILL / OBJ_EVENT_GFX_C
 COTTAGE = (30, 0)
 FLAG_GOT_HM01 = 0x237
 FLAG_GOT_HM03, FLAG_GOT_HM04 = 0x239, 0x23A
+FLAG_GOT_COIN_CASE = 0x243
+RESTAURANT, COIN_CASE_MAN = (10, 17), (1, 2)       # Celadon Restaurant; the man who gives the Coin Case away
+COIN_CASE_SPOTS = (((2, 2), "Left"), ((1, 3), "Up"), ((1, 1), "Down"))
 FLAG_GOLD_TEETH_TAKEN = 0x189             # FLAG_HIDE_SAFARI_ZONE_WEST_GOLD_TEETH: set once the item ball is picked up
 SURF_MOVE_ID, STRENGTH_MOVE_ID = 57, 70
 SAFARI_ENTRANCE, SAFARI_CENTER, SAFARI_WEST, SECRET_HOUSE, WARDENS_HOUSE = (11, 0), (1, 63), (1, 66), (1, 71), (11, 7)
@@ -62,6 +65,8 @@ class QuestMixin:
             done.add("ss_ticket")
         if self._knows_cut():
             done.add("cut")
+        if self.reader.read_flag(FLAG_GOT_COIN_CASE):
+            done.add("coin_case")
         if self._knows_move(SURF_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM03):
             done.add("surf")
         if self._knows_move(STRENGTH_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM04):
@@ -77,7 +82,7 @@ class QuestMixin:
         if missing:
             return f"quest('{q.key}') needs quest('{missing[0]}') first."
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
-                "strength": self._get_strength}[q.key](auto_trainers)
+                "strength": self._get_strength, "coin_case": self._get_coin_case}[q.key](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:
@@ -200,6 +205,36 @@ class QuestMixin:
             self._advance_to_control(tries=24)
         self._leave_safari_zone()
         return None
+
+    def _get_coin_case(self, auto_trainers: bool = False) -> str:
+        if self.reader.read_flag(FLAG_GOT_COIN_CASE):
+            return "You already have the Coin Case — game_corner('status')."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        for _ in range(10):
+            if tuple(self.reader.read_current_map()) == RESTAURANT:
+                break
+            out = self._go_to("Celadon Restaurant", mode="yield", auto_trainers=auto_trainers, resume_call="quest('coin_case')")
+            if tuple(self.reader.read_current_map()) == RESTAURANT:
+                break
+            if self.reader.detect_context() == GameContext.IN_BATTLE:
+                return out
+            if "Can't get to" in out or "No route" in out:
+                return f"Can't reach the Celadon Restaurant: {out}"
+        if tuple(self.reader.read_current_map()) != RESTAURANT:
+            return "Didn't reach the Celadon Restaurant yet — call quest('coin_case') again to continue (it resumes)."
+        if not self._talk_to(COIN_CASE_SPOTS):
+            if (b := self._quest_battle("quest('coin_case')", "the Coin Case man")):
+                return b
+            return "Couldn't reach the man in the corner — walk_to (2,2), face left, press A."
+        for _ in range(10):
+            if self.reader.read_flag(FLAG_GOT_COIN_CASE):
+                break
+            self._advance_to_control(tries=30)
+        if not self.reader.read_flag(FLAG_GOT_COIN_CASE):
+            return "Talked to the man but no Coin Case yet — quest('coin_case') again."
+        self._advance_to_control(tries=24)
+        return "Got the Coin Case. The Game Corner is next door: game_corner('buy_coins', 50) then game_corner('slots', 20)."
 
     def _get_surf(self, auto_trainers: bool = False) -> str:
         if self._knows_move(SURF_MOVE_ID):

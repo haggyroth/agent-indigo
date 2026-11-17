@@ -191,6 +191,14 @@ Wild battles on the way are opportunities (XP, a new species), not just obstacle
 fight it for XP when the team needs levels, or catch it if the advice says it is worth a ball. Pay attention to PP in "Your moves" — don't keep leaning on one move
 until it runs dry; rotate to another good attack, switch to a Pokémon with PP left, or heal.
 
+## The Celadon Game Corner
+`quest('coin_case')` (a man in the Celadon Restaurant) unlocks it. `game_corner('buy_coins', N)` buys coins (¥20 each),
+`game_corner('slots', N)` plays N full-bet spins and stops on a bad streak, and `shop(item='TM24' | 'Abra' | 'Smoke Ball' …)` spends
+coins at the Prize Corner (TM13 Ice Beam 4000, TM24 Thunderbolt 4000, TM35 Flamethrower 4000, TM30 Shadow Ball 4500, TM23 Iron Tail
+3500; Abra 120, Clefairy 750, Pinsir 2500, Dratini 4600, Porygon 6500). The slot driver is not luck: it reads the machine's hidden
+bias and stops each reel where it serves it, which pays about +16 coins a spin in practice (jackpots are 300) — so slots are the
+cheap way to a TM, but watch the clock: a session is ~200 frames a spin.
+
 ## The Safari Zone
 `quest('surf')` and `quest('strength')` pay the ¥500 entry and do the whole trip (Center → East → North → West; HM03 from the Secret
 House, the Gold Teeth for the Warden). Inside, wild encounters are SAFARI battles: no moves, party or Bag — only
