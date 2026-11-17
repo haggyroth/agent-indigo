@@ -367,6 +367,11 @@ class LeafGreenReader:
                     bag[iid] = qty
         return bag
 
+    def count_item(self, item_id: int) -> int:
+        """How many of `item_id` the player holds, in the Items / Poké Balls pockets or the TM case."""
+        n = self.read_bag().get(item_id, 0)
+        return n or dict(self.read_tmhm_pocket()).get(item_id, 0)
+
     def read_items_pocket(self) -> list[tuple[int, int]]:
         """The Items pocket as an ORDERED [(item_id, quantity)] list, in the same slot
         order the in-game list displays (compacted — empties skipped). use_item needs

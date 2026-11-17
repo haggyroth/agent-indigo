@@ -224,6 +224,9 @@ You can never deposit your last battle-ready Pokémon.
    line shows you're low on Poké Balls or Potions** (and you're not mid-dungeon). It
    travels to the Mart and buys the right items for your badge count automatically —
    you don't drive the shop menu. Do this before a gym or a long route.
+   `shop(item='…')` buys ONE specific thing from the nearest clerk that sells it — a TM ('TM28'/'Dig'), a stone, a vitamin
+   (Protein…), an X-item, Super Repel. The Celadon Dept. Store (2F TMs, 4F stones, 5F vitamins and X-items) is the only place
+   for most of these; check your money first, and note some TMs are also free story rewards (TM28 Dig: the Rocket Grunt in Cerulean).
 8. save_state before every gym leader and every Elite Four member.
    Getting out without walking (see the 'Exit shortcut' / 'Shortcut' line when one applies): in a cave, forest or dungeon an
    Escape Rope or use_hm('Dig') warps you to its entrance; OUTDOORS use_hm('Teleport') warps to the last Pokémon Center you healed

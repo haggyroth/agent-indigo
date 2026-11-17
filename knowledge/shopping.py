@@ -116,3 +116,60 @@ def shopping_summary(bag: dict[int, int], badges: int, money: int) -> str:
         return ""
     parts = [f"{ln['qty']}× {ln['name']} (¥{ln['subtotal']})" for ln in plan["lines"]]
     return f"Restock (¥{plan['total']} of ¥{money}): " + ", ".join(parts)
+
+
+# ── buying a SPECIFIC item (shop(item=…)): which clerk sells it, where to stand ─────────────────────────────────────
+# Things a clerk sells that the story also hands out for free (the model should not pay for what it can earn).
+FREE_SOURCES: dict[int, str] = {
+    316: "TM28 Dig is also a free reward in Cerulean City: beat the Rocket Grunt at the robbed house (he drops it)",
+}
+
+
+def item_label(item_id: int) -> str:
+    """'TM28 Dig' for a TM/HM, else the shop's display name ('Super Repel')."""
+    from knowledge.shop_stock import ITEM_LABELS
+    from knowledge.tmhm import TMHM
+    if item_id in TMHM:
+        label, move, _ = TMHM[item_id]
+        return f"{label} {move}"
+    return ITEM_LABELS.get(item_id) or ITEM_NAMES.get(item_id, f"item #{item_id}")
+
+
+def resolve_item(text: str) -> tuple[int | None, list[str]]:
+    """(item id, []) for a name some clerk sells — 'TM28', 'Dig', 'super repel', 'protein' — else (None, close names)."""
+    from knowledge.shop_stock import SHOPS
+    from knowledge.tmhm import resolve_tmhm
+    sold = {i for s in SHOPS for i in s[4]}
+    key = str(text or "").strip().lower().replace("é", "e")
+    tm = resolve_tmhm(key)
+    if tm in sold:
+        return tm, []
+    names = {i: item_label(i).lower().replace("é", "e") for i in sold}
+    exact = [i for i, n in names.items() if n == key]
+    partial = exact or [i for i, n in names.items() if key and key in n]
+    if len(partial) == 1:
+        return partial[0], []
+    return None, sorted(item_label(i) for i in (partial or [])[:6])
+
+
+def shops_selling(item_id: int) -> list[tuple]:
+    """[(map_bank, map_id, clerk_x, clerk_y)] for every clerk that sells `item_id`."""
+    from knowledge.shop_stock import SHOPS
+    return [(b, m, x, y) for b, m, x, y, items in SHOPS if item_id in items]
+
+
+def approach_options(clerk: tuple, passable, reachable=None) -> list[tuple]:
+    """[((x, y), facing)] — where the customer can stand to talk to `clerk`. A clerk sits behind a counter: the tile beside them is
+    often counter or enclosure, so the answer is either that adjacent floor tile or, when it is not floor, the tile BEYOND it
+    (talking across the counter works). `passable(x, y)` = floor; `reachable(x, y)` (default: any floor) = the player can get there,
+    which rules out the clerk's own side of the counter."""
+    reachable = reachable or passable
+    cx, cy = clerk
+    out = []
+    for dx, dy, face in ((0, 1, "Up"), (1, 0, "Left"), (-1, 0, "Right"), (0, -1, "Down")):
+        near, far = (cx + dx, cy + dy), (cx + 2 * dx, cy + 2 * dy)
+        if reachable(*near):
+            out.append((near, face))
+        elif not passable(*near) and reachable(*far):
+            out.append((far, face))
+    return out

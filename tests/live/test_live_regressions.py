@@ -476,3 +476,37 @@ def test_quest_lists_progress_and_refuses_what_is_blocked(live):
     out = live.c._execute("quest", "{}")
     assert out.startswith("Story quests:") and "ss_ticket" in out and "cut" in out, out
     assert "needs quest('ss_ticket') first" in live.c._execute("quest", json.dumps({"name": "cut"})) or "already" in out
+
+
+def _fly_to_celadon(live):
+    """Stage: Fly (Thunder Badge + visited flag) from the Vermilion fixture to Celadon City."""
+    live.load("vermilion")
+    live.patch_mon(0, moves=[33, 19, 0, 0], pps=[35, 15, 0, 0])
+    live.set_badges(0b111)                                   # Boulder, Cascade, Thunder
+    live.set_flag(0x896)                                     # Celadon visited
+    out = live.c._execute("fly_to", json.dumps({"town": "Celadon"}))
+    assert live.r.read_current_map() == (3, 6), out
+
+
+def test_shop_item_buys_a_tm_at_the_celadon_dept_store(live):
+    """#215: shop(item='TM28') flies nowhere — it walks Celadon City → Dept. Store 2F, stands across the counter from the TM clerk
+    and buys; too little money is refused up front; an item nobody sells is explained."""
+    _fly_to_celadon(live)
+    live.set_money(1500)
+    assert "costs ¥2000 and you have ¥1500" in live.c._execute("shop", json.dumps({"item": "TM28"}))
+    assert "No clerk sells 'Masterball'" in live.c._execute("shop", json.dumps({"item": "Masterball"}))
+    live.set_money(5000)
+    had = dict(live.r.read_tmhm_pocket()).get(316, 0)
+    out = ""
+    for _ in range(8):
+        out = live.c._execute("shop", json.dumps({"item": "TM28"}))
+        if out.startswith("Bought") or live.r.detect_context() != GameContext.OVERWORLD:
+            break
+    assert out.startswith("Bought 1× TM28 Dig (¥2000)"), out
+    assert dict(live.r.read_tmhm_pocket()).get(316) == had + 1 and live.r.read_money() == 3000
+    assert live.r.read_current_map() == (10, 1) and live.r.detect_context() == GameContext.OVERWORLD
+    # the other clerk on the same floor (the Items counter two tiles away) sells ordinary goods: quantity and the right clerk
+    reps = dict(live.r.read_items_pocket()).get(83, 0)
+    out = live.c._execute("shop", json.dumps({"item": "Super Repel", "quantity": 2}))
+    assert out.startswith("Bought 2× Super Repel (¥1000)"), out
+    assert dict(live.r.read_items_pocket()).get(83) == reps + 2 and live.r.read_money() == 2000

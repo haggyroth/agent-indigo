@@ -431,8 +431,9 @@ class NavMixin:
                 return None, f"No {dest} reachable from here."
             target_map = found[0]
             return target_map, MAP_NAMES.get(target_map, dest.title())
-        matches = [(k, v) for k, v in MAP_NAMES.items()
-                   if v.lower() == dest or dest in v.lower()]
+        from knowledge.shop_stock import SHOP_NAMES        # shop interiors (Dept. Store floors…): reachable by name too
+        matches = [(k, v) for k, v in {**MAP_NAMES, **SHOP_NAMES}.items()
+                   if v.lower().replace("é", "e") == dest or dest in v.lower().replace("é", "e")]
         if not matches:
             return None, f"Unknown destination '{destination}'."
         exact = [(k, v) for k, v in matches if v.lower() == dest]

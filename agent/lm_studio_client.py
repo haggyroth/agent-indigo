@@ -410,7 +410,7 @@ class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMix
             case "heal":
                 return self._heal()
             case "shop":
-                return self._shop()
+                return self._shop(str(args.get("item", "") or ""), int(args.get("quantity", 1) or 1))
             case "pick_up_items":
                 return self._pick_up_items()
             case "use_item":
