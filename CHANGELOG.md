@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — the observation builder leaves `main.py` (#214, part 2)
+- `agent/observation.py` replaces the 370-line `build_observation` that lived inline in `main.py` (1,199 → 819 lines). It is now a
+  composition of named sections — header, lead, readiness + bag digest, shortcuts (Escape Rope / Dig / Teleport, Repel), trip,
+  battle (moves, boosters, volatiles, catch advice), supplies (bag, PP, Mart, PC), gym, field (tiles, items, direction), exits, and
+  loop signals — each returning the lines it contributes, in the order the model has always seen them.
+- Every import is at module level (the per-tick path no longer imports anything), and reads that can fail on a half-loaded screen go
+  through one `_safe(key, fn, default)` that logs the first failure of each kind.
+- Behaviour is unchanged: the old and new builders were run side by side on seven real-ROM states (overworld, mid-battle, forced
+  switch, a staged wild battle…) and produced byte-identical text; a permanent live test keeps the sections honest.
+
 ### Changed — backend capabilities and tolerated failures (#214, part 1)
 - **One capability check instead of twenty.** `agent/skills/base.py::SkillBase._wait_idle()` is the only place that asks whether the
   emulator can wait for the screen to settle (the legacy HTTP client now has a no-op `wait_until_idle`, so it is just a fake in tests
