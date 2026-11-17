@@ -98,7 +98,6 @@ Pokemon_LeafGreen.gba
    │                            the nav/battle skills (walk_to/go_to/go_to_map/use_move)
    ├── agent/tools.py           Tool schemas + button-name normalization
    ├── agent/history.py         Message trimming + control-token stripping (dependency-light)
-   ├── agent/reward.py          Shaped/sparse reward tracker
    ├── memory/short_term.py     Current context (in-process)
    ├── memory/long_term.py      Persistent progress → logs/progress.json
    ├── memory/battle_journal.py JSONL log + retrieval
@@ -117,7 +116,7 @@ Pokemon_LeafGreen.gba
 ```
 
 **Module boundaries — never cross these:**
-- `game/` drives the emulator (native binding or legacy mGBA-http) and does memory decoding. No LLM, no reward logic.
+- `game/` drives the emulator (native binding or legacy mGBA-http) and does memory decoding. No LLM, no scoring logic.
 - `agent/` talks only to LM Studio. Interacts with the game only through tool execution.
 - `memory/` reads/writes memory structures only. No network I/O.
 - `knowledge/` is pure data and string construction. Zero I/O.
@@ -145,7 +144,7 @@ ones:
 | Script engine | `0x03000EB0` | byte[0] ≠ 0 while a map script/dialog runs |
 | Screen fade | `0x03000F9C` | 1 while a menu is on screen **or** mid-fade; clears the instant a menu closes |
 | `gBattleTypeFlags` | `0x02022B4C` | TRAINER bit `0x08`; set at battle init, read at battle start |
-| Bag key-items pocket | `gSaveBlock1(0x03005008) + 0x3B8` | 30 slots; count non-empty for the `key_item` reward |
+| Bag key-items pocket | `gSaveBlock1(0x03005008) + 0x3B8` | 30 slots; count non-empty for the `key_item` event |
 | Current map (bank/id) | deref `PLAYER_PTR` `+0x04`/`+0x05` | the TRUE current map (interior-aware); the absolute `0x02031DBC/DBD` is the stale *parent outdoor* map |
 | `gEnemyParty[0]` | `0x0202402C` | opponent's active Pokémon — same 100-byte Gen III struct as gPlayerParty; fixed global. `read_enemy_lead()` |
 | `gObjectEvents` | `0x02036E38` (= OW slot 0) | NPCs on screen; 36-byte stride, `currentCoords` at +0x10/+0x12 = grid coord **+7**. walk_to routes around them |
@@ -256,31 +255,13 @@ The opponent is identified from memory (`gEnemyParty`), so there is no
 5. `catch()` a weakened wild Pokémon to build a team (a lone mon can't sustain a dungeon/E4).
 6. Save state before every gym leader and every E4 trainer; after a loss, load and retry.
 
-### Reward Schedule
+### Run statistics (there is no reward)
 
-| Event | Shaped (≤4 badges) | Sparse (>4 badges) |
-|-------|-------------------|-------------------|
-| Beat random trainer | +1.0 | +0.0 |
-| Beat gym leader | +10.0 | +10.0 |
-| Beat Elite Four member | +15.0 | +15.0 |
-| Beat Champion | +50.0 | +100.0 |
-| New badge | +5.0 | +10.0 |
-| New town | +2.0 | +0.0 |
-| Catch new species | +1.0 | +0.0 |
-| Level up | +0.5 | +0.0 |
-| Key item | +2.0 | +0.0 |
-| Party faint | −1.0 | −0.5 |
-| Blackout/loss | −2.0 | −1.0 |
-
-Call `reward.anneal_to_sparse()` after the 4th badge.
-
-All events above are wired in `main.py` **except** `elite_four_win` / `champion_win`
-(the E4/Champion are trainer battles, so they currently fire `trainer_win`;
-distinguishing them needs their trainer IDs — tracked in issue #22). Battle type
-is read from `gBattleTypeFlags` (`0x02022B4C`), key items from the bag key-items
-pocket.
-
----
+The old shaped→sparse reward was a scoreboard nothing read (never shown to the model, Elite Four / Champion terms never wired), so it
+was removed (#212). What a run did is read from the event stream (`agent/events.py`): `events.run_stats()` — battles by outcome
+(won / lost / fled / caught / drew), trainer wins, catches, level-ups, evolutions, faints, blackouts, badges, new towns, key items,
+heals — printed at the end of a run (`events.stats_line()`), stored in the eval scorecard (`EpisodeResult.stats`) and in `run.jsonl`'s
+`end` record. Cumulative counters (`battles_won/lost/fled/caught`, `pokemon_caught`) live in `logs/progress.json`.
 
 ## Development Reference
 

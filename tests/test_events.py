@@ -168,3 +168,23 @@ def test_the_foe_is_only_announced_once_the_menu_is_up_and_an_unseen_battle_stil
     r2.ctx, r2.outcome = GameContext.OVERWORLD, Addr.B_OUTCOME_RAN
     events.observe(r2)
     assert texts("battle_end") == ["wild battle fled"]
+
+
+def test_run_stats_summarise_the_run_by_real_outcome():
+    foe = NS(species_id=19, species_name="RATTATA", level=4, current_hp=14, max_hp=14)
+    for code, trainer in ((Addr.B_OUTCOME_WON, False), (Addr.B_OUTCOME_WON, True), (Addr.B_OUTCOME_RAN, False),
+                          (Addr.B_OUTCOME_CAUGHT, False)):
+        r = FakeReader([mon()], ctx=GameContext.IN_BATTLE, foe=foe, outcome=code, trainer=trainer)
+        events.observe(r)
+        r.ctx = GameContext.OVERWORLD
+        events.observe(r)
+    events.emit("level_up", "x reached L6")
+    events.emit("level_up", "x reached L7")
+    events.emit("faint", "y fainted")
+    s = events.run_stats()
+    assert s["battles"] == {"won": 2, "fled": 1, "caught": 1} and s["trainer_wins"] == 1
+    assert (s["level_ups"], s["faints"], s["blackouts"]) == (2, 1, 0)
+    line = events.stats_line()
+    assert "battles 4 (2 won, 1 fled, 1 caught)" in line and "level-ups 2" in line and "faints 1" in line
+    events.configure(None, None)
+    assert events.run_stats()["battles"] == {} and events.stats_line().startswith("badges 0 · battles 0")

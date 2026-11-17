@@ -75,18 +75,3 @@ class StateDiff:
             self.moves_changed, self.party_size_changed,
             self.battle_started, self.battle_ended, self.context_changed,
         ])
-
-
-def newly_fainted_slots(before: list[PokemonStatus],
-                        after: list[PokemonStatus]) -> list[int]:
-    """Party slots that transitioned from alive (HP > 0) to fainted (HP == 0)
-    between two states. Used to fire the party_faint reward once per faint."""
-    out = []
-    by_pid = {p.personality: p for p in before if p.personality}
-    for i, a in enumerate(after):
-        # pair a Pokémon with ITSELF (personality value), not with whatever now sits in the same slot: a switch,
-        # set_lead or the battle party screen permutes the party, which read as one faint and one miss
-        b = by_pid.get(a.personality) if a.personality else (before[i] if i < len(before) else None)
-        if b is not None and b.current_hp > 0 and a.current_hp == 0:
-            out.append(i)
-    return out

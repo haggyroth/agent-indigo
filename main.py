@@ -3,10 +3,9 @@ from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACK
                     USE_VISION, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
                     LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY, IV_PEEK_BEFORE_CATCH)
 from game.memory_reader import LeafGreenReader
-from game.state import GameContext, GameState, StateDiff, newly_fainted_slots
+from game.state import GameContext, GameState, StateDiff
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
-from agent.reward import RewardTracker
 from agent import events
 from memory.short_term import ShortTermMemory
 from memory.long_term import LongTermMemory
@@ -63,9 +62,9 @@ def _party_brief(s: GameState) -> list:
     return out
 
 
-def _run_summary(reward, client, steps: int) -> str:
-    """One-line end-of-run tally: steps, reward, and LLM usage (spend visibility)."""
-    return (f"steps={steps}  reward={reward.total:.1f}  "
+def _run_summary(client, steps: int) -> str:
+    """One-line end-of-run tally: steps, what happened (the event-stream statistics) and LLM usage (spend visibility)."""
+    return (f"steps={steps}  {events.stats_line()}  "
             f"llm_calls={client.llm_calls}  tokens={client.total_tokens} "
             f"(prompt={client.total_prompt_tokens}, completion={client.total_completion_tokens})")
 
@@ -86,7 +85,6 @@ class AgentRuntime:
     ltm:     LongTermMemory
     stm:     ShortTermMemory
     journal: BattleJournal
-    reward:  RewardTracker
     tilemap: TilemapReader
 
 
@@ -96,13 +94,13 @@ class EpisodeResult:
     reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | interrupted | error_budget
     passed:            bool           # goal predicate satisfied
     steps:             int
-    reward:            float
     llm_calls:         int
     prompt_tokens:     int
     completion_tokens: int
     final_map:         tuple[int, int]
     final_pos:         tuple[int, int]
     badges:            int
+    stats:             dict = field(default_factory=dict)    # events.run_stats(): battles by outcome, catches, level-ups, faints…
     milestones:        list[str] = field(default_factory=list)
     stuck_ratio:       float = 0.0    # fraction of overworld decision ticks with no movement
     goal_desc:         str = ""
@@ -113,7 +111,7 @@ class EpisodeResult:
 
     def summary(self) -> str:
         flag = "PASS" if self.passed else "----"
-        return (f"[{flag}] {self.reason}  steps={self.steps}  reward={self.reward:.1f}  "
+        return (f"[{flag}] {self.reason}  steps={self.steps}  "
                 f"map={self.final_map} pos={self.final_pos}  badges={self.badges}  "
                 f"stuck={self.stuck_ratio:.0%}  llm_calls={self.llm_calls}  "
                 f"tokens={self.total_tokens}")
@@ -303,7 +301,6 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
     client  = AgentClient(mgba, reader, ltm)
     stm     = ShortTermMemory()
     journal = BattleJournal(path=journal_path)
-    reward  = RewardTracker(shaped=True)
 
     if fresh_session:
         ltm.new_session()
@@ -328,7 +325,7 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
         say(f"[yellow]Adopted from the save into LTM: {', '.join(_sync['adopted'])}[/]")
 
     return AgentRuntime(mgba=mgba, reader=reader, client=client, ltm=ltm,
-                        stm=stm, journal=journal, reward=reward, tilemap=tilemap)
+                        stm=stm, journal=journal, tilemap=tilemap)
 
 
 @dataclass
@@ -366,28 +363,22 @@ _JOURNAL_OUTCOME = {"won": "win", "lost": "loss", "drew": "draw"}
 _last_ltm_save = 0.0
 
 
-def _record_battle(s: dict, run: "_RunState", reader: LeafGreenReader, reward: RewardTracker,
+def _record_battle(s: dict, run: "_RunState", reader: LeafGreenReader,
                    ltm: LongTermMemory, journal: BattleJournal) -> None:
     """Book one finished battle — called by the event stream exactly once per battle wherever it was fought (a
-    skill, a tool call or the main loop): counters by real outcome, the reward, and a journal row with the foe,
+    skill, a tool call or the main loop): counters by real outcome and a journal row with the foe,
     turns and moves actually used."""
     global _last_ltm_save
     ltm.data["total_battles"] = ltm.data.get("total_battles", 0) + 1
     key = _OUTCOME_COUNTER.get(s["outcome"])
     if key:
         ltm.data[key] = ltm.data.get(key, 0) + 1
-    earned = 0.0
-    if s["outcome"] == "won" and s["trainer"]:
-        # Gym leaders are trainers too and additionally fire gym_leader_win on the subsequent badge.
-        earned = reward.reward("trainer_win")
     if s["outcome"] == "caught":
         ltm.data["pokemon_caught"] = ltm.data.get("pokemon_caught", 0) + 1
         try:
             owned = reader.read_pokedex()[0]
         except Exception:
             owned = None
-        if owned is not None and run.prev_dex_owned is not None and owned > run.prev_dex_owned:
-            earned += reward.reward("caught_new")             # a species the Pokédex had not registered yet
         if owned is not None:
             run.prev_dex_owned = owned
     foe = (s.get("foe_name") or "").upper().strip()
@@ -404,7 +395,6 @@ def _record_battle(s: dict, run: "_RunState", reader: LeafGreenReader, reward: R
         turns=int(s.get("turns") or 0),
         moves_used=list(s.get("moves") or []),
         hp_remaining_pct=round(float(s.get("hp_pct") or 0.0), 2),
-        reward=round(earned, 2),
         notes=", ".join(bits),
     ))
     now = time.time()
@@ -419,21 +409,18 @@ def _handle_battle_end(run: _RunState) -> None:
     run.current_enemy = ""
 
 
-def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
-                   reader: LeafGreenReader, reward: RewardTracker,
-                   ltm: LongTermMemory) -> None:
-    """Apply auto-rewards + auto-milestones derived from this tick's state diff.
+def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
+                    reader: LeafGreenReader, ltm: LongTermMemory) -> None:
+    """Auto-milestones and long-term progress derived from this tick's state diff (badges, key items, the starter).
 
     Reads `run.prev_state` for "increased" comparisons and updates
     `run.prev_key_items` so the next tick can detect a new key item."""
     if diff.badges_changed:
-        # Only reward/record when badge count genuinely increased. A spurious read
+        # Only record when badge count genuinely increased. A spurious read
         # (e.g. badge_bits glitches 0→non-0→0) triggers badges_changed without
         # state.badges > run.prev_state.badges.
         if run.prev_state is not None and state.badges > run.prev_state.badges:
-            reward.reward("new_badge")
             # A badge increase means a gym leader was just defeated.
-            reward.reward("gym_leader_win")
             # Use raw bitmask diff — state.badges is a popcount (0-8), not a
             # bitmask, so "state.badges & ~prev_state.badges" was WRONG.
             newly_set = state.badge_bits & (~run.prev_state.badge_bits & 0xFF)
@@ -446,21 +433,10 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
                     gym = next((g for g in GYMS if g["badge_bit"] == bit), None)
                     if gym:
                         ltm.add_badge(gym["leader"])
-            if reward.shaped and state.badges >= 4:
-                reward.anneal_to_sparse()
 
-    for _ in diff.level_changed:
-        reward.reward("level_up")
-
-    # Penalise each of our Pokémon fainting (once per faint).
-    if run.prev_state is not None:
-        for _slot in newly_fainted_slots(run.prev_state.party, state.party):
-            reward.reward("party_faint")
-
-    # Reward obtaining a key item (bag key-items pocket count increased).
+    # A key item was obtained (bag key-items pocket count increased).
     key_items = reader.read_key_item_count()
     if run.prev_key_items is not None and key_items > run.prev_key_items:
-        reward.reward("key_item")
         events.emit("key_item", f"key item obtained (bag now holds {key_items})")
     run.prev_key_items = key_items
     try:
@@ -476,11 +452,6 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
                 ltm.data["starter"] = starter
             if ltm.add_milestone("starter_chosen", f"chose {starter}"):
                 events.emit("milestone", f"milestone: starter_chosen ({starter})")
-
-    # Keep the in-memory reward total current; it's written to disk on the next
-    # ltm.save() (battle end / milestone / stop), not every tick — so a crash loses
-    # reward accrued since the last save (acceptably small).
-    ltm.data["total_reward"] = round(reward.total, 2)
 
 
 def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
@@ -816,8 +787,8 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
 
 
 def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenReader,
-                     reward: RewardTracker, ltm: LongTermMemory) -> bool:
-    """Handle an all-fainted party: fire the loss penalty once, then recover.
+                     ltm: LongTermMemory) -> bool:
+    """Handle an all-fainted party: announce the blackout once, then recover.
 
     Returns True if the caller should `continue` (the blackout path never falls
     through to the LLM decision step). Tries a slot-0 state reload first; if none
@@ -826,12 +797,10 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
     if not party_wiped:
         run.blackout_active = False   # recovered (respawn/heal) → re-arm
         return False
-    # Fire the loss penalty ONCE per blackout, not every tick while the party stays
-    # fainted (that double-counted the penalty indefinitely).
+    # Announce ONCE per blackout, not every tick while the party stays fainted.
     if not run.blackout_active:
         run.blackout_active = True
         events.emit("blackout", "BLACKOUT — all party fainted")
-        reward.reward("loss")
         ltm.save()
     # Try to reload the pre-fight state. If none was saved this session the load
     # FAILS (slot file missing) — don't pretend it worked and spin; let the game's
@@ -868,12 +837,12 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
     uses). The eval harness passes a goal predicate + step budget per scenario.
     Spend caps (MAX_LLM_CALLS/TOKEN_BUDGET) always apply as a safety net.
 
-    The body is a thin phase sequence — battle bookkeeping, reward application,
+    The body is a thin phase sequence — battle bookkeeping, milestone / progress updates,
     observation, blackout recovery, and the LLM decision — each a helper above.
     Only the per-tick locals (state/diff/in_battle) and loop accounting live here.
     """
     mgba, reader, client = rt.mgba, rt.reader, rt.client
-    ltm, stm, journal, reward, tilemap = rt.ltm, rt.stm, rt.journal, rt.reward, rt.tilemap
+    ltm, stm, journal, tilemap = rt.ltm, rt.stm, rt.journal, rt.tilemap
 
     run = _RunState()
     t_start = time.time()
@@ -882,7 +851,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
     rlog = run_log or NullRunLog()
     client.run_log = rlog
     events.configure(console if verbose else None, rlog, LOG_LEVEL)
-    events.on_battle_end(lambda s: _record_battle(s, run, reader, reward, ltm, journal))
+    events.on_battle_end(lambda s: _record_battle(s, run, reader, ltm, journal))
     ckpt = None
     if getattr(rlog, "dir", None) and CHECKPOINT_EVERY > 0 and hasattr(mgba, "save_state_file"):
         from memory.checkpoints import CheckpointManager
@@ -902,7 +871,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             s = reader.read_state()
         return EpisodeResult(
             reason=reason, passed=passed, steps=run.step_count,
-            reward=round(reward.total, 2), llm_calls=client.llm_calls,
+            stats=events.run_stats(), llm_calls=client.llm_calls,
             prompt_tokens=client.total_prompt_tokens,
             completion_tokens=client.total_completion_tokens,
             final_map=(s.map_bank, s.map_id), final_pos=(s.player_x, s.player_y),
@@ -1000,7 +969,6 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 town_name = MAP_NAMES.get(map_key)
                 if town_name and state.map_bank == 3 and state.map_id < 19:
                     if ltm.add_town(town_name):
-                        reward.reward("new_town")
                         events.emit("town", f"new town: {town_name}")
                 # Load overhead reference map (attach to next decision step)
                 if USE_VISION:
@@ -1009,9 +977,9 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                         console.print(f"[blue]Area map loaded: {run.pending_map_name}[/]")
                 run.prev_map_key = map_key
 
-            # ── Auto-reward + auto-milestone from state diff ────────────────
+            # ── Auto-milestones / long-term progress from the state diff ────────
             events.observe(reader)                    # books any battle that just ended (see _record_battle)
-            _apply_rewards(run, state, diff, reader, reward, ltm)
+            _apply_progress(run, state, diff, reader, ltm)
 
             # ── Build observation string ─────────────────────────────────────
             obs = build_observation(state=state, diff=diff, in_battle=in_battle,
@@ -1021,7 +989,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             events.emit("note", f"OBS: {obs[:140]}", debug=True, log=False)
 
             # ── Blackout check ───────────────────────────────────────────────
-            if _handle_blackout(run, state, mgba, reader, reward, ltm):
+            if _handle_blackout(run, state, mgba, reader, ltm):
                 continue
 
             # ── LLM decision step ────────────────────────────────────────────
@@ -1073,7 +1041,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                        map=[state.map_bank, state.map_id],
                        pos=[state.player_x, state.player_y], badges=state.badges,
                        party=_party_brief(state), obs=obs, reasoning=(reasoning or "")[:1500],
-                       actions=actions, reward=round(reward.total, 2),
+                       actions=actions,
                        llm_calls=client.llm_calls, tokens=client.total_tokens)
             if STATUS_EVERY and run.step_count and run.step_count % STATUS_EVERY == 0:
                 events.emit("status", _status_line(state, ltm, client, reader, run.step_count, t_start), major=False)
@@ -1086,7 +1054,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             if max_steps and run.step_count >= max_steps:
                 if verbose:
                     console.print(f"[green]Reached max_steps={max_steps} — stopping. "
-                                  f"{_run_summary(reward, client, run.step_count)}[/]")
+                                  f"{_run_summary(client, run.step_count)}[/]")
                 ltm.save()
                 return _result("max_steps", False, state)
             # Spend guards (matter for cloud endpoints; 0 = unlimited). Stop
@@ -1095,13 +1063,13 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             if MAX_LLM_CALLS and client.llm_calls >= MAX_LLM_CALLS:
                 if verbose:
                     console.print(f"[green]Reached MAX_LLM_CALLS={MAX_LLM_CALLS} — stopping. "
-                                  f"{_run_summary(reward, client, run.step_count)}[/]")
+                                  f"{_run_summary(client, run.step_count)}[/]")
                 ltm.save()
                 return _result("max_llm_calls", False, state)
             if TOKEN_BUDGET and client.total_tokens >= TOKEN_BUDGET:
                 if verbose:
                     console.print(f"[green]Reached TOKEN_BUDGET={TOKEN_BUDGET} — stopping. "
-                                  f"{_run_summary(reward, client, run.step_count)}[/]")
+                                  f"{_run_summary(client, run.step_count)}[/]")
                 ltm.save()
                 return _result("token_budget", False, state)
             # Wall-clock guard: an unattended run (esp. a local model that degrades on a
@@ -1110,13 +1078,13 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             if wall_deadline and time.time() >= wall_deadline:
                 if verbose:
                     console.print(f"[green]Reached wall-clock cap ({max_wall_s:.0f}s) — stopping. "
-                                  f"{_run_summary(reward, client, run.step_count)}[/]")
+                                  f"{_run_summary(client, run.step_count)}[/]")
                 ltm.save()
                 return _result("max_wall", False, state)
 
         except KeyboardInterrupt:
             if verbose:
-                console.print(f"\n[red]Stopped.[/] {_run_summary(reward, client, run.step_count)}")
+                console.print(f"\n[red]Stopped.[/] {_run_summary(client, run.step_count)}")
             ltm.save()
             return _result("interrupted", False)
         except Exception as e:
@@ -1130,7 +1098,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 if verbose:
                     console.print(f"[red bold]{run.consecutive_errors} consecutive errors — "
                                   f"stopping. Full tracebacks in {ERRORS_LOG}. "
-                                  f"{_run_summary(reward, client, run.step_count)}[/]")
+                                  f"{_run_summary(client, run.step_count)}[/]")
                 ltm.save()
                 return _result("error_budget", False)
             time.sleep(1.0)

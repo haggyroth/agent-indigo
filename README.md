@@ -121,7 +121,7 @@ All settings live in `.env` (copy from `.env.example`). Key options:
 
 ## Testing
 
-Hardware-free unit tests cover the Gen III decoder, state machine, type chart, reward logic, and charset — no ROM, libmgba, or network required.
+Hardware-free unit tests cover the Gen III decoder, state machine, type chart, event stream, and charset — no ROM, libmgba, or network required.
 
 ```sh
 pip install -r requirements-test.txt
@@ -136,7 +136,7 @@ Tests that need the compiled binding or a ROM skip automatically when those aren
 Measuring whether a run actually made progress — instead of reading hundreds of
 log lines — is what `evals/` is for. It runs the **real agent loop**
 (`main.run_episode`) from a start state toward a goal with a step budget, and
-scores the episode: pass/fail, steps, reward, **stuck-ratio** (overworld ticks
+scores the episode: pass/fail, steps, event statistics (battles by outcome, level-ups), **stuck-ratio** (overworld ticks
 with no movement — the signature of a nav skill that can't cross), LLM calls, and
 tokens. Each scenario runs in isolation (its own scratch `progress.json`), so the
 real save is never touched.
@@ -172,7 +172,6 @@ pathfinding/routing bug. It boots a real emulator, so it's opt-in:
 │   ├── lm_studio_client.py   LLM client (local/cloud) + nav/battle skills, tool loop
 │   ├── tools.py              Tool schemas (go_to, walk_to, use_move, press_button, …)
 │   ├── history.py            Message trimming + control-token stripping
-│   └── reward.py             Shaped → sparse reward tracker
 ├── game/
 │   ├── _mgba_build.py        cffi builder for the in-process libmgba binding
 │   ├── mgba_core.py          NativeMGBAClient — drives libmgba in-process (default)

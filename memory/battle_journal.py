@@ -7,7 +7,10 @@ from config import JOURNAL_PATH
 class BattleRecord:
     timestamp: str;  location: str;  enemy_name: str;  enemy_level: int
     player_lead: str;  outcome: str;  turns: int
-    moves_used: list[str];  hp_remaining_pct: float;  reward: float;  notes: str
+    moves_used: list[str];  hp_remaining_pct: float;  notes: str
+
+_FIELDS = set(BattleRecord.__dataclass_fields__)      # old journal rows carried a `reward` field: ignored on load
+
 
 class BattleJournal:
     def __init__(self, path=None):
@@ -44,7 +47,7 @@ class BattleJournal:
         with open(self.path) as f:
             for line in f:
                 if line.strip():
-                    try: records.append(BattleRecord(**json.loads(line)))
+                    try: records.append(BattleRecord(**{k: v for k, v in json.loads(line).items() if k in _FIELDS}))
                     except Exception: pass
         self._cache, self._cache_key = records, key
         return records

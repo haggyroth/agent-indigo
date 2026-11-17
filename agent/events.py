@@ -34,6 +34,8 @@ _S: dict = {"console": None, "run_log": None, "level": 1, "t0": time.time(), "la
             "badges": None, "battle": None, "hooks": []}
 _RECENT: deque = deque(maxlen=300)
 COUNTS: Counter = Counter()
+OUTCOMES: Counter = Counter()        # battle outcome label -> count, this run (won / lost / fled / caught / …)
+TRAINER_WINS: Counter = Counter()    # {"n": trainer battles won this run}
 
 
 def configure(console=None, run_log=None, level: str = "events") -> None:
@@ -41,11 +43,37 @@ def configure(console=None, run_log=None, level: str = "events") -> None:
     _S.update(console=console, run_log=run_log, level=LEVELS.get(str(level).lower(), 1), t0=time.time(),
               party=None, badges=None, battle=None, hooks=[])
     COUNTS.clear()
+    OUTCOMES.clear()
+    TRAINER_WINS.clear()
     _RECENT.clear()
 
 
 def reset() -> None:
     configure(None, None)
+
+
+_STAT_KINDS = {"catches": "catch", "level_ups": "level_up", "evolutions": "evolve", "faints": "faint",
+               "blackouts": "blackout", "badges": "badge", "new_towns": "town", "key_items": "key_item",
+               "heals": "heal"}
+
+
+def run_stats() -> dict:
+    """What happened this run, from the event stream: the scoreboard that replaced the reward counter (#212).
+    Battles are by real outcome (won / lost / fled / caught / drew …)."""
+    out = {name: COUNTS[kind] for name, kind in _STAT_KINDS.items()}
+    out["battles"] = dict(OUTCOMES)
+    out["trainer_wins"] = TRAINER_WINS["n"]
+    return out
+
+
+def stats_line(stats: dict | None = None) -> str:
+    """'badges 2 · battles 41 (36 won, 3 fled, 2 caught) · catches 2 · level-ups 17 · faints 4 · blackouts 0'."""
+    s = stats if stats is not None else run_stats()
+    b = s.get("battles", {})
+    detail = ", ".join(f"{n} {k}" for k, n in sorted(b.items(), key=lambda kv: -kv[1]))
+    return (f"badges {s.get('badges', 0)} · battles {sum(b.values())}" + (f" ({detail})" if detail else "")
+            + f" · catches {s.get('catches', 0)} · level-ups {s.get('level_ups', 0)} · evolutions {s.get('evolutions', 0)}"
+            f" · faints {s.get('faints', 0)} · blackouts {s.get('blackouts', 0)}")
 
 
 def recent(kind: str | None = None) -> list[dict]:
@@ -55,7 +83,7 @@ def recent(kind: str | None = None) -> list[dict]:
 def on_battle_end(fn) -> None:
     """Register `fn(summary: dict)`, called exactly once for every finished battle wherever it was fought —
     inside a skill, inside a tool call or on the main loop. This is where the journal, the win/loss/fled/caught
-    counters and the rewards are booked (the old main-loop edge detector never saw battles inside a skill)."""
+    counters and the journal rows are booked (the old main-loop edge detector never saw battles inside a skill)."""
     _S["hooks"].append(fn)
 
 
@@ -254,6 +282,9 @@ def _observe_battle(reader) -> None:
         wiped = bool(party) and all(p.current_hp == 0 for p in party)
         outcome = battle_outcome_label(reader.client.read8(Addr.BATTLE_OUTCOME), wiped)
         kind = "trainer" if cur["trainer"] else "wild"
+        OUTCOMES[outcome] += 1
+        if cur["trainer"] and outcome == "won":
+            TRAINER_WINS["n"] += 1
         if cur["announced"]:
             emit("battle_end", f"{outcome} vs {cur['foe']}", outcome=outcome, trainer=cur["trainer"], foe=cur["foe"])
         else:                                        # never saw the menu (fled / ended inside one call)

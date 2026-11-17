@@ -34,7 +34,7 @@ def test_read_badges_ignores_stale_fixed_address():
 def test_read_badges_returns_last_good_on_invalid_pointer():
     # #66: a title/reset/transition frame reads an invalid SaveBlock1 pointer. We
     # must return the last good badges, not a spurious 0 that would flicker and
-    # misfire the badge-increase reward when it snaps back.
+    # misfire the badge-increase milestone when it snaps back.
     fc = FakeClient()
     sb = 0x02025540
     fc.set32(Addr.SAVEBLOCK1_PTR, sb)
