@@ -14,7 +14,7 @@ from knowledge.leafgreen_data import MILESTONES
 from knowledge.navigation import get_map_image_path, MAP_NAMES
 from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKENS,
                     ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT)
-from rich.console import Console
+from agent import events
 from agent.skills.nav import NavMixin
 from agent.skills.quests import QuestMixin
 from agent.skills.party import PartyMixin
@@ -28,7 +28,6 @@ from agent.skills.items import FieldItemMixin
 from agent.skills.hm import HMMixin
 from agent.skills.tmhm import TMHMMixin
 
-console = Console()
 
 
 class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
@@ -255,7 +254,8 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                     result = f"Tool {tc.function.name} failed: {e}"
                 self._log_tool(tc.function.name, tc.function.arguments, result,
                                time.time() - _t0)
-                console.log(f"[cyan]{tc.function.name}[/] → {str(result)[:80]}")
+                events.tool(tc.function.name, tc.function.arguments, result, time.time() - _t0)
+                events.observe(getattr(self, "reader", None))
                 self.messages.append({
                     "role": "tool", "tool_call_id": tc.id, "content": str(result)
                 })

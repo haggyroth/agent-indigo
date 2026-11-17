@@ -278,6 +278,8 @@ class PCMixin:
         if len(self.reader.read_party()) != len(party) - 1:
             return f"The deposit of {name} didn't go through (box {target + 1} had room) — try pc_deposit again."
         where = f" into Box {target + 1}" + (" (the earlier boxes are full)" if target else "")
+        from agent import events
+        events.emit("pc", f"deposited {name}{where}")
         return f"Deposited {name}{where}. Party now: {self._party_names()}."
 
     def _pc_withdraw(self, who: str) -> str:
@@ -307,6 +309,8 @@ class PCMixin:
             self._pc_close()
         if len(self.reader.read_party()) != len(party) + 1:
             return f"The withdrawal of {name} didn't go through — try pc_withdraw again."
+        from agent import events
+        events.emit("pc", f"withdrew {name} (L{pick['level']}) from Box {pick['box'] + 1}")
         return f"Withdrew {name} (L{pick['level']}) from Box {pick['box'] + 1}. Party now: {self._party_names()}."
 
     def _pc_swap(self, party_mon: str, box_mon: str, force: bool = False) -> str:

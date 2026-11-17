@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — a live game-event stream in the terminal (#209)
+- `agent/events.py`: one compact line per event (and an `ev` record in `run.jsonl`): every **tool call** with its arguments,
+  a one-line result and timing (was: name + 80 chars); **battle start / end** classified from `gBattleOutcome`
+  (won / lost / fled / caught / drew…) with foe, level and place; **level-ups, evolutions, faints, new moves, party
+  joins/leaves, badges** (gym leader named); **catches** (species + nickname, "→ PC box" when the party was full);
+  **heals, shop purchases, PC deposits/withdrawals, HM use / Fly, trip legs** (arrived / encounter handed to the model),
+  key items, new towns, milestones, blackouts, checkpoints, the model's reasoning line, and a periodic `STATUS` line
+  (badges, party HP, ¥, balls, LLM calls/tokens, wall minutes).
+- Events come from where they happen: explicit emits in the skills, plus `events.observe(reader)` — a cheap snapshot diff
+  run after every tool, every battle move and every main-loop tick — so the hundreds of fights inside one `grind()` /
+  `go_to()` / `heal()` call are no longer invisible. Pokémon are tracked by personality value, so reordering the party
+  isn't an event and evolutions/level-ups attach to the right mon.
+- `LOG_LEVEL=quiet|events|debug` (default `events`) and `STATUS_EVERY` (default 25 ticks) in `.env`; the `OBS:` dump moved to
+  `debug`. Not done here: the journal / reward / `battles_won` accounting still uses the old win/loss rule (#210).
+
 ### Fixed — PC driver (#206)
 - **Full-box deposits.** The game's "Deposit in which BOX?" chooser always starts on Box 1 (the decomp resets
   `sDepositBoxId` each time the storage screen opens) and refuses a full box instead of moving on, so a 30/30 Box 1 made

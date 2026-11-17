@@ -1,12 +1,13 @@
 from datetime import datetime
 from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
-                    LLM_BASE_URL, MAX_WALL_SECONDS)
+                    LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
 from game.memory_reader import LeafGreenReader
 from game.state import GameContext, GameState, StateDiff, active_party_member, newly_fainted_slots
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
 from agent.reward import RewardTracker
+from agent import events
 from memory.short_term import ShortTermMemory
 from memory.long_term import LongTermMemory
 from memory.battle_journal import BattleJournal, BattleRecord
@@ -120,6 +121,20 @@ class EpisodeResult:
         d = dict(self.__dict__)
         d["total_tokens"] = self.total_tokens
         return d
+
+
+def _status_line(state, ltm, client, reader, step: int, t_start: float) -> str:
+    """The periodic one-line status: where the run stands without reading the whole scrollback."""
+    try:
+        party = ", ".join(f"{p.nickname or p.species_name} L{p.level} {p.current_hp}/{p.max_hp}" for p in state.party)
+        bag = reader.read_bag()
+        balls = sum(bag.get(b, 0) for b in (1, 2, 3, 4))
+        money = reader.read_money()
+    except Exception:
+        party, balls, money = "?", "?", "?"
+    mins = (time.time() - t_start) / 60
+    return (f"STATUS step {step} · badges {ltm.data['badges_earned']}/8 · [{party}] · ¥{money} · balls {balls} · "
+            f"LLM {client.llm_calls} calls / {client.total_tokens // 1000}k tok · {mins:.0f} min wall")
 
 
 def _frame_chroma(mgba) -> float:
@@ -380,7 +395,6 @@ def _handle_battle_end(run: _RunState, state: GameState, reward: RewardTracker,
         reward=0.0,
         notes="",
     ))
-    console.print(f"[magenta]Battle {outcome}[/] | active={active_species} hp={lead_hp_pct:.0%}")
     ltm.save()
 
 
@@ -407,7 +421,7 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
                     ms = BADGE_BIT_MILESTONE.get(bit)
                     if ms:
                         ltm.add_milestone(ms)
-                        console.print(f"[green bold]Milestone: {ms}[/]")
+                        events.emit("milestone", f"milestone: {ms}")
                     gym = next((g for g in GYMS if g["badge_bit"] == bit), None)
                     if gym:
                         ltm.add_badge(gym["leader"])
@@ -426,7 +440,7 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
     key_items = reader.read_key_item_count()
     if run.prev_key_items is not None and key_items > run.prev_key_items:
         reward.reward("key_item")
-        console.print(f"[cyan]Key item obtained (bag key items: {key_items})[/]")
+        events.emit("key_item", f"key item obtained (bag now holds {key_items})")
     run.prev_key_items = key_items
 
     if run.prev_state is not None and state.party_count > run.prev_state.party_count:
@@ -438,7 +452,7 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
             if ltm.data.get("starter") is None:
                 ltm.data["starter"] = starter
             if ltm.add_milestone("starter_chosen", f"chose {starter}"):
-                console.print(f"[green bold]Milestone: starter_chosen ({starter})[/]")
+                events.emit("milestone", f"milestone: starter_chosen ({starter})")
 
     # Keep the in-memory reward total current; it's written to disk on the next
     # ltm.save() (battle end / milestone / stop), not every tick — so a crash loses
@@ -764,7 +778,7 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
     # fainted (that double-counted the penalty indefinitely).
     if not run.blackout_active:
         run.blackout_active = True
-        console.print("[red bold]BLACKOUT — all party fainted[/]")
+        events.emit("blackout", "BLACKOUT — all party fainted")
         reward.reward("loss")
         ltm.save()
     # Try to reload the pre-fight state. If none was saved this session the load
@@ -772,14 +786,13 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
     # own whiteout sequence carry the player to the last Pokémon Center by advancing
     # its dialog with A.
     if mgba.load_state(0):
-        console.print("[green]Loaded slot 0 after blackout[/]")
+        events.emit("note", "loaded slot 0 after the blackout")
         mgba.tick(60)
         run.prev_state = None
         run.battle_was_active = False
         run.blackout_active = False   # recovered via reload
     else:
-        console.print("[yellow]No save state in slot 0 — advancing the "
-                      "whiteout/Nurse-Joy recovery to the Pokémon Center[/]")
+        events.emit("note", "no save state in slot 0 — advancing the whiteout / Nurse Joy recovery")
         # The blackout plays a multi-box sequence (out of Pokémon → scurried to a
         # Center → warp → auto-heal) that only advances on A. Press it several times
         # per pass (not once) so recovery actually progresses instead of crawling one
@@ -811,10 +824,12 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
     ltm, stm, journal, reward, tilemap = rt.ltm, rt.stm, rt.journal, rt.reward, rt.tilemap
 
     run = _RunState()
+    t_start = time.time()
     wall_deadline = time.time() + max_wall_s if max_wall_s else 0.0
     from memory.run_log import NullRunLog
     rlog = run_log or NullRunLog()
     client.run_log = rlog
+    events.configure(console if verbose else None, rlog, LOG_LEVEL)
     ckpt = None
     if getattr(rlog, "dir", None) and CHECKPOINT_EVERY > 0 and hasattr(mgba, "save_state_file"):
         from memory.checkpoints import CheckpointManager
@@ -946,7 +961,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 if town_name and state.map_bank == 3 and state.map_id < 19:
                     if ltm.add_town(town_name):
                         reward.reward("new_town")
-                        console.print(f"[cyan]New town: {town_name}[/]")
+                        events.emit("town", f"new town: {town_name}")
                 # Load overhead reference map (attach to next decision step)
                 if USE_VISION:
                     run.pending_map_b64, run.pending_map_name = AgentClient.load_area_map(*map_key)
@@ -956,14 +971,14 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
 
             # ── Auto-reward + auto-milestone from state diff ────────────────
             _apply_rewards(run, state, diff, reader, reward, ltm)
+            events.observe(reader)
 
             # ── Build observation string ─────────────────────────────────────
             obs = build_observation(state=state, diff=diff, in_battle=in_battle,
                                     run=run, reader=reader, tilemap=tilemap,
                                     ltm=ltm, stm=stm, map_key=map_key,
                                     trip=getattr(client, "_trip", None))
-            if verbose:
-                console.print(f"[yellow]OBS:[/] {obs[:140]}")
+            events.emit("note", f"OBS: {obs[:140]}", debug=True, log=False)
 
             # ── Blackout check ───────────────────────────────────────────────
             if _handle_blackout(run, state, mgba, reader, reward, ltm):
@@ -983,8 +998,8 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 stm.record_action(";".join(actions), state.player_x, state.player_y)
             elif reasoning:
                 stm.record_action(reasoning[:80], state.player_x, state.player_y)
-            if reasoning and verbose:
-                console.print(f"[dim]{reasoning[:160]}[/]")
+            if reasoning:
+                events.emit("note", f"💭 {reasoning[:160]}", major=False, log=False)
 
             # set_opponent is now only a fallback — memory (read_enemy_lead) is
             # authoritative and refreshed each tick above. Use the tool's value
@@ -1020,10 +1035,14 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                        party=_party_brief(state), obs=obs, reasoning=(reasoning or "")[:1500],
                        actions=actions, reward=round(reward.total, 2),
                        llm_calls=client.llm_calls, tokens=client.total_tokens)
+            if STATUS_EVERY and run.step_count and run.step_count % STATUS_EVERY == 0:
+                events.emit("status", _status_line(state, ltm, client, reader, run.step_count, t_start), major=False)
             if ckpt:
-                ckpt.maybe(run.step_count, state.badges, state.context.name,
-                           meta={"map": [state.map_bank, state.map_id], "badges": state.badges,
-                                 "party": _party_brief(state), "llm_calls": client.llm_calls})
+                saved = ckpt.maybe(run.step_count, state.badges, state.context.name,
+                                   meta={"map": [state.map_bank, state.map_id], "badges": state.badges,
+                                         "party": _party_brief(state), "llm_calls": client.llm_calls})
+                if saved:
+                    events.emit("checkpoint", f"checkpoint saved: {getattr(saved, 'name', saved)}", major=False)
             if max_steps and run.step_count >= max_steps:
                 if verbose:
                     console.print(f"[green]Reached max_steps={max_steps} — stopping. "

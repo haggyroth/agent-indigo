@@ -74,6 +74,11 @@ RESUME            = os.getenv("RESUME", "").strip()
 # CHECKPOINT_EVERY: save an emulator checkpoint every N decision ticks (and on every new badge); 0 = off.
 CHECKPOINT_EVERY  = _env_int("CHECKPOINT_EVERY", 20, minimum=0)
 MAX_STEPS         = _env_int("MAX_STEPS", 0, minimum=0)
+# LOG_LEVEL: how much of the game-event stream (agent/events.py) the terminal shows — "quiet" (milestones: catches,
+#   badges, level-ups, battle results, faints), "events" (default: + every tool call and the quieter events),
+#   "debug" (+ observations/reasoning). STATUS_EVERY: a one-line status (party, money, balls, tokens) every N ticks.
+LOG_LEVEL         = os.getenv("LOG_LEVEL", "events").strip().lower()
+STATUS_EVERY      = _env_int("STATUS_EVERY", 25, minimum=0)
 # USE_VISION: attach the live screenshot (and overhead area maps) to the model.
 # Set false for text-only models, or models whose vision is unstable/blows the
 # context window — the observation string carries the key state either way.

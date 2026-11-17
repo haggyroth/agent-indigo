@@ -296,7 +296,9 @@ First time only: `python -m game._mgba_build` to compile the binding.
 Run controls (env vars, native backend): `START_FROM_SAVE=<path.sav>` boots from a
 battery save and drives to "Continue" (real gameplay instead of the new-game
 intro); `MAX_STEPS=<n>` bounds a run for smoke/eval; `CHECKPOINT_EVERY=<ticks>` (default 20) saves emulator states under
-`logs/runs/<ts>/checkpoints/`; `RESUME=latest` (or a `.ss1` path) continues from the last one; `USE_VISION=false` runs
+`logs/runs/<ts>/checkpoints/`; `RESUME=latest` (or a `.ss1` path) continues from the last one; `LOG_LEVEL=quiet|events|debug` (default `events`) sets how much of the live
+game-event stream prints (catches, KOs, level-ups, badges, battle results, heals, every tool call; `STATUS_EVERY=<ticks>` adds
+a status line) — see `agent/events.py`; `USE_VISION=false` runs
 text-only (for text models or unstable vision). Example bounded text-only run:
 `USE_VISION=false MAX_STEPS=20 START_FROM_SAVE=~/mgba-http/Pokemon_LeafGreen.sav python main.py`
 

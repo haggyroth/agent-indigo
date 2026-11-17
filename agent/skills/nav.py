@@ -465,6 +465,9 @@ class NavMixin:
         except Exception:
             here = "this map"
         self._trip = {"dest": resume or target_name, "target": target_name, "call": call}
+        from agent import events
+        events.emit("trip", f"{'trainer' if trainer else 'wild encounter'} on the way to {target_name} — handed to the model",
+                    major=False)
         again = call or f"go_to({(resume or target_name)!r})"
         if trainer:
             return (f"A TRAINER battle started at {here} on the way to {target_name} (you can't flee it). Win it with "
@@ -810,6 +813,8 @@ class NavMixin:
                 self._go_to_stalls = 0          # reached it — clear any stall streak
                 self._go_to_last_end = None
                 self._trip = None
+                from agent import events
+                events.emit("trip", f"arrived at {target_name}", major=False)
                 return f"Arrived at {target_name}."
             # Region-qualify the current node (Route 2's north/south halves route
             # differently) so a split map is crossed via its gate, not a sealed edge.
