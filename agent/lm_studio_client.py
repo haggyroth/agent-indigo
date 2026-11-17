@@ -363,7 +363,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                         self.mgba.tap(button)
                 return f"Pressed {button} × {times}"
             case "walk_to":
-                return self._walk_to(int(args["x"]), int(args["y"]))
+                return self._walk_to_tool(int(args["x"]), int(args["y"]))
             case "go_to_map":
                 return self._go_to_map(args["direction"])
             case "go_to":

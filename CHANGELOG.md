@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — nav driver review (#216)
+- **Travel rules are data.** `knowledge/travel_rules.py`: `PC_TOWNS` and `NO_WALK` (the Cerulean → west "Route 4 ledges only go one
+  way" rule) moved out of the skill code. The no-walk message now says what to do for *this* party: "Pidgeotto knows Fly: fly_to the
+  nearest visited town", "…but you need the Thunder Badge", "Pidgey could learn it — teach it", or "catch a Fly-capable bird".
+- **Why a trip ended is recorded.** `_go_to` is a wrapper that records `last_trip_stop = {reason, target, map}` and emits one `trip`
+  event per outermost trip: `arrived`, `battle`, `battle_unresolved`, `lost`, `low_hp`, `no_route`, `gated`, `no_walk`, `stall`,
+  `blocked`, `budget`, `nested`, `unknown_destination`. A spent hop budget now says so ("…after the 40-hop budget") instead of reading
+  like an interrupted trip. The classification of battle stop messages is pinned by a test.
+- **Re-entrancy guard.** Travel nested more than 4 deep (go_to → gym city → first-visit heal → go_to(Pokémon Center)…) stops with `nested`
+  instead of recursing; the counter always unwinds. The first-visit heal is now announced as a `trip` event.
+- **Tolerated failures are logged once** (`_log_once`) instead of `except: pass`: a failing forced-switch while advancing to control,
+  and a gate check that couldn't read the game (still treated as met so travel isn't blocked).
+- **Warp probing** stops when a wild/trainer battle starts mid-probe, and a battle during a probe is no longer counted as a dead edge.
+- **`walk_to` validates its tile** against the map size ("(3,15) is outside this map — valid tiles are x 0-19, y 0-14"); internal
+  callers still aim at edge/warp tiles through `_walk_to` directly.
+
 ### Removed — the reward tracker; run statistics from the event stream instead (#212)
 - **Why.** The shaped→sparse reward was a scoreboard nothing read: never shown to the model, no policy or stop condition used it, the
   Elite Four / Champion terms (#22) could never fire, and several events mis-fired. Decision: delete it rather than keep a number
