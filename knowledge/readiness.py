@@ -32,7 +32,8 @@ def next_gym_target(gyms_beaten) -> tuple[str, int] | None:
     return nxt["leader"], max(5, GYM_ACE_LEVEL.get(nxt["leader"], 20) - 1)
 
 
-def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=(), dex=None, tms=None) -> list[Need]:
+def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=(), dex=None, tms=None,
+           boxes=None) -> list[Need]:
     needs: list[Need] = []
     if not party:
         return needs
@@ -76,6 +77,10 @@ def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=
     if tgt and top_level < tgt[1]:
         needs.append(Need("should", "level", f"{tgt[0]}'s gym is next (ace L{GYM_ACE_LEVEL.get(tgt[0], '?')}): "
                                              f"your best is L{top_level} — grind({tgt[1]}) first"))
+    if not blocking(needs):
+        from knowledge.team import gaps
+        for g in gaps(party, boxes, gyms_beaten)[:2]:
+            needs.append(Need("should", "hunt" if g.code == "gym" else "hm", f"team gap — {g.text}"))
     if tms and not blocking(needs):
         from knowledge.bag import tm_advice
         for adv in tm_advice(party, tms):

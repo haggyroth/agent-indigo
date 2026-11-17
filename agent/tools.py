@@ -206,6 +206,15 @@ TOOLS = [
         }, "required": []},
     }},
     {"type": "function", "function": {
+        "name": "team_report",
+        "description": "Read-only analysis of your team: which types your KNOWN moves hit super effectively (and which "
+                       "they don't), shared weaknesses, who can carry each HM (Cut / Fly / Surf / Strength) against what the "
+                       "story is about to need, whether the team answers the NEXT gym (against the leader's real party) and — "
+                       "if not — which Pokémon would fix it and where to find them in LeafGreen (or which one in the PC to "
+                       "pc_swap in). Use it when planning catches, before a gym, and after a team change.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
         "name": "pc_boxes",
         "description": "List the Pokémon stored in the PC boxes (per box: names and levels). Reads memory — no menu "
                        "needed, works anywhere. detail=true adds each one's box:slot, types, moves and which HMs it "

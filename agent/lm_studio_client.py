@@ -363,6 +363,10 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                                         bool(args.get("auto_trainers", False)))
             case "get_ss_ticket":
                 return self._get_ss_ticket(bool(args.get("auto_trainers", False)))
+            case "team_report":
+                from knowledge.team import team_report
+                return team_report(self.reader.read_party(), self.reader.read_boxes(),
+                                   self.ltm.data.get("gyms_beaten", []))
             case "pc_boxes":
                 return self._pc_boxes(bool(args.get("detail", False)))
             case "pc_deposit":

@@ -256,6 +256,12 @@ gap never closes); use Potions and `use_move` with the trainee. The target is fi
 (best − 7, capped at the next gym's level), so it finishes. (`grind(13)` raises your best one to L13, still rotating
 lagging teammates in.) Catch worthwhile wild Pokémon yourself with `catch()` when `grind` hands you one.
 
+**Team gaps.** The readiness block names what the TEAM is missing — "team gap — Lt. Surge's gym (Electric): your team hits
+only 0/3 of his Pokémon … catch a counter: Diglett — Diglett's Cave B1F …" or "nobody on the team can learn Surf … catch one
+that can: …" (with the exact LeafGreen locations, or the box:slot of one you already own in the PC). A catch that fills such a gap
+is worth a ball whatever its stats, and `team_report()` gives the full picture (coverage, shared weaknesses, HM carriers, the
+next gym's fit) — use it before a gym and when deciding what to catch or swap.
+
 **Party composition.** Aim for a full party of 6 with different types and strong evolution lines. Early placeholders
 (Weedle, Rattata, Pidgey…) are fine to start, but when you find a clearly better species — or a new type — catch it
 (when `grind()` or `go_to` hands you a worthwhile wild Pokémon, `catch()` it yourself) and swap the weakest member out with

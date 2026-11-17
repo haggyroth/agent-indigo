@@ -5,6 +5,23 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — team composition awareness (#207)
+- **`knowledge/team.py`** (pure): coverage from the moves a team actually knows, shared weaknesses (≥ 3 members), who can carry
+  each HM (Cut / Fly / Surf / Strength) against the badge count at which the story needs it, and a **fit check against the next
+  Gym Leader's real party** (`tools/gen_gym_teams.py` → `knowledge/gym_teams.py`, first-battle parties of the 8 leaders + the Elite
+  Four from the decomp): "hits 0/3 of Lt. Surge's Pokémon super effectively, 1/2 members safe from his types".
+- **Hunt hints with real locations.** When the team doesn't answer the next gym (or no one can learn an HM it is about to need) the
+  readiness block says what to catch and where: `Diglett — Diglett's Cave B1F (grass L15-22); Sandshrew — Route 4 (grass L6-12)`,
+  taken from the LeafGreen wild-encounter tables (`tools/gen_wild_locations.py`, Kanto only — the old hand-written counter text
+  could not be wrong about a version difference like Oddish/Bellsprout because it is no longer from memory). If a counter is already in the
+  PC the hint is `pc_swap` it in. The curated per-gym shortlist is validated against the tables by the tests.
+- **Catch policy.** `evaluate(..., wanted=…)`: a species that fills a gap is worth a ball whatever its BST (within the premium level
+  debt; a full party sends it to the PC with a `pc_swap` hint). Used by the battle observation, `go_to`/`grind` encounter briefs and
+  the grind autopilot gate.
+- **`team_report` tool** (read-only): the full report above on demand.
+- Not done: an "availability curve" for how good a species is at a given point of the story (the BST-based line value still stands in);
+  Elite Four fit checks (the data is generated, the hints cover the 8 gyms).
+
 ### Added — the model knows what is in its Bag (#205)
 - **TM upgrades.** `knowledge/bag.py::tm_advice` scores each owned TM against every compatible party member with the battle
   ranker's expected-damage function (`move_score`: STAB, accuracy, a +15% bonus for a new damaging type) and only flags clear

@@ -482,7 +482,8 @@ class NavMixin:
                 if balls > 0 and foe.species_id not in {p.species_id for p in party}:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
-                                 dex_owned=getattr(self.reader, "read_dex_owned", lambda _s: None)(foe.species_id))
+                                 dex_owned=getattr(self.reader, "read_dex_owned", lambda _s: None)(foe.species_id),
+                                 wanted=self._wanted_species(party))
                     verdict = (f" Worth a ball: {v.reason}." if v.catch else f" Not worth a ball: {v.reason}.") \
                         + f" ({balls} Poké Balls.)"
         except Exception:

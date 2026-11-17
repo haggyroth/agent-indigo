@@ -546,8 +546,12 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 _items = reader.read_items_pocket()
             except Exception:
                 _tms, _items = None, []
+            try:       # the PC contents only matter (and are only read) where the PC is: "you already own one — pc_swap it in"
+                _boxes = reader.read_boxes() if MAP_KIND.get((state.map_bank, state.map_id)) == "pokecenter" else None
+            except Exception:
+                _boxes = None
             _block = _render(_assess(state.party, _balls, _pots, _money, ltm.data.get("gyms_beaten", []),
-                                     dex=_dex, tms=_tms))
+                                     dex=_dex, tms=_tms, boxes=_boxes))
             if _block:
                 obs_parts.append(_block)
             # The bag digest (TMs / HMs / stones / candy): shown when it changes, then every 30 ticks as a reminder —
@@ -644,8 +648,10 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 if (balls > 0 and enemy and enemy.species_id
                         and enemy.species_id not in party_species):
                     from knowledge.catch_policy import evaluate as _catch_eval
+                    from knowledge.team import wanted_species as _wanted
                     _v = _catch_eval(state.party, enemy.species_id, enemy.level or 0,
-                                     dex_owned=reader.read_dex_owned(enemy.species_id))
+                                     dex_owned=reader.read_dex_owned(enemy.species_id),
+                                     wanted=_wanted(state.party, None, ltm.data.get("gyms_beaten", [])))
                     if _v.catch:
                         obs_parts.append(
                             f"NEW SPECIES you don't own ({balls} Poké Balls in bag) — worth catching: "
