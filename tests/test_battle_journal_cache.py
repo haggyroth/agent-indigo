@@ -7,7 +7,7 @@ from memory.battle_journal import BattleJournal, BattleRecord
 def _rec(enemy="BROCK", outcome="loss", **kw):
     d = dict(timestamp="t", location="Pewter", enemy_name=enemy, enemy_level=14,
              player_lead="Bulbasaur", outcome=outcome, turns=3, moves_used=["Tackle"],
-             hp_remaining_pct=0.0, reward=-1.0, notes="fainted")
+             hp_remaining_pct=0.0, notes="fainted")
     d.update(kw)
     return BattleRecord(**d)
 

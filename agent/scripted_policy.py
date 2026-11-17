@@ -3,7 +3,7 @@
 `FakeLLM` is a drop-in for the OpenAI client the AgentClient talks to. Each time the agent asks for a
 decision it asks `ScriptedPolicy.decide()` for one tool call (from live emulator state); on the follow-up
 round (after the tool result) it replies with plain text so control returns to the main loop, exactly
-like a real model that has nothing more to call. Everything else — observations, rewards, ltm
+like a real model that has nothing more to call. Everything else — observations, statistics, ltm
 bookkeeping, run logging, checkpoints, the watchdog — is the real run_episode.
 
 Use it to find where the skill chain stalls (item 5 of #185) without spending a token:

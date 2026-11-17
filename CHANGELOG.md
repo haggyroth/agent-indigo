@@ -5,6 +5,20 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Removed — the reward tracker; run statistics from the event stream instead (#212)
+- **Why.** The shaped→sparse reward was a scoreboard nothing read: never shown to the model, no policy or stop condition used it, the
+  Elite Four / Champion terms (#22) could never fire, and several events mis-fired. Decision: delete it rather than keep a number
+  that implies steering (option A in the issue). #22 is moot.
+- **What replaces it.** `events.run_stats()` / `events.stats_line()` — battles by real outcome (won / lost / fled / caught / drew),
+  trainer wins, catches, level-ups, evolutions, faints, blackouts, badges, new towns, key items, heals — printed at the end of a
+  run ("steps=120  badges 2 · battles 41 (36 won, 3 fled, 2 caught) · catches 2 · level-ups 17 · …"), carried in
+  `EpisodeResult.stats` (the eval scorecard's old `reward` column is now "events", e.g. `3W 1F 2C · 5↑`) and in `run.jsonl`'s `end`
+  record. Cumulative counters (`battles_*`, `pokemon_caught`) stay in `progress.json`.
+- **Removed.** `agent/reward.py`, `RewardTracker`, `_apply_rewards` (now `_apply_progress`: badges → milestones + LTM, key items,
+  the starter), `newly_fainted_slots` (faints come from the event observer, per Pokémon), the journal's per-row `reward` (old journal
+  files still load: unknown keys are ignored), `total_reward` in `progress.json` (old files are cleaned on load), the CLAUDE.md reward
+  table and `tests/test_reward.py`.
+
 ### Changed — the model is only offered the tools that fit the screen (#213)
 - **Context-gated tool lists** (`agent.tools.tools_for`, re-read every tool round so a `go_to` that turns into a battle switches
   lists mid-step): a **battle** gets 11 tools (the battle skills, `use_item`, `inspect_pokemon`, `team_report`, and the button /

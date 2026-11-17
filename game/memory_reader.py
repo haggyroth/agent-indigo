@@ -71,7 +71,7 @@ class LeafGreenReader:
         # reset, or mid-transition frame the deref'd SaveBlock1/map pointer can be
         # 0 or stale; returning the previous good value avoids feeding garbage
         # (bad positions, or a badge flicker that the badge-increase logic would
-        # misread as newly-earned) into the reward/diff/stuck machinery (#66/#58).
+        # misread as newly-earned) into the diff/stuck machinery (#66/#58).
         self._last_badges: tuple[int, int] = (0, 0)
         self._last_pos:    tuple[int, int] = (0, 0)
         self._last_map:    tuple[int, int] = (0, 0)
@@ -92,7 +92,7 @@ class LeafGreenReader:
         transitions, so a fixed address drifts off the badge byte after a warp and
         returns garbage (phantom badges / false milestones). If the pointer itself
         is invalid (title/reset/transition), return the last good read rather than
-        a spurious 0 that would flicker and misfire the badge-increase reward."""
+        a spurious 0 that would flicker and misfire the badge-increase milestone."""
         ptr = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(ptr):
             return self._last_badges
@@ -315,7 +315,7 @@ class LeafGreenReader:
         return mon
 
     def read_key_item_count(self) -> int:
-        """Number of occupied key-item slots in the bag. Reward key_item when
+        """Number of occupied key-item slots in the bag. The key-item event fires when
         this increases. Item IDs are cleartext; empty slots read id 0."""
         sb = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb):

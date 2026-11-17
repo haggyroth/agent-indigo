@@ -5,7 +5,7 @@ import pytest
 
 from agent import events
 from game.constants import Addr
-from game.state import GameContext, GameState, PokemonStatus, newly_fainted_slots
+from game.state import GameContext, GameState, PokemonStatus
 
 
 @pytest.fixture(autouse=True)
@@ -84,8 +84,6 @@ def book():
     import main
     ltm = NS(data={"total_battles": 0, "battles_won": 0, "battles_lost": 0, "battles_fled": 0, "battles_caught": 0,
                    "pokemon_caught": 0}, save=lambda: None)
-    rewards = []
-    reward = NS(reward=lambda ev: rewards.append(ev) or {"trainer_win": 1.0, "caught_new": 1.0}.get(ev, 0.0))
     rows = []
     journal = NS(log=rows.append)
     run = main._RunState()
@@ -95,8 +93,8 @@ def book():
 
     def record(summary):
         main._last_ltm_save = 0.0
-        main._record_battle(summary, run, reader, reward, ltm, journal)
-    return NS(record=record, ltm=ltm, rewards=rewards, rows=rows, dex=dex, run=run)
+        main._record_battle(summary, run, reader, ltm, journal)
+    return NS(record=record, ltm=ltm, rows=rows, dex=dex, run=run)
 
 
 def summary(outcome, trainer=False, **kw):
@@ -116,34 +114,49 @@ def test_only_a_real_win_counts_as_a_win(book):
     assert (d["total_battles"], d["battles_won"], d["battles_fled"], d["battles_caught"], d["battles_lost"]) == (4, 1, 1, 1, 1)
 
 
-def test_trainer_win_rewards_and_journal_rows_carry_real_data(book):
+def test_journal_rows_carry_real_data(book):
     book.record(summary("won", trainer=True))
-    assert book.rewards == ["trainer_win"]
     row = book.rows[0]
     assert (row.enemy_name, row.enemy_level, row.turns, row.moves_used, row.outcome) == \
         ("RATTATA", 4, 3, ["Tackle", "Growl"], "win")
-    assert row.player_lead == "Bulby" and row.hp_remaining_pct == 0.5 and row.reward == 1.0
+    assert row.player_lead == "Bulby" and row.hp_remaining_pct == 0.5
     assert "trainer Rattata" in row.notes
     book.record(summary("lost", trainer=True, wiped=True))
     assert book.rows[1].outcome == "loss" and "whole party fainted" in book.rows[1].notes
 
 
-def test_caught_new_needs_a_new_dex_entry_and_pokemon_caught_counts_catches(book):
+def test_pokemon_caught_counts_catches_and_tracks_the_dex_baseline(book):
     book.record(summary("caught"))                          # a duplicate species: dex unchanged
-    assert book.rewards == [] and book.ltm.data["pokemon_caught"] == 1
+    assert book.ltm.data["pokemon_caught"] == 1
     book.dex["owned"] = 11                                  # a new species
     book.record(summary("caught"))
-    assert book.rewards == ["caught_new"] and book.ltm.data["pokemon_caught"] == 2 and book.run.prev_dex_owned == 11
+    assert book.ltm.data["pokemon_caught"] == 2 and book.run.prev_dex_owned == 11
+
+
+def test_old_journal_rows_with_a_reward_field_still_load(tmp_path):
+    import json
+    from memory.battle_journal import BattleJournal
+    path = tmp_path / "battles.jsonl"
+    path.write_text(json.dumps(dict(timestamp="t", location="Pewter", enemy_name="BROCK", enemy_level=14,
+                                    player_lead="Bulbasaur", outcome="loss", turns=3, moves_used=["Tackle"],
+                                    hp_remaining_pct=0.0, reward=-1.0, notes="fainted")) + "\n")
+    assert "Past losses against BROCK" in BattleJournal(path).get_loss_lessons("BROCK")
 
 
 # ── identity instead of slot index ───────────────────────────────────────────────────────────────
 def test_faints_are_tracked_per_pokemon_not_per_slot():
+    class Rd:
+        def __init__(self, party): self.party = party
+        def read_party(self): return self.party
+        def read_badges(self): return 0, 0
+        def detect_context(self): return GameContext.OVERWORLD
     a, b = mon(1, name="A", hp=20), mon(2, name="B", hp=20)
-    # B and A swap places and B faints: the old slot-index rule blamed slot 1 (A) for nothing and missed B
-    assert newly_fainted_slots([a, b], [mon(2, name="B", hp=0), mon(1, name="A", hp=20)]) == [0]
-    assert newly_fainted_slots([a, b], [mon(1, name="A", hp=20), mon(2, name="B", hp=20)]) == []
-    legacy = [mon(0, hp=20)], [mon(0, hp=0)]                  # no personality known: falls back to the slot
-    assert newly_fainted_slots(*legacy) == [0]
+    r = Rd([a, b])
+    events.observe(r)
+    r.party = [mon(2, name="B", hp=0), mon(1, name="A", hp=20)]       # B fainted AND the party was reordered
+    events.observe(r)
+    assert [e["text"] for e in events.recent("faint")] == ["B fainted"]
+    assert events.run_stats()["faints"] == 1
 
 
 def state(party):

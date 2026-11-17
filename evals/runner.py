@@ -74,12 +74,19 @@ def run_all(scenarios: list[Scenario] | None = None, *, verbose: bool = False) -
     return results
 
 
+def _event_cell(stats: dict) -> str:
+    """'3W 1F 2C · 5↑' = battles won / fled / caught, level-ups (the event-stream statistics; was a reward number)."""
+    b = stats.get("battles", {})
+    return (f"{b.get('won', 0)}W {b.get('fled', 0)}F {b.get('caught', 0)}C · {stats.get('level_ups', 0)}↑"
+            if stats else "—")
+
+
 def _report(results: list[dict]) -> None:
     if not results:
         console.print("[yellow]No scenarios ran.[/]")
         return
     table = Table(title="Eval results", show_lines=False)
-    for col in ("scenario", "status", "reason", "steps", "reward",
+    for col in ("scenario", "status", "reason", "steps", "events",
                 "final_map", "stuck", "llm_calls", "tokens", "time"):
         table.add_column(col)
     for r in results:
@@ -87,7 +94,7 @@ def _report(results: list[dict]) -> None:
                  "FAIL": "red", "xfail": "dim"}.get(r["status"], "")
         table.add_row(
             r["scenario"], f"[{style}]{r['status']}[/]" if style else r["status"],
-            r["reason"], str(r["steps"]), f"{r['reward']:.1f}",
+            r["reason"], str(r["steps"]), _event_cell(r.get("stats") or {}),
             str(tuple(r["final_map"])), f"{r['stuck_ratio']:.0%}",
             str(r["llm_calls"]), str(r["total_tokens"]), f"{r['elapsed_s']}s",
         )
