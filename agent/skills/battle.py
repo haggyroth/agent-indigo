@@ -831,8 +831,17 @@ class BattleMixin:
                 # Drive it to the next decision point NOW rather than leaving the model to guess
                 # (it spent ~190 calls pressing advance_dialog on this exact screen).
                 return f" [{'; '.join(bits)}] {self._battle_settle()}"
-            return (f" [{'; '.join(bits)}] Still in battle — call use_move again "
-                    f"(do NOT press A or wait).")
+            warn = ""
+            try:
+                from knowledge.party import low_hp_switch_hint
+                party = self.reader.read_party()
+                active = self.reader.read_active_battle_species()
+                idx = next((i for i, p in enumerate(party) if p.species_id == active), -1)
+                warn = low_hp_switch_hint(party, idx, mine, mx, (foe.level or 0) if foe else 0)
+            except Exception:
+                log_once("battle._turn_summary.hint", "battle._turn_summary: switch hint unavailable (continuing without it)")
+            return (f" [{'; '.join(bits)}] Still in battle — call use_move again (do NOT press A or wait)."
+                    + (f" {warn}" if warn else ""))
         except Exception:
             log_once("battle._turn_summary", "battle._turn_summary: tolerated failure (continuing with a default)")
             return ""

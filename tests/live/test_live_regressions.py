@@ -43,7 +43,7 @@ def _grind(live, args, rounds=60):
         if "forcing a replacement" in out:             # the model would switch_pokemon; the auto-sender stands in
             live.c._send_next_mon()
             continue
-        if "while grinding" not in out or live.r.detect_context() != GameContext.IN_BATTLE:
+        if "still going" not in out and ("while grinding" not in out or live.r.detect_context() != GameContext.IN_BATTLE):
             break
         for _ in range(6):                                  # play the encounter out (it may take several passes)
             live.c._auto_fight()
@@ -82,6 +82,7 @@ def test_watchdog_cuts_off_the_old_status_spam_bug(live, monkeypatch):
     monkeypatch.setattr(live.c, "_no_attack_turn", lambda: live.c._use_move("Growl"))
     monkeypatch.setattr(kp, "can_attack", lambda m: True)
     monkeypatch.setattr(kp, "attack_pp", lambda m: 99)
+    monkeypatch.setattr(live.c, "_relocate_to_grass", lambda **kw: True)       # stay in the forest: this test is about the fights
     out = live.c._execute("grind", json.dumps({"level": 40, "auto_battles": 50}))   # autopilot: the bug lives there
     assert "was stopped" in out and "no progress" in out, out
 
@@ -257,10 +258,12 @@ def test_balance_training_keeps_the_ace_from_stealing_xp(live, monkeypatch):
     from agent import budgets
     monkeypatch.setitem(budgets.BUDGETS, "grind", (90_000, 15_000))
     live.load("threemon")
-    live.patch_mon(0, [33, 45, 73, 22], [35, 40, 10, 25], level=19, exp=4575)
+    # L14 (not 19): the floor is 7 levels under it, which the Viridian Forest wilds (L3-6) can actually train a L5 to — grass on
+    # Routes 3/4 would train faster but sits behind Brock's gate for this badge-less fixture.
+    live.patch_mon(0, [33, 45, 73, 22], [35, 40, 10, 25], level=14, exp=1612)
     out = _grind(live, {"catch": False}, rounds=120)
     party = live.r.read_party()
-    assert party[0].species_name == "Bulbasaur" and party[0].level == 19, (out, [(p.species_name, p.level, p.current_hp) for p in party])
+    assert party[0].species_name == "Bulbasaur" and party[0].level == 14, (out, [(p.species_name, p.level, p.current_hp) for p in party])
     assert max(p.level for p in party[1:]) > 5, out                              # the trainees actually levelled
 
 

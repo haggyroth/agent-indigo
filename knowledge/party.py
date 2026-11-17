@@ -108,3 +108,19 @@ def party_needs_restock(party, hp_floor: float = 0.35, pp_floor: int = 2) -> str
     if attack_pp(best) <= pp_floor:
         return f"{best.species_name or 'your best attacker'} is nearly out of attack PP"
     return ""
+
+
+LOW_HP_SWITCH = 0.35        # an active Pokémon at or below this share of its HP is about to faint
+
+
+def low_hp_switch_hint(party, active_idx: int, cur: int, mx: int, foe_level: int = 0) -> str:
+    """'' normally; when the ACTIVE Pokémon is nearly out and a fit teammate exists, a warning naming the switch. A weak trainee
+    (a fresh L3 catch) loses these exchanges every time and a model that keeps attacking just feeds the foe a free faint."""
+    if not mx or cur <= 0 or cur / mx > LOW_HP_SWITCH or not 0 <= active_idx < len(party):
+        return ""
+    pick = pick_finisher(party, active_idx, foe_level)
+    if pick is None:
+        return ""
+    me, mate = party[active_idx], party[pick]
+    return (f"⚠ {me.nickname or me.species_name} is at {cur}/{mx} HP and the next hit may faint it (no XP and a Center trip): "
+            f"switch_pokemon('{mate.nickname or mate.species_name}') now, or use a Potion.")
