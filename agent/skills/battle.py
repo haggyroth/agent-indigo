@@ -932,32 +932,44 @@ class BattleMixin:
             self.mgba.tap("A")
             self.mgba.tick(8)
 
+    def _battle_ctx(self) -> dict:
+        """What move_score needs to know about the live fight: levels, the foe's sleep / HP, our HP fraction.
+        Best effort — any read that fails is simply left out (the scorer falls back to its table estimates)."""
+        ctx: dict = {}
+        try:
+            sp = self.reader.read_active_battle_species()
+            party = self.reader.read_party()
+            mine = next((p for p in party if p.species_id == sp), party[0] if party else None)
+            if mine is not None:
+                ctx["user_level"] = mine.level
+                if mine.max_hp:
+                    ctx["user_hp_frac"] = mine.current_hp / mine.max_hp
+            foe = self.reader.read_enemy_lead()
+            if foe is not None:
+                ctx["foe_level"] = foe.level
+                ctx["foe_hp"] = foe.current_hp
+                ctx["foe_asleep"] = "asleep" in (foe.status or "")
+        except Exception:
+            pass
+        return ctx
+
     @staticmethod
-    def _best_damaging_move(move_names, pp, attacker_types=(), defender_types=()) -> str | None:
-        """From parallel (move_names, pp) lists, the best damaging move that still has PP.
-        Ranked by power × STAB × type effectiveness when the types are known (a 4×
-        Vine Whip must beat a neutral Tackle of equal power vs Brock's Rock/Ground);
-        with no type info it's plain highest power. None when no damaging move with PP can
-        hurt the foe (all out of PP, only status moves, or all immune) — NEVER a status
+    def _best_damaging_move(move_names, pp, attacker_types=(), defender_types=(), ctx=None) -> str | None:
+        """From parallel (move_names, pp) lists, the best damaging move that still has PP, ranked by
+        knowledge.move_semantics.move_score: power × accuracy × STAB × type effectiveness, with the moves that
+        can't work right now (Dream Eater on an awake foe, one-hit KOs, Focus Punch, counters) at zero and
+        two-turn / recharge moves at half. `ctx` (see _battle_ctx) adds levels, sleep and HP. None when no
+        damaging move with PP can hurt the foe (all out of PP, only status moves, or all immune) — NEVER a status
         move. Empty slots (name "") are skipped, so a mon with <4 moves is safe."""
-        from knowledge.leafgreen_data import MOVE_POWER, MOVE_TYPE, SUICIDE_MOVES
-        from knowledge.battle import effectiveness_vs
+        from knowledge.leafgreen_data import SUICIDE_MOVES
+        from knowledge.move_semantics import move_score
         best, best_score = None, 0.0
         for name, p in zip(move_names, pp):
             if not name or p <= 0:
                 continue
             if name in SUICIDE_MOVES:      # Self-Destruct/Explosion faint the user: no XP, a lost teammate
                 continue
-            pw = MOVE_POWER.get(name, 0)
-            if pw <= 0:
-                continue
-            score = float(pw)
-            mt = MOVE_TYPE.get(name)
-            if mt:
-                if defender_types:
-                    score *= effectiveness_vs(mt, tuple(defender_types))
-                if mt in attacker_types:
-                    score *= 1.5
+            score = move_score(name, attacker_types, defender_types, **(ctx or {}))
             if score > best_score:
                 best, best_score = name, score
         # No fallback to a status move: a mon whose attacks are out of PP (or immune) that keeps
@@ -1026,7 +1038,7 @@ class BattleMixin:
             # mon fighting may be a switched-in / sent-out teammate with a different set.
             _ids, names, pp, _dslot, _dturns = self._active_moves_view()
             atk, dfn = self._battle_types()
-            mv = self._best_damaging_move(names, pp, atk, dfn)
+            mv = self._best_damaging_move(names, pp, atk, dfn, self._battle_ctx())
             if mv:
                 self._use_move(mv)
             else:

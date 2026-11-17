@@ -1,3 +1,5 @@
+from knowledge.move_effects import MOVE_FX      # generated data only (no I/O)
+
 # Pure game data for Pokemon LeafGreen (FireRed/LeafGreen US v1.0).
 # No I/O. Zero imports. Hand-written from the pret/pokefirered decomp (verified by tests/test_game_data.py when the
 # decomp is checked out at ~/Projects/pokefirered); the generated tables (species_data, move_data, …) are in their own files.
@@ -509,4 +511,4 @@ _merge_generated_moves()
 # Moves that faint their own user. They out-power everything (200/250) so a plain "highest power" pick
 # chooses them every time — and the user then gains no XP and has to be revived (the 2026-11-14 Geodude
 # training loop). Never pick one while any other damaging move can hurt the foe.
-SUICIDE_MOVES = frozenset({"Self-Destruct", "Explosion"})
+SUICIDE_MOVES = frozenset(_n for _n, _fx in MOVE_FX.items() if _fx[0] == "EXPLOSION")      # Self-Destruct, Explosion (from the decomp effect table)

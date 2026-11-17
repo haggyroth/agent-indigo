@@ -5,6 +5,24 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — moves are ranked by what they actually do (#204)
+- `tools/gen_move_effects.py` → `knowledge/move_effects.py`: every move's decomp `effect`, accuracy, priority, secondary
+  chance and target. `knowledge/move_semantics.py` turns that into `move_score` (expected damage per turn), `role_tag`
+  (what a move is for / when it fails) and `catch_setup_hint`.
+- `move_score` = power × accuracy × STAB × type effectiveness, except: Dream Eater needs a sleeping foe; one-hit KOs,
+  Counter / Mirror Coat / Bide, Focus Punch, Snore and Explosion are never auto-picked; Solar Beam / Fly / Dig and Hyper
+  Beam count half; Return / Frustration use friendship (≈28 / ≈74 for a fresh catch, not 102); Seismic Toss / Night
+  Shade / Dragon Rage / Sonic Boom / Super Fang use their real fixed damage (no STAB, no super-effective bonus, type
+  immunity respected); Flail / Eruption use your HP; Hidden Power ignores type guesses (its type comes from IVs).
+- Used by the auto-fighters (`_best_damaging_move(..., ctx)` with `_battle_ctx()`), the "Best move" line and the idle
+  nudge. `SUICIDE_MOVES` is now derived from the effect table.
+- "Your moves" now carries a tag per move (Mean Look "traps the foe — use it BEFORE weakening a wild Pokémon", Roar /
+  Whirlwind "ENDS a wild battle", Protect "fails if used twice in a row", Splash "does nothing", Disable, Wrap, sleep /
+  paralysis "FAILS if the foe has a status condition", accuracy under 85%…). Wild battles with balls and a worthwhile
+  species also get a "Catch setup you have: False Swipe …" line (replaces the removed auto-weakening).
+- Not done: refusing certain-fail moves in `use_move`, using Hidden Power's real type (needs IVs, #208), a planner for
+  status-move plans (Substitute / Rest / setup).
+
 ### Changed — grind() rework: fixed floor, benched ace, level-fit routes, model-driven fights (#203)
 - **Encounters are handed to the model.** `grind` paces on grass until a wild Pokémon (or trainer) appears, then the call
   ends with a brief (foe, catch verdict, who should fight, progress); the model plays it with `use_move` / `use_item` /

@@ -18,6 +18,7 @@ from knowledge.map_graph import MAP_KIND
 from game.constants import Addr
 from game.pathfinding import door_centers
 from knowledge.battle import battle_summary, overworld_pp_summary
+from knowledge.move_semantics import catch_setup_hint
 from rich.console import Console
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -526,12 +527,17 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                         if p.species_id != _act and _healthy(p, 0.3) and _can_attack(p)]
             _hint = (("Teammates that can still attack: " + ", ".join(_backups) +
                       " — switch_pokemon to one.") if _backups else "")
+            _me = next((p for p in state.party if p.species_id == _act), lead)
             bsummary = battle_summary(move_names, run.current_enemy,
                                       lead.hp_percent, pp_view,
                                       attacker_types=lead_types,
                                       opponent_status=enemy.status if enemy else "",
                                       disabled_slot=d_slot, disabled_turns=d_turns,
-                                      backup_hint=_hint)
+                                      backup_hint=_hint,
+                                      wild=not run.battle_is_trainer,
+                                      user_level=_me.level, user_hp_frac=_me.hp_percent,
+                                      foe_level=(enemy.level or 0) if enemy else 0,
+                                      foe_hp=enemy.current_hp if enemy else 0)
             obs_parts.append(bsummary)
             try:
                 from knowledge.battle import xp_share_hint as _xp_hint
@@ -562,7 +568,10 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 stm.action_history,
                 _AC._best_damaging_move(move_names, pp_view, lead_types,
                                         POKEMON_TYPES.get((enemy.species_name or "").upper().strip(), ())
-                                        if enemy else ()))
+                                        if enemy else (),
+                                        {"user_level": _me.level, "user_hp_frac": _me.hp_percent,
+                                         "foe_level": (enemy.level or 0) if enemy else 0,
+                                         "foe_asleep": "asleep" in (enemy.status if enemy else "")}))
             if _nudge:
                 obs_parts.append(_nudge)
             if enemy:
@@ -590,7 +599,8 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                             "species name)"
                             + ((f"; already taken: "
                                 f"{', '.join(n for n in (p.nickname for p in state.party) if n)}")
-                               if any(p.nickname for p in state.party) else "") + ".")
+                               if any(p.nickname for p in state.party) else "") + ". "
+                            + catch_setup_hint(move_names, pp_view))
                     else:
                         obs_parts.append(
                             f"New species, but NOT worth a ball right now: {_v.reason}. "
