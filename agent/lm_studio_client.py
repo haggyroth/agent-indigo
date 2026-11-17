@@ -334,6 +334,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
+        events.observe(getattr(self, "reader", None))      # register a battle already under way before the tool runs
         if name in self._ABANDONS_GRIND and getattr(self, "_grind_run", None):
             self._grind_abandon()              # the model moved on: a stale session must not pin the floor
         match name:

@@ -66,7 +66,10 @@ class Addr:
     B_OUTCOME_LOST     = 2   # player lost (party about to white out)
     B_OUTCOME_DREW     = 3   # draw (both sides down)
     B_OUTCOME_RAN      = 4   # the player ran away
+    B_OUTCOME_PLAYER_TELEPORTED = 5
+    B_OUTCOME_MON_FLED = 6   # the wild Pokémon ran away
     B_OUTCOME_CAUGHT   = 7
+    B_OUTCOME_MON_TELEPORTED = 8
     # gMoveToLearn (u16) — the move the game is offering the lead on a level-up, set
     # while the "Delete a move to make room?" prompt is up. Derived + verified live
     # (=77 Poison Powder at Bulbasaur's L15 prompt). Stale between prompts (holds the

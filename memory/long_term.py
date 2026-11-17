@@ -12,6 +12,7 @@ DEFAULTS = {
     "notes": [],          "starter": None,
     "total_battles": 0,   "battles_won": 0,
     "battles_lost": 0,    "total_reward": 0.0,
+    "battles_fled": 0,    "battles_caught": 0,
 }
 
 class LongTermMemory:

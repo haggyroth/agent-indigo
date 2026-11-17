@@ -31,7 +31,7 @@ STYLE = {
 }
 
 _S: dict = {"console": None, "run_log": None, "level": 1, "t0": time.time(), "last": None, "party": None,
-            "badges": None, "battle": None}
+            "badges": None, "battle": None, "hooks": []}
 _RECENT: deque = deque(maxlen=300)
 COUNTS: Counter = Counter()
 
@@ -39,7 +39,7 @@ COUNTS: Counter = Counter()
 def configure(console=None, run_log=None, level: str = "events") -> None:
     """Turn printing on (console) and run-log recording on. Called once by main."""
     _S.update(console=console, run_log=run_log, level=LEVELS.get(str(level).lower(), 1), t0=time.time(),
-              party=None, badges=None, battle=None)
+              party=None, badges=None, battle=None, hooks=[])
     COUNTS.clear()
     _RECENT.clear()
 
@@ -50,6 +50,21 @@ def reset() -> None:
 
 def recent(kind: str | None = None) -> list[dict]:
     return [e for e in _RECENT if kind is None or e["kind"] == kind]
+
+
+def on_battle_end(fn) -> None:
+    """Register `fn(summary: dict)`, called exactly once for every finished battle wherever it was fought —
+    inside a skill, inside a tool call or on the main loop. This is where the journal, the win/loss/fled/caught
+    counters and the rewards are booked (the old main-loop edge detector never saw battles inside a skill)."""
+    _S["hooks"].append(fn)
+
+
+def note_move(name: str) -> None:
+    """A move was used in the current battle (a turn)."""
+    b = _S["battle"]
+    if b is not None and name:
+        b["turns"] += 1
+        b["moves"].append(name)
 
 
 def current_foe() -> str | None:
@@ -206,7 +221,8 @@ def _observe_battle(reader) -> None:
             except Exception:
                 where = ""
             _S["battle"] = cur = {"trainer": trainer, "foe": None, "foe_hp": None, "foe_species": None,
-                                  "where": where, "announced": False}
+                                  "where": where, "announced": False, "turns": 0, "moves": [], "lead": "",
+                                  "active": 0, "foe_name": "", "foe_level": 0}
         if not _battle_settled(reader):
             return                                   # intro / animations: the foe slot may still hold the last foe
         foe = None
@@ -217,6 +233,12 @@ def _observe_battle(reader) -> None:
         if not (foe and foe.species_id and foe.max_hp and not (foe.species_name or "").startswith("#")):
             return
         label = f"{foe.species_name} L{foe.level}"
+        try:
+            cur["active"] = reader.read_active_battle_species()
+            if not cur["lead"]:
+                cur["lead"] = (reader.read_party() or [None])[0].species_name
+        except Exception:
+            pass
         if not cur["announced"]:
             cur["announced"] = True
             emit("battle_start", f"{'trainer battle' if cur['trainer'] else 'wild'} {label}"
@@ -224,6 +246,7 @@ def _observe_battle(reader) -> None:
         elif cur["foe_hp"] and foe.current_hp == 0 and cur["foe_species"] == foe.species_id:
             emit("foe_ko", f"{foe.species_name} fainted", major=False)
         cur["foe"], cur["foe_hp"], cur["foe_species"] = label, foe.current_hp, foe.species_id
+        cur["foe_name"], cur["foe_level"] = foe.species_name, foe.level or 0
         return
     if cur is not None:
         _S["battle"] = None
@@ -235,3 +258,16 @@ def _observe_battle(reader) -> None:
             emit("battle_end", f"{outcome} vs {cur['foe']}", outcome=outcome, trainer=cur["trainer"], foe=cur["foe"])
         else:                                        # never saw the menu (fled / ended inside one call)
             emit("battle_end", f"{kind} battle {outcome}", outcome=outcome, trainer=cur["trainer"])
+        active = next((p for p in party if p.species_id == cur["active"]), party[0] if party else None)
+        summary = {"outcome": outcome, "trainer": cur["trainer"], "foe_name": cur["foe_name"],
+                   "foe_level": cur["foe_level"], "where": cur["where"], "turns": cur["turns"],
+                   "moves": list(dict.fromkeys(cur["moves"])), "lead": cur["lead"],
+                   "active": (active.species_name if active else cur["lead"]),
+                   "hp_pct": (active.current_hp / active.max_hp if active and active.max_hp else 0.0),
+                   "wiped": wiped, "announced": cur["announced"]}
+        _S["last_battle"] = summary
+        for fn in list(_S["hooks"]):
+            try:
+                fn(summary)
+            except Exception:
+                pass

@@ -77,8 +77,12 @@ def newly_fainted_slots(before: list[PokemonStatus],
     """Party slots that transitioned from alive (HP > 0) to fainted (HP == 0)
     between two states. Used to fire the party_faint reward once per faint."""
     out = []
-    for i in range(min(len(before), len(after))):
-        if before[i].current_hp > 0 and after[i].current_hp == 0:
+    by_pid = {p.personality: p for p in before if p.personality}
+    for i, a in enumerate(after):
+        # pair a Pokémon with ITSELF (personality value), not with whatever now sits in the same slot: a switch,
+        # set_lead or the battle party screen permutes the party, which read as one faint and one miss
+        b = by_pid.get(a.personality) if a.personality else (before[i] if i < len(before) else None)
+        if b is not None and b.current_hp > 0 and a.current_hp == 0:
             out.append(i)
     return out
 
