@@ -5,6 +5,7 @@ from knowledge.catch_policy import evaluate
 from knowledge.species_data import SPECIES_DATA
 
 BULBASAUR, IVYSAUR, CATERPIE, PIDGEY, PIKACHU, KAKUNA, GEODUDE, ZUBAT, MAGIKARP, ABRA = 1, 2, 10, 16, 25, 14, 74, 41, 129, 63
+GROWLITHE = 58          # a strong line reachable without a trade (Abra/Alakazam is not: #215)
 
 
 def party(*mons):
@@ -61,17 +62,22 @@ def test_go_to_only_stops_on_worthwhile_species():
 # ── party composition: upgrades and a bigger debt allowance (the team stalled at 4 weak members) ──
 def test_a_stronger_line_than_the_weakest_member_is_an_upgrade_even_far_behind():
     team = party((IVYSAUR, "Ivysaur", 30), (CATERPIE, "Caterpie", 10), (PIDGEY, "Pidgey", 12))
-    v = evaluate(team, ABRA, 14)                 # Alakazam line vs the Caterpie line; debt 9 (floor 23)
+    v = evaluate(team, GROWLITHE, 14)            # Arcanine line vs the Caterpie line; debt 9 (floor 23)
     assert v.catch and v.debt >= 5
 
 
 def test_full_party_catches_an_upgrade_into_the_box_with_a_pc_swap_hint():
     full = party((IVYSAUR, "Ivysaur", 30), (CATERPIE, "Caterpie", 12), (PIDGEY, "Pidgey", 12),
                  (CATERPIE + 1, "Metapod", 12), (CATERPIE + 2, "Butterfree", 12), (13, "Weedle", 12))
-    v = evaluate(full, ABRA, 18)
+    v = evaluate(full, GROWLITHE, 18)
     assert v.catch and "pc_swap" in v.reason
 
 
 def test_a_weak_line_only_adding_a_type_still_needs_a_small_gap():
     team = party((IVYSAUR, "Ivysaur", 19))
     assert not evaluate(team, KAKUNA, 5).catch   # debt 7 > TYPE_DEBT
+
+
+def test_a_trade_only_line_is_not_a_premium_catch():
+    team = party((IVYSAUR, "Ivysaur", 30), (CATERPIE, "Caterpie", 10), (PIDGEY, "Pidgey", 12))
+    assert not evaluate(team, ABRA, 14).catch      # Alakazam needs a link trade: Abra tops out at Kadabra
