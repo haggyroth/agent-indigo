@@ -131,6 +131,8 @@ class OverworldMixin:
                 # walk_to can't move — the Poké Center exit stall (the agent re-issued
                 # walk_to(exit) for ~50s until the fade happened to clear).
                 self._advance_to_control(tries=24)
+                from agent import events
+                events.emit("heal", "party healed at the Pokémon Center")
                 return "Healed the party to full HP at the Pokémon Center."
             self.mgba.tap("Up")        # keep the YES/NO cursor on YES if it's up
             self.mgba.tap("A")
@@ -325,6 +327,8 @@ class OverworldMixin:
             return ("At the Mart but bought nothing (this mart doesn't sell the "
                     "recommended items, or you couldn't afford them).")
         msg = f"Bought {', '.join(bought)} (¥{spent}). Money left: ¥{self.reader.read_money()}."
+        from agent import events
+        events.emit("shop", f"bought {', '.join(bought)} (−¥{spent}, ¥{self.reader.read_money()} left)")
         if skipped:
             msg += f" (Not sold here: {', '.join(dict.fromkeys(skipped))}.)"
         return msg

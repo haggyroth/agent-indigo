@@ -25,6 +25,7 @@ class PokemonStatus:
     move_names: list[str] = field(default_factory=lambda: [""]*4)
     pp: list[int] = field(default_factory=lambda: [0]*4)
     nickname: str = ""    # the mon's given name ("" when unreadable)
+    personality: int = 0  # PID: identifies the same Pokémon across party reorders, evolutions and level-ups
 
     @property
     def hp_percent(self) -> float:

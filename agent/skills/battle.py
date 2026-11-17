@@ -42,6 +42,16 @@ class BattleMixin:
         return self.mgba.read8(Addr.BATTLE_OUTCOME) != 0
 
     def _use_move(self, name: str) -> str:
+        """Use a move (see _use_move_inner), then let the event stream notice what the turn did (a KO, a level-up,
+        a faint, the battle ending) — grind/go_to play hundreds of these inside one tool call."""
+        from agent import events
+        events.observe(getattr(self, "reader", None))       # sees the battle START even if this move ends it
+        try:
+            return self._use_move_inner(name)
+        finally:
+            events.observe(getattr(self, "reader", None))
+
+    def _use_move_inner(self, name: str) -> str:
         """Use a move by name in battle, deterministically.
 
         Per pokefirered HandleInputChooseMove, pressing A commits
@@ -152,6 +162,8 @@ class BattleMixin:
             # battler (gBattleMons[0]) — the live in-battle PP that decrements when the
             # move lands, and matches the slot the cursor indexes.
             pp_before = self.reader.read_active_battle_moves()[2][slot]
+            from agent import events
+            events.observe(self.reader)          # the move menu is up: the foe reads cleanly now (battle start)
             self.mgba.write8(Addr.MOVE_CURSOR, slot)
             self.mgba.hold("A", 20)       # A edge → commits gMoveSelectionCursor
             # A committed move leaves the move menu at once. If it is STILL up after settling,
@@ -566,6 +578,13 @@ class BattleMixin:
         self._exit_battle_menus()            # clear any prompt; never strand in a menu
         if caught or self.mgba.read8(OUTCOME) == Addr.B_OUTCOME_CAUGHT or named.startswith("Named"):
             extra = f" {named}" if named else ""
+            try:
+                from agent import events
+                foe0 = events.current_foe() or (getattr(self, "_current_opponent", "") or "").title() or "Pokémon"
+                events.emit("catch", f"CAUGHT {foe0}" + (f" — {named.strip(' .')}" if named else "")
+                            + (" (party full → PC box)" if party_before >= 6 else ""), species=foe0)
+            except Exception:
+                pass
             if party_before >= 6:
                 return ("Gotcha! Caught the wild Pokémon — your party was full, so it was sent to the PC "
                         f"box — see pc_boxes, and pc_swap / pc_withdraw to bring it into the team.{extra}")

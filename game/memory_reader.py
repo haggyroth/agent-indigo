@@ -162,6 +162,7 @@ class LeafGreenReader:
             status=decode_status(status_word), species_id=species_id,
             species_name=species_name, move_ids=move_ids, move_names=move_names, pp=pp,
             nickname="".join(nick).strip(),
+            personality=int.from_bytes(raw[0:4], "little"),
         )
 
     # Gen III internal species indices run 1..411 (Bulbasaur..Chimecho-era slots);

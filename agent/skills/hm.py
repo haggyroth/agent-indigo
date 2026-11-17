@@ -184,6 +184,8 @@ class HMMixin:
                 break
         self._advance_to_control(tries=20)
         if self.reader.read_current_map() == (dbank, did):
+            from agent import events
+            events.emit("hm_use", f"flew to {key.title()}")
             return f"Flew to {key.title()}."
         self._menus.close_menus()
         return f"Selected {key.title()} but didn't arrive (map {self.reader.read_current_map()})."
@@ -257,5 +259,7 @@ class HMMixin:
             if label == "Strength":
                 return "Used Strength — boulders can be pushed now (walk into them)."
             if (ox, oy) not in self.reader.read_objects_by_gfx([gfx]):
+                from agent import events
+                events.emit("hm_use", f"used {label} at ({ox},{oy})")
                 return f"Used {label}: cleared the obstacle at ({ox},{oy})."
         return f"Tried {label} but the obstacle is still there."
