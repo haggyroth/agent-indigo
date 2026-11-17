@@ -8,19 +8,54 @@ def min_level_for(top: int) -> int:
     return max(1, top - BALANCE_GAP)
 
 
-def lagging_mons(party) -> list:
+def grind_floor(top: int, gym_target: int | None = None, balance: bool = True) -> int:
+    """The level every Pokémon should reach in ONE grind session, fixed when the session starts. It must not
+    follow the ace's level (a moving target is how a 300-minute grind never finished): top − BALANCE_GAP,
+    capped at the next gym's recommended level when that is lower (nobody needs to be stronger than the gym
+    asks). In target-level mode `top` is the level being ground to."""
+    floor = min_level_for(top)
+    if balance and gym_target:
+        floor = min(floor, max(1, gym_target))
+    return floor
+
+
+def ace_index(party) -> int | None:
+    """Index of the highest-level living member (the 'ace': first on ties), or None."""
+    alive = [(p.level, -i) for i, p in enumerate(party) if p.current_hp > 0]
+    return -max(alive)[1] if alive else None
+
+
+def ace_runaway(start_levels: dict, party, battles: int, min_battles: int = 20, ace_gain: int = 3) -> str:
+    """'' normally; else why a balance session should stop: after `min_battles` fights the ace has gained
+    `ace_gain`+ levels while the weakest member that started under the floor has gained at most one — the
+    grind is feeding the ace, not the team. `start_levels` is {species_id: level at session start}."""
+    if battles < min_battles or len(party) < 2:
+        return ""
+    ace = ace_index(party)
+    if ace is None:
+        return ""
+    gains = {p.species_id: p.level - start_levels.get(p.species_id, p.level) for p in party}
+    low_id = min(start_levels, key=lambda sid: start_levels[sid], default=None)
+    a_gain = gains.get(party[ace].species_id, 0)
+    if low_id is not None and low_id != party[ace].species_id and a_gain >= ace_gain and gains.get(low_id, 0) <= 1:
+        return (f"after {battles} battles the ace gained {a_gain} levels but the lowest member only "
+                f"{gains.get(low_id, 0)} — the fights are feeding the ace")
+    return ""
+
+
+def lagging_mons(party, floor: int | None = None) -> list:
     """[(index, mon)] of members below the balance floor, lowest level first. FAINTED members count: a team
     whose trainees are all knocked out is not balanced, it is just waiting for a heal (a fainted-excluded
     check used to report "Party balanced" for L7/L6/L5 beside an L38 ace). A party of fewer than two has
     nothing to balance."""
     if len(party) < 2:
         return []
-    need = min_level_for(max(p.level for p in party))
+    need = floor if floor is not None else min_level_for(max(p.level for p in party))
     lag = [(i, p) for i, p in enumerate(party) if p.level < need]
     return sorted(lag, key=lambda ip: (ip[1].level, ip[0]))
 
 
-def pick_finisher(party, trainee_idx: int, foe_level: int = 0):
+def pick_finisher(party, trainee_idx: int, foe_level: int = 0, bench=()):
     """Index of the teammate who finishes a training fight once the trainee has been tagged out: healthy
     (>= 40% HP), not the trainee, and CAPABLE (level >= the foe's). Among the capable ones the LOWEST level is
     chosen, so the finishing XP rotates through the whole team instead of always feeding the ace; with no
@@ -29,6 +64,11 @@ def pick_finisher(party, trainee_idx: int, foe_level: int = 0):
            if i != trainee_idx and q.max_hp and q.current_hp > 0 and q.current_hp / q.max_hp >= 0.4]
     if not fit:
         return None
+    benched = set(bench)
+    if benched:            # keep the ace out of balance-mode fights unless nobody else is fit to finish
+        rest = [(i, q) for i, q in fit if i not in benched]
+        if rest:
+            fit = rest
     capable = [(i, q) for i, q in fit if q.level >= foe_level]
     if capable:
         return min(capable, key=lambda iq: (iq[1].level, iq[0]))[0]

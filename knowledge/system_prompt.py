@@ -171,8 +171,8 @@ the observation's **READINESS** block (when present) tell you what is overdue:
    start a trip in that state (`force=true` overrides — rarely right).
 2. **Restock** — few Poké Balls / Potions and money to spend → `shop()`.
 3. **Catch** — a team of 1-2 can't carry a gym, a dungeon or a forced switch. Aim for 4-6 Pokémon covering
-   different types: catch useful NEW species whenever they appear (weaken, then `catch()`), and `grind()`
-   catches worthwhile ones for you.
+   different types: catch useful NEW species whenever they appear (weaken, then `catch()`) — `grind()` and `go_to`
+   point out worthwhile ones when they hand you the encounter.
 4. **Level the whole team** — nobody more than 7 levels under your best (`grind()` with no level); and your best
    one up to the next gym's level before you walk in (`grind(N)`). USE EVERYONE: XP is split between every Pokémon
    that was on the field, so lead with a low-level teammate and switch to a stronger one on the first turn — both
@@ -230,10 +230,9 @@ your lead is strong enough and has the right move:
 - **Brock (Pewter, Rock): you want Bulbasaur at ~L13+ so it has Vine Whip** (Grass,
   2× vs Rock/Ground — it 2HKOs Geodude L12 and Onix L14). Tackle barely dents them.
 - **If you are under that level, GRIND to level up: stand in TALL GRASS (Route 1/
-  Route 2 or Viridian Forest) and call `grind(13)`.** It wanders to trigger wild
-  battles and auto-fights each one for you until your lead hits the target level —
-  you do NOT fight them one at a time. It pauses if HP gets low; then `heal()` and
-  `grind(13)` again. (Do not `flee_battle()` while levelling — that's for when you
+  Route 2 or Viridian Forest) and call `grind(13)`.** It paces on grass until a wild Pokémon
+  appears, then hands you the battle: fight it with `use_move`, then call `grind(13)` again (with
+  `auto_battles=N` it plays N boring fights itself). It heals at a Pokémon Center on its own when HP/PP run low. (Do not `flee_battle()` while levelling — that's for when you
   DON'T want the fight.)
 - When your lead reaches the target (watch the "Lead: … L<level>" field), `heal()`,
   then go to the Gym and `save_state` before the leader.
@@ -248,13 +247,15 @@ your lead is strong enough and has the right move:
 Nobody should trail your highest level by more than 7 (top L40 → nobody under L33).
 A lone strong lead is fragile: it faints, a move gets Disabled, PP runs out — and then your
 L5 backups are useless. After you catch something, before a gym, and whenever the observation
-shows a "⚠ Team imbalance" line, call `grind()` with NO level: it fights wild battles so the lowest
-lagging Pokémon gets the XP, and heals itself at a Pokémon Center when HP or attack PP runs low.
-(`grind(13)` raises your best one to L13, but still rotates lagging teammates in so they are not left behind.)
+shows a "⚠ Team imbalance" line, call `grind()` with NO level: it goes to grass whose wild levels fit your weakest member, which leads each
+fight and earns the XP. **Keep the ace out of those fights** (do not switch to it — it would take the XP and the
+gap never closes); use Potions and `use_move` with the trainee. The target is fixed when the session starts
+(best − 7, capped at the next gym's level), so it finishes. (`grind(13)` raises your best one to L13, still rotating
+lagging teammates in.) Catch worthwhile wild Pokémon yourself with `catch()` when `grind` hands you one.
 
 **Party composition.** Aim for a full party of 6 with different types and strong evolution lines. Early placeholders
 (Weedle, Rattata, Pidgey…) are fine to start, but when you find a clearly better species — or a new type — catch it
-(`grind()` catches worthwhile wild Pokémon automatically; when `go_to` hands you a wild encounter, `catch()` it yourself) and swap the weakest member out with
+(when `grind()` or `go_to` hands you a worthwhile wild Pokémon, `catch()` it yourself) and swap the weakest member out with
 `pc_swap`. Don't run from a wild Pokémon you could use.
 
 **Tag-switch XP.** In any battle you can lead with a low-level Pokémon, then `switch_pokemon` to your strongest on

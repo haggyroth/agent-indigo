@@ -507,8 +507,9 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
             if _block:
                 obs_parts.append(_block)
         if trip and not in_battle and state.context == GameContext.OVERWORLD:
-            obs_parts.append(f"TRIP IN PROGRESS → {trip['target']} (an encounter interrupted it): "
-                             f"call go_to() with no destination — or go_to({trip['dest']!r}) — to resume.")
+            resume = (f"call {trip['call']} to resume." if trip.get("call") else
+                      f"call go_to() with no destination — or go_to({trip['dest']!r}) — to resume.")
+            obs_parts.append(f"TRIP IN PROGRESS → {trip['target']} (an encounter interrupted it): {resume}")
         if in_battle:
             # Moves/PP of the ACTIVE battler (gBattleMons[0]) — party[0] is not necessarily the one
             # fighting after a switch — with a Disabled move's PP zeroed so it is never suggested.

@@ -36,23 +36,36 @@ def trash_can_tile(can: int) -> tuple[int, int]:
 
 
 class QuestMixin:
+    def _quest_battle(self, call: str, label: str) -> str | None:
+        """A walk or trip inside a quest was interrupted by a battle: hand it to the model (like go_to does) and
+        say which tool resumes the quest. None when no battle is up."""
+        from game.constants import Addr
+        if self.reader.detect_context() != GameContext.IN_BATTLE:
+            return None
+        trainer = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
+        return self._yield_encounter(label, trainer, None, call)
+
     def _has_ss_ticket(self) -> bool:
         return (SS_TICKET_ITEM in self.reader.read_key_items()
                 or bool(self.reader.read_flag(FLAG_GOT_SS_TICKET)))
 
-    def _get_ss_ticket(self) -> str:
+    def _get_ss_ticket(self, auto_trainers: bool = False) -> str:
         if self._has_ss_ticket():
             return "You already have the SS Ticket — Cerulean's exits are open. go_to Vermilion City."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
-        # 1. Get to the cottage: resumable travel (trainers on Nugget Bridge are auto-fought; stops on a
-        # lost fight / low HP with advice), so keep calling it, healing when it asks.
+        # 1. Get to the cottage: resumable travel. A wild Pokémon / trainer ends the call so the model plays it
+        # (auto_trainers=true auto-fights the Nugget Bridge trainers; it then stops on a lost fight / low HP with
+        # advice), so keep calling it, healing when it asks.
         for _ in range(12):
             if self.reader.read_current_map() == COTTAGE:
                 break
-            out = self._go_to("Bill's Sea Cottage", mode="autopilot")
+            out = self._go_to("Bill's Sea Cottage", mode="yield", auto_trainers=auto_trainers,
+                              resume_call="get_ss_ticket()")
             if self.reader.read_current_map() == COTTAGE:
                 break
+            if self.reader.detect_context() == GameContext.IN_BATTLE:
+                return out
             if "heal()" in out or "Lost a trainer" in out:
                 heal = self._heal()
                 if not heal.startswith(("Healed", "Party is already")):
@@ -66,10 +79,14 @@ class QuestMixin:
         # 2. Clefairy-Bill → teleporter. (Skipped on a re-run if he's already gone.)
         if self.reader.read_objects_by_gfx([CLEFAIRY_GFX]) and not self.reader.read_objects_by_gfx([BILL_GFX]):
             if not self._press_on_tile(*CLEFAIRY_SPOT, yesno=True):
+                if (b := self._quest_battle("get_ss_ticket()", "Bill's cottage")):
+                    return b
                 return "Couldn't reach the Clefairy (Bill) in the cottage — walk_to (10,7), face up, press A, answer YES."
         # 3. The computer runs the cell separator; wait for human Bill to appear.
         if not self.reader.read_objects_by_gfx([BILL_GFX]):
             if not self._press_on_tile(*COMPUTER_SPOT):
+                if (b := self._quest_battle("get_ss_ticket()", "Bill's cottage")):
+                    return b
                 return "Couldn't reach Bill's computer at (4,5) — walk_to (4,6), face up, press A."
             for _ in range(30):
                 if self.reader.detect_context() == GameContext.OVERWORLD and self.reader.read_objects_by_gfx([BILL_GFX]):
@@ -83,6 +100,8 @@ class QuestMixin:
         for stand, face in (((bx, by + 1), "Up"), ((bx - 1, by), "Right"), ((bx + 1, by), "Left")):
             if self._press_on_tile(stand, face):
                 break
+            if (b := self._quest_battle("get_ss_ticket()", "Bill's cottage")):
+                return b
         for _ in range(12):
             if self._has_ss_ticket():
                 break
@@ -97,7 +116,7 @@ class QuestMixin:
     def _knows_cut(self) -> bool:
         return any(CUT_MOVE_ID in (p.move_ids or []) for p in self.reader.read_party())
 
-    def _get_cut(self) -> str:
+    def _get_cut(self, auto_trainers: bool = False) -> str:
         if self._knows_cut():
             return "A Pokémon in your party already knows Cut — use_hm('cut') on a tree, or just go_to."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
@@ -108,9 +127,12 @@ class QuestMixin:
             for _ in range(14):
                 if self.reader.read_current_map() == CAPTAIN_OFFICE:
                     break
-                out = self._go_to("S.S. Anne Captain's Office", mode="autopilot")
+                out = self._go_to("S.S. Anne Captain's Office", mode="yield", auto_trainers=auto_trainers,
+                                  resume_call="get_cut()")
                 if self.reader.read_current_map() == CAPTAIN_OFFICE:
                     break
+                if self.reader.detect_context() == GameContext.IN_BATTLE:
+                    return out
                 if "heal()" in out or "Lost a trainer" in out:
                     heal = self._heal()
                     if not heal.startswith(("Healed", "Party is already")):
@@ -121,6 +143,8 @@ class QuestMixin:
             if self.reader.read_current_map() != CAPTAIN_OFFICE:
                 return "Didn't reach the Captain's Office yet — call get_cut() again to continue (it resumes)."
             if not self._press_on_tile(*CAPTAIN_SPOT):
+                if (b := self._quest_battle("get_cut()", "the Captain")):
+                    return b
                 return "Couldn't reach the Captain — walk_to (5,5), face up, press A."
             for _ in range(12):
                 if self.reader.read_flag(FLAG_GOT_HM01):
@@ -144,11 +168,21 @@ class QuestMixin:
         if self.reader.read_flag(FLAG_VERMILION_SWITCHES):
             return "The electric locks are already open."
         s1, s2 = self.reader.read_var(0x4000), self.reader.read_var(0x4001)
+        if 1 <= s1 <= 15 and 1 <= s2 <= 15:
+            self._vermilion_cans = (s1, s2)          # remember: a gym trainer's battle can interrupt us mid-way
+        elif getattr(self, "_vermilion_cans", None):
+            s1, s2 = self._vermilion_cans            # …and the temp vars may read 0 after it
         if not (1 <= s1 <= 15 and 1 <= s2 <= 15):
             return f"Couldn't read the trash-can switches (got {s1}, {s2}) — search the cans by hand (A on each)."
         for can in (s1, s2):
             x, y = trash_can_tile(can)
-            if not self._press_on_tile((x, y + 1), "Up"):
+            # Below the can first; if a (beaten) gym trainer stands there, press it from either side instead.
+            for stand, face in (((x, y + 1), "Up"), ((x - 1, y), "Right"), ((x + 1, y), "Left")):
+                if self._press_on_tile(stand, face):
+                    break
+                if (b := self._quest_battle("challenge_leader()", "Surge's trash cans")):
+                    return b
+            else:
                 return f"Couldn't reach trash can {can} at ({x},{y}) — walk_to ({x},{y + 1}), face up, press A."
         if not self.reader.read_flag(FLAG_VERMILION_SWITCHES):
             return "Pressed both switch cans but the locks didn't open — try again."

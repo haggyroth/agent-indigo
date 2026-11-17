@@ -80,21 +80,3 @@ def test_a_failed_visit_is_retried_next_time():
     c._heal = lambda force=False: "A battle started while healing — handle it, then heal again."
     c._maybe_visit_new_town((3, 3), "x")
     assert c.ltm.data["pc_visited"] == []
-
-
-# ── auto-catch gating ────────────────────────────────────────────────────────────
-def test_grind_catch_declines_without_balls_or_with_a_full_party():
-    foe = SimpleNamespace(species_id=16, species_name="Pidgey", level=5, max_hp=20, current_hp=20)
-    c = _client(read_party=lambda: [mon(1)], read_enemy_lead=lambda: foe)
-    c._ball_count = lambda: 0
-    assert c._grind_try_catch() is None
-    c = _client(read_party=lambda: [mon(i) for i in range(1, 7)], read_enemy_lead=lambda: foe)
-    c._ball_count = lambda: 5
-    assert c._grind_try_catch() is None
-
-
-def test_grind_catch_declines_a_species_the_policy_rejects():
-    foe = SimpleNamespace(species_id=14, species_name="Kakuna", level=5, max_hp=20, current_hp=20)
-    c = _client(read_party=lambda: [mon(2, level=30)], read_enemy_lead=lambda: foe)   # L5 vs L30 team
-    c._ball_count = lambda: 5
-    assert c._grind_try_catch() is None

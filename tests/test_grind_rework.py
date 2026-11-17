@@ -1,0 +1,183 @@
+"""grind() rework (#203): fixed floor, benched ace, level-fit routes, encounter hand-off, stop-loss (no emulator)."""
+from types import SimpleNamespace as NS
+
+import pytest
+
+from game.constants import Addr
+from game.state import GameContext, PokemonStatus
+from knowledge.grind_routes import best_grass, is_misfit, route_fit
+from knowledge.party import ace_index, ace_runaway, grind_floor, lagging_mons, pick_finisher
+
+
+def mon(level, sid=1, hp=40, name="Mon"):
+    return PokemonStatus(slot=0, level=level, current_hp=hp, max_hp=40, status="healthy", species_id=sid,
+                         species_name=f"{name}{sid}", nickname=f"{name}{sid}")
+
+
+# ── pure helpers ──────────────────────────────────────────────────────────────────────
+def test_floor_is_fixed_by_the_starting_top_and_capped_by_the_next_gym():
+    assert grind_floor(38) == 31
+    assert grind_floor(38, gym_target=20) == 20            # nobody needs to out-level the next gym
+    assert grind_floor(30, balance=False) == 23            # target mode: target − 7
+
+
+def test_lagging_uses_a_fixed_floor_not_the_moving_top():
+    party = [mon(40, 1), mon(25, 2), mon(30, 3)]
+    assert [p.species_id for _, p in lagging_mons(party)] == [2, 3]          # moving rule: floor 33
+    assert [p.species_id for _, p in lagging_mons(party, floor=25)] == []      # fixed floor 25: balanced
+
+
+def test_pick_finisher_keeps_the_ace_out_unless_nobody_else_is_fit():
+    party = [mon(8, 1), mon(30, 2), mon(9, 3)]
+    assert pick_finisher(party, 0, foe_level=10) == 1                         # only the ace is capable…
+    assert pick_finisher(party, 0, foe_level=10, bench=(1,)) == 2             # …but it is benched
+    hurt = [mon(8, 1), mon(30, 2), mon(9, 3, hp=1)]
+    assert pick_finisher(hurt, 0, foe_level=10, bench=(1,)) == 1              # nobody else fit: ace as a last resort
+
+
+def test_ace_runaway_flags_a_grind_that_feeds_the_ace():
+    start = {1: 30, 2: 8}
+    assert ace_runaway(start, [mon(34, 1), mon(8, 2)], battles=25) != ""
+    assert ace_runaway(start, [mon(34, 1), mon(8, 2)], battles=10) == ""      # too early to judge
+    assert ace_runaway(start, [mon(31, 1), mon(15, 2)], battles=25) == ""     # the trainee is moving
+    assert ace_index([mon(8, 1), mon(30, 2, hp=0), mon(12, 3)]) == 2
+
+
+def test_route_fit_prefers_wild_levels_near_the_trainee():
+    route22, route25 = (3, 22), (3, 25)                  # avg L9.4 vs L19.0
+    assert route_fit(route22, 8) < route_fit(route25, 8)
+    assert is_misfit(route25, 8) and not is_misfit(route22, 8)
+    assert is_misfit((3, 19), 25)                         # Route 1 is far too cold for a L25
+    assert best_grass((3, 2), 8)[0] != route25            # never the L17-22 route for a L8
+    assert best_grass((3, 2), 0) is not None              # no level → plain nearest grass
+
+
+# ── the session ──────────────────────────────────────────────────────────────────────
+class FakeWorld:
+    def __init__(self, party, ctx=GameContext.OVERWORLD, trainer=False, foe_level=6):
+        self.party, self.ctx, self.trainer = party, ctx, trainer
+        self.foe = NS(species_id=19, species_name="RATTATA", level=foe_level, current_hp=14, max_hp=14)
+
+    # reader + mgba surface used by the grind loop
+    def read_party(self): return self.party
+    def detect_context(self): return self.ctx
+    def read32(self, addr): return Addr.BATTLE_TYPE_TRAINER if (addr == Addr.BATTLE_TYPE_FLAGS and self.trainer) else 0
+    def read_enemy_lead(self): return self.foe
+    def read_current_map(self): return (3, 22)
+    def read_active_battle_species(self): return self.party[0].species_id
+    def read_player_pos(self): return (5, 5)
+    def tap(self, *_): pass
+    def tick(self, *_): pass
+
+
+ALL_GYMS = ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina", "Blaine", "Giovanni"]   # no gym cap on the floor
+
+
+def grind_client(world, gyms=ALL_GYMS):
+    pytest.importorskip("openai")
+    from agent.lm_studio_client import AgentClient
+    c = AgentClient.__new__(AgentClient)
+    c.reader = c.mgba = world
+    c.ltm = NS(data={"gyms_beaten": list(gyms)})
+    c._nearest_grass = lambda: (5, 5)
+    c._relocate_to_grass = lambda **kw: True
+    c._ball_count = lambda: 0
+    c._grass_step = lambda st, again: None
+    c._restock = lambda why: None
+    c._lead_trainee = lambda t: True
+    c._restore_ace_lead = lambda: None
+    c._close_menus = lambda: None
+    c._training_swapped = False
+    c._grind_run = None
+    return c
+
+
+def test_wild_encounter_ends_the_call_and_the_session_persists():
+    w = FakeWorld([mon(8, 1, name="Rat"), mon(30, 2, name="Ace")], ctx=GameContext.IN_BATTLE)
+    c = grind_client(w)
+    fought = []
+    c._auto_fight = lambda: fought.append(1)
+    c._train_fight = lambda sig: fought.append(2)
+    out = c._grind(0, True, 0)
+    assert "wild RATTATA L6" in out and "Keep Ace2 OUT" in out and "grind()" in out
+    assert fought == [] and c._grind_run["battles"] == 1 and c._grind_run["floor"] == 23
+    again = c._grind(0, True, 0)                       # still in the battle: yields again, same session
+    assert "Battle 2" in again and fought == [] and c._grind_run["floor"] == 23
+
+
+def test_the_floor_does_not_follow_the_ace_up():
+    w = FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE)
+    c = grind_client(w)
+    c._grind(0, True, 0)
+    w.party = [mon(8, 1), mon(37, 2)]                  # the ace levelled a lot
+    assert c._grind_run["floor"] == 23                 # moving rule would now say 30
+    assert [p.species_id for _, p in c._lagging_mons(w.party)] == [1]
+
+
+def test_balanced_party_reports_the_floor_and_starts_no_session():
+    w = FakeWorld([mon(25, 1), mon(30, 2)])
+    c = grind_client(w)
+    out = c._grind(0, True, 0)
+    assert "balanced" in out and "L23" in out and c._grind_run is None
+
+
+def test_auto_battles_plays_only_boring_fights_itself():
+    w = FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE, foe_level=7)
+    c = grind_client(w)
+    fights = []
+
+    def train(sig):                                    # the fight ends and the trainee jumps to the floor
+        fights.append(sig)
+        w.ctx = GameContext.OVERWORLD
+        w.party = [mon(25, 1), mon(30, 2)]
+    c._train_fight = train
+    out = c._grind(0, True, 3)
+    assert len(fights) == 1 and out.startswith("Party balanced") and c._grind_run is None
+
+    w2 = FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE, foe_level=15)   # too strong to autopilot
+    c2 = grind_client(w2)
+    c2._train_fight = lambda sig: pytest.fail("should have been handed to the model")
+    assert "wild RATTATA L15" in c2._grind(0, True, 3)
+
+
+def test_worth_a_ball_is_never_autopiloted_and_is_pointed_out():
+    w = FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE, foe_level=7)
+    w.foe = NS(species_id=25, species_name="PIKACHU", level=7, current_hp=14, max_hp=14)   # a new type
+    w.read_dex_owned = lambda sid: False
+    c = grind_client(w)
+    c._ball_count = lambda: 5
+    c._train_fight = lambda sig: pytest.fail("a catch-worthy foe must go to the model")
+    out = c._grind(0, True, 3)
+    assert "Worth a ball" in out and "5 Poké Balls" in out
+
+
+def test_trainer_battles_are_always_handed_over():
+    w = FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE, trainer=True)
+    c = grind_client(w)
+    c._train_fight = lambda sig: pytest.fail("trainers go to the model")
+    assert "TRAINER battle" in c._grind(0, True, 5)
+
+
+def test_session_stops_when_the_grind_is_feeding_the_ace():
+    w = FakeWorld([mon(8, 1), mon(30, 2)])
+    c = grind_client(w)
+    c._grind_run = None
+    c._grind_inner  # noqa: B018  (session is created by the first call; seed it, then let the ace run away)
+    w.ctx = GameContext.IN_BATTLE
+    c._grind(0, True, 0)                                # creates the session (floor 23)
+    c._grind_run["battles"] = 25
+    w.ctx = GameContext.OVERWORLD
+    w.party = [mon(8, 1), mon(34, 2)]
+    out = c._grind(0, True, 0)
+    assert out.startswith("Grinding stopped") and "feeding the ace" in out and c._grind_run is None
+
+
+def test_abandoning_a_session_drops_it_and_restores_the_ace_in_the_overworld():
+    w = FakeWorld([mon(8, 1), mon(30, 2)])
+    c = grind_client(w)
+    c._grind_run = {"floor": 23}
+    c._training_swapped = True
+    restored = []
+    c._restore_ace_lead = lambda: restored.append(1)
+    c._grind_abandon()
+    assert c._grind_run is None and restored == [1] and c._training_swapped is False
