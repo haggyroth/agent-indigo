@@ -442,3 +442,27 @@ def test_dig_in_the_forest_then_teleport_outdoors(live):
     out = live.c._execute("use_hm", json.dumps({"move": "Teleport"}))
     assert out.startswith("Used Teleport: now in") and live.r.read_current_map() != here, out
     assert live.r.detect_context() == GameContext.OVERWORLD
+
+
+def test_give_item_equips_swaps_and_x_items_work_in_battle(live):
+    """#215: held items through Bag → GIVE → party screen (incl. the 'already holding' swap prompt) and an X item in battle."""
+    live.load("threemon")
+    live.give_item(182, 1)                                   # Exp. Share
+    live.give_item(200, 1)                                   # Leftovers
+    out = live.c._execute("give_item", json.dumps({"item": "Exp. Share", "pokemon": "Caterpie"}))
+    assert out.lower() == "caterpie now holds exp. share (the holder gets half the exp. of a battle even if it never fought).", out
+    held = {p.species_name: p.held_item for p in live.r.read_party()}
+    assert held["Caterpie"] == 182 and held["Bulbasaur"] == 0
+    out = live.c._execute("give_item", json.dumps({"item": "Leftovers", "pokemon": "Caterpie"}))   # swap
+    assert "now holds Leftovers" in out and "Exp. Share went back to the Bag" in out, out
+    bag = dict(live.r.read_items_pocket())
+    assert bag.get(182) == 1 and bag.get(200, 0) == 0
+    assert "already holding" in live.c._execute("give_item", json.dumps({"item": "Leftovers", "pokemon": "Caterpie"}))
+    assert "Give it to whom" in live.c._execute("give_item", json.dumps({"item": "Exp. Share", "pokemon": ""}))
+    assert live.r.detect_context() == GameContext.OVERWORLD
+
+    live.give_item(75, 2)                                    # X Attack
+    assert live.wild_battle()
+    out = live.c._execute("use_item", json.dumps({"item": "X Attack"}))
+    assert out.startswith("Used X Attack — +1 Attack stage"), out
+    assert dict(live.r.read_items_pocket()).get(75) == 1

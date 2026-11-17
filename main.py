@@ -529,13 +529,17 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
             if _tms is not None:
                 from knowledge.bag import bag_digest, stone_notes
                 sig = (tuple(_tms), tuple((i, q) for i, q in _items if i in (63, 64, 65, 66, 67, 68, 70, 93, 94, 95, 96, 97, 98)),
-                       tuple(tuple(p.move_names) for p in state.party))
+                       tuple(tuple(p.move_names) for p in state.party), tuple(p.held_item for p in state.party))
                 if sig != run.bag_sig or run.step_count % 30 == 0:
                     run.bag_sig = sig
                     _line = bag_digest(state.party, _tms, _items)
                     if _line:
                         obs_parts.append(_line)
                     obs_parts.extend(stone_notes(state.party, _items))
+                    from knowledge.held_items import holding_line, suggest as _held_suggest
+                    if holding_line(state.party):
+                        obs_parts.append(holding_line(state.party))
+                    obs_parts.extend(_held_suggest(state.party, _items))
         if not in_battle and state.context == GameContext.OVERWORLD and state.party:
             from knowledge.escape import hint as _escape_hint
             try:
@@ -546,6 +550,16 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
             _eh = _escape_hint((state.map_bank, state.map_id), _ids, _rope)
             if _eh:
                 obs_parts.append(_eh)
+            try:
+                from knowledge.repel import REPEL_IDS, VAR_REPEL_STEP_COUNT, note as _repel_note
+                _pk = dict(reader.read_items_pocket())
+                _lead = next((p for p in state.party if p.current_hp > 0), state.party[0])
+                _rn = _repel_note((state.map_bank, state.map_id), _lead.level, reader.read_var(VAR_REPEL_STEP_COUNT),
+                                  sum(_pk.get(i, 0) for i in REPEL_IDS), len(state.party))
+            except Exception:
+                _rn = ""
+            if _rn:
+                obs_parts.append(_rn)
         if trip and not in_battle and state.context == GameContext.OVERWORLD:
             resume = (f"call {trip['call']} to resume." if trip.get("call") else
                       f"call go_to() with no destination — or go_to({trip['dest']!r}) — to resume.")
@@ -579,6 +593,13 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                                       foe_hp=enemy.current_hp if enemy else 0,
                                       hidden_power=_hidden_power(_me.ivs))
             obs_parts.append(bsummary)
+            try:
+                from knowledge.bag import booster_note
+                _bn = booster_note(reader.read_items_pocket(), run.battle_is_trainer)
+            except Exception:
+                _bn = ""
+            if _bn:
+                obs_parts.append(_bn)
             if IV_PEEK_BEFORE_CATCH and enemy and not run.battle_is_trainer:
                 from knowledge.mon_quality import assess as _assess_iv
                 _qf = _assess_iv(enemy)

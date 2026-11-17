@@ -190,3 +190,83 @@ class FieldItemMixin:
         if p is not None and p.status != st0:
             return f"Used {name} on {who}: {st0} -> {p.status} ({qty1} left)."
         return f"Used {name} on {who} ({qty1} left)."
+
+    # ── held items ───────────────────────────────────────────────────────────────────────
+    def _give_item(self, item: str, pokemon: str) -> str:
+        """Bag → Items pocket → the item → GIVE → the Pokémon. The Items pocket's menu is always [USE, GIVE, TOSS, CANCEL], so
+        GIVE is one Down from the default. Confirmed by the Pokémon's held item changing (a held item already there is swapped
+        out and returns to the bag, after the game's own 'make it hold X instead?' prompt)."""
+        from knowledge.held_items import HELD_ITEMS, describe
+        if self.reader.detect_context() != GameContext.OVERWORLD:
+            return "give_item works from the overworld (not in battle or a menu)."
+        key = str(item).lower().strip().replace("é", "e")
+        names = {iid: v[0].lower().replace("é", "e") for iid, v in HELD_ITEMS.items()}
+        hits = [iid for iid, n in names.items() if key == n] or [iid for iid, n in names.items() if key and key in n]
+        if len(hits) != 1:
+            return (f"Which item? '{item}' matches " + (", ".join(HELD_ITEMS[i][0] for i in hits) if hits else "no holdable item")
+                    + " — a held item is something like Leftovers, Exp. Share, Quick Claw or a type-boost item (berries aren't supported).")
+        iid = hits[0]
+        party = self.reader.read_party()
+        holder = next((p for p in party if p.held_item == iid), None)
+        pocket = self.reader.read_items_pocket()
+        order = [i for i, _ in pocket]
+        if iid not in order:
+            return (f"{holder.nickname or holder.species_name} is already holding the {HELD_ITEMS[iid][0]}." if holder
+                    else f"No {HELD_ITEMS[iid][0]} in your Items pocket.")
+        slot = self._resolve_party_target(pokemon, party) if pokemon else None
+        if slot is None:
+            from knowledge.held_items import holder_for
+            who = holder_for(iid, party)
+            return (f"Give it to whom? give_item('{HELD_ITEMS[iid][0]}', '<species or slot>')"
+                    + (f" — suggestion: {who.nickname or who.species_name}." if who else "."))
+        mon = party[slot]
+        if mon.held_item == iid:
+            return f"{mon.nickname or mon.species_name} is already holding the {HELD_ITEMS[iid][0]}."
+        res = self._menus.open_menu("Bag")
+        if "Bag screen open" not in res:
+            return f"Couldn't open the Bag ({res})"
+        self.mgba.tick(40)
+        if not self._items_pocket_open() or not self._bag_cursor_to(order.index(iid)):
+            self._menus.close_menus()
+            return f"Couldn't select {HELD_ITEMS[iid][0]} in the Bag."
+        self.mgba.tap("A")                                  # context menu: USE / GIVE / TOSS / CANCEL
+        self.mgba.tick(30)
+        self.mgba.tap("Down")
+        self.mgba.tick(14)
+        for _ in range(8):                                  # GIVE → the party screen in give mode
+            self.mgba.tap("A")
+            self.mgba.tick(40)
+            if self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_PARTY_MENU:
+                break
+        if self.mgba.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_PARTY_MENU:
+            self._menus.close_menus()
+            return f"The {HELD_ITEMS[iid][0]} can't be given right now (the party screen didn't open)."
+        self.mgba.tick(30)
+        for _ in range(10):
+            cur = self.mgba.read8(Addr.PARTY_FIELD_SLOT)
+            if cur == slot:
+                break
+            self.mgba.tap("Down" if cur < slot else "Up")
+            self.mgba.tick(14)
+        if self.mgba.read8(Addr.PARTY_FIELD_SLOT) != slot:
+            self._menus.close_menus()
+            return "Couldn't move the party cursor to the target."
+        for _ in range(8):
+            self.mgba.tap("A")
+            self.mgba.tick(40)
+            if self._menus.choice_live():                    # 'already holding X — make it hold Y instead?'
+                self._menus.answer_prompt("yes")
+                self.mgba.tick(40)
+            now = next((p for p in self.reader.read_party() if p.personality == mon.personality), None)
+            if now is not None and now.held_item == iid:
+                break
+        for _ in range(4):
+            self.mgba.tick(30)
+            self.mgba.tap("B")
+        self._menus.close_menus()
+        now = next((p for p in self.reader.read_party() if p.personality == mon.personality), None)
+        who = mon.nickname or mon.species_name
+        if now is None or now.held_item != iid:
+            return f"Couldn't give the {HELD_ITEMS[iid][0]} to {who} — check read_game_state."
+        swapped = f" (its {HELD_ITEMS[mon.held_item][0]} went back to the Bag)" if mon.held_item in HELD_ITEMS else ""
+        return f"{who} now holds {describe(iid)}{swapped}."
