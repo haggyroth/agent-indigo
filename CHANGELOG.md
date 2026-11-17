@@ -5,6 +5,25 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the Safari Zone: `quest('surf')`, `quest('strength')` and `safari(...)` battles (#215)
+- **Safari battles are playable.** Their menu is BALL / BAIT / GO NEAR / RUN (no moves, party or Bag), so a battle that sets the Safari
+  flag gets its own tool list (`safari`, `inspect_pokemon`, `team_report`, `press_button`, `advance_dialog`, `answer_prompt`,
+  `close_menus`) and `safari(action, nickname?)`: `ball` (= `catch()`, with the nickname flow, confirmed by the Safari Ball counter),
+  `bait`, `rock`, `run`. The observation says what the foe is, whether it is worth a ball and what rock/bait do; the overworld shows
+  "SAFARI ZONE: N steps and M Safari Balls left". Counters found by scanning EWRAM (30 balls / 600 steps); the menu's controller
+  values (0x080DD739 first turn, 0x080DD57D after) found live — A is only ever pressed AT the menu, once.
+- **`quest('surf')` / `quest('strength')`** (registry entries): pay ¥500, walk Center → East → North → West, take the Gold Teeth and the
+  Secret House's HM03 on the same visit, walk out ('leaving early?' → YES) and, for Strength, return the teeth to the Warden; the HM
+  is taught like Cut. Encounters hand over to the model (`safari(...)`) and the quest resumes; it never routes through its own exit
+  (which would re-trigger the ¥500 prompt).
+- **Navigation bug found on the way: bridges.** The walkable-tile rule only knew elevation 3, so every bridge deck (elevation 4) was a
+  wall and the Safari areas looked disconnected. Decks now count when a ramp (elevation 0) joins them to floor, and A* / the
+  region generator refuse a direct floor↔deck step (`tilemap_reader.bridge_tiles`, `deck_step_ok`). `knowledge/map_regions.py` was
+  regenerated: Victory Road's floors, Cerulean Cave, the Safari areas and some interiors route correctly now.
+- New map names for `go_to`: Safari Zone Entrance, Safari Zone Secret House, Warden's House.
+- Tests: `tests/test_bridges.py`, Safari gating and registry tests; live tests drive a full Safari battle (bait, rock, ball with a
+  nickname, run), both quests end to end on the real ROM, and a catch.
+
 ### Added — `save_game`: a real cartridge save, and readiness says when one is due (#215)
 - **`save_game()`** drives Start → Save → YES → YES (overwrite) and CONFIRMS the save by the game's own counter: `gSaveCounter`
   (0x0203AA34, found by diffing EWRAM across two saves — one u32 rose by exactly 1 each time) must rise. The screen text isn't

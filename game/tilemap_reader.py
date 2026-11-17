@@ -27,6 +27,47 @@ logger = logging.getLogger(__name__)
 ELEV_WALL  = 0
 ELEV_WATER = 1
 ELEV_FLOOR = 3
+ELEV_BRIDGE = 4      # a bridge deck (Safari Zone East…): walkable, but only when a ramp joins it to ordinary floor
+
+
+def bridge_tiles(entry, w: int, h: int) -> tuple[set, set]:
+    """(decks, ramps): the walkable bridge-deck tiles and the ramp tiles that lead onto them, given `entry(x, y)` -> the map's
+    u16 block entry.
+
+    A deck is elevation 4 / collision 0, entered through RAMP tiles (elevation 0 / collision 0) that touch it; the player steps
+    floor -> ramp -> deck because elevation 0 matches any level. A deck counts only when one of its ramps also touches ordinary
+    floor (elevation 3 / collision 0) — a raised platform with no ramp stays a wall, so this cannot invent a shortcut. Stepping
+    straight from floor onto a deck (or back) is NOT allowed: see `deck_step_ok`."""
+    def kind(x, y):
+        v = entry(x, y)
+        elev, coll = (v >> 12) & 0xF, (v >> 10) & 0x3
+        if coll:
+            return None
+        return "floor" if elev == ELEV_FLOOR else "deck" if elev == ELEV_BRIDGE else "ramp" if elev == 0 else None
+
+    def around(x, y):
+        return [(nx, ny) for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)) if 0 <= nx < w and 0 <= ny < h]
+
+    kinds = {(x, y): kind(x, y) for y in range(h) for x in range(w)}
+    ramps = {p for p, k in kinds.items() if k == "ramp" and any(kinds[q] == "deck" for q in around(*p))}
+    todo = [p for p in ramps if any(kinds[q] == "floor" for q in around(*p))]
+    seen = set()
+    while todo:                                   # flood the deck (and further ramps) from the ramps that touch floor
+        p = todo.pop()
+        if p in seen:
+            continue
+        seen.add(p)
+        for q in around(*p):
+            if q not in seen and (kinds[q] == "deck" or (kinds[q] == "ramp" and q in ramps)):
+                todo.append(q)
+    return {p for p in seen if kinds[p] == "deck"}, {p for p in seen if kinds[p] == "ramp"}
+
+
+def deck_step_ok(decks: set, ramps: set):
+    """edge_ok(a, b) for the path finder: no direct step between a bridge deck and ordinary floor (ramps join them)."""
+    def ok(a, b):
+        return (a in decks) == (b in decks) or a in ramps or b in ramps
+    return ok
 
 
 @dataclass
@@ -40,6 +81,9 @@ class TileInfo:
 
 
 class TilemapReader:
+    decks: set = frozenset()       # bridge-deck / ramp tiles of the map last read by passable_grid (see bridge_tiles)
+    ramps: set = frozenset()
+
     def __init__(self, client: MGBAClient):
         self.client = client
         self._map_ptr:        int | None = None
@@ -256,6 +300,10 @@ class TilemapReader:
                 opened = (rom is not None and elev == ELEV_WALL and len(rom) > i + 1
                           and (rom[i] != raw[i] or rom[i + 1] != raw[i + 1]))
                 row[x] = coll == 0 and (elev == ELEV_FLOOR or opened or (surf and elev == ELEV_WATER))
+        decks, ramps = bridge_tiles(lambda x, y: raw[(y * w + x) * 2] | (raw[(y * w + x) * 2 + 1] << 8), w, h)
+        for x, y in decks | ramps:
+            grid[y][x] = True
+        self.decks, self.ramps = decks, ramps
         return grid, w, h
 
     # Gen III connection direction codes (gMapHeader.connections).

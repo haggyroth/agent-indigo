@@ -20,6 +20,16 @@ FLAG_GOT_SS_TICKET = 0x234
 BILL_GFX, CLEFAIRY_GFX = 73, 113          # OBJ_EVENT_GFX_BILL / OBJ_EVENT_GFX_CLEFAIRY
 COTTAGE = (30, 0)
 FLAG_GOT_HM01 = 0x237
+FLAG_GOT_HM03, FLAG_GOT_HM04 = 0x239, 0x23A
+FLAG_GOLD_TEETH_TAKEN = 0x189             # FLAG_HIDE_SAFARI_ZONE_WEST_GOLD_TEETH: set once the item ball is picked up
+SURF_MOVE_ID, STRENGTH_MOVE_ID = 57, 70
+SAFARI_ENTRANCE, SAFARI_CENTER, SAFARI_WEST, SECRET_HOUSE, WARDENS_HOUSE = (11, 0), (1, 63), (1, 66), (1, 71), (11, 7)
+SAFARI_TRIGGER = (4, 3)                   # the middle of three tiles in the entrance hall that start the "¥500?" dialogue
+GOLD_TEETH_TILE = (28, 14)                # the item ball in Safari Zone (West)
+SAFARI_FEE = 500
+FUCHSIA_CITY = (3, 7)
+ATTENDANT_SPOTS = (((6, 6), "Up"), ((5, 5), "Right"), ((7, 5), "Left"))     # the Secret House man stands at (6,5)
+WARDEN_SPOTS = (((3, 6), "Up"), ((4, 5), "Left"), ((2, 5), "Right"))        # the Warden stands at (3,5)
 FLAG_VERMILION_SWITCHES = 0x264           # FLAG_FOUND_BOTH_VERMILION_GYM_SWITCHES
 CUT_MOVE_ID = 15
 CAPTAIN_OFFICE = (1, 11)
@@ -52,6 +62,10 @@ class QuestMixin:
             done.add("ss_ticket")
         if self._knows_cut():
             done.add("cut")
+        if self._knows_move(SURF_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM03):
+            done.add("surf")
+        if self._knows_move(STRENGTH_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM04):
+            done.add("strength")
         if not str(name or "").strip():
             return listing(done)
         q = resolve(name)
@@ -62,7 +76,179 @@ class QuestMixin:
         missing = [n for n in q.needs if n not in done]
         if missing:
             return f"quest('{q.key}') needs quest('{missing[0]}') first."
-        return self._get_ss_ticket(auto_trainers) if q.key == "ss_ticket" else self._get_cut(auto_trainers)
+        return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
+                "strength": self._get_strength}[q.key](auto_trainers)
+
+    # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
+    def _in_safari_zone(self) -> bool:
+        from game.constants import Addr
+        return bool(self.mgba.read8(Addr.SAFARI_BALLS) or self.mgba.read16(Addr.SAFARI_STEPS))
+
+    def _knows_move(self, move_id: int) -> bool:
+        return any(move_id in (p.move_ids or []) for p in self.reader.read_party())
+
+    def _safari_leg(self, dest: str, call: str, auto_trainers: bool = False) -> str | None:
+        """Travel to `dest` inside the Safari Zone. Returns None on arrival, else the message to hand back (a Safari battle,
+        a problem). Wild battles end the call so the model plays them with safari(...); the call resumes the quest."""
+        want = {"Safari Zone (West)": SAFARI_WEST, "Safari Zone Secret House": SECRET_HOUSE}.get(dest)
+        for _ in range(10):
+            if want and tuple(self.reader.read_current_map()) == want:
+                return None
+            self._avoid_maps = (SAFARI_ENTRANCE, FUCHSIA_CITY)      # never walk out through the exit (it would end the visit)
+            try:
+                out = self._go_to(dest, mode="yield", auto_trainers=auto_trainers, resume_call=call)
+            finally:
+                self._avoid_maps = ()
+            if want and tuple(self.reader.read_current_map()) == want:
+                return None
+            if self.reader.detect_context() == GameContext.IN_BATTLE:
+                return out
+            if not self._in_safari_zone():
+                return ("The Safari Zone visit ended before you got there (out of steps or Safari Balls) — "
+                        f"call {call} again to re-enter (¥{SAFARI_FEE}).")
+            if "Can't get to" in out or "No route" in out or "Blocked" in out:
+                return f"Can't reach {dest} inside the Safari Zone: {out}"
+        return f"Didn't reach {dest} yet — call {call} again to continue (it resumes)."
+
+    def _enter_safari_zone(self, call: str, auto_trainers: bool = False) -> str | None:
+        """Pay the ¥500 at the entrance hall and walk in (30 Safari Balls, 600 steps). None once inside, else a message."""
+        if self._in_safari_zone():
+            return None
+        if self.reader.read_money() < SAFARI_FEE:
+            return f"The Safari Zone costs ¥{SAFARI_FEE} and you have ¥{self.reader.read_money()}."
+        if tuple(self.reader.read_current_map()) != SAFARI_ENTRANCE:
+            for _ in range(10):
+                out = self._go_to("Safari Zone Entrance", mode="yield", auto_trainers=auto_trainers, resume_call=call)
+                if tuple(self.reader.read_current_map()) == SAFARI_ENTRANCE:
+                    break
+                if self.reader.detect_context() == GameContext.IN_BATTLE:
+                    return out
+                if "heal()" in out or "Lost a trainer" in out:
+                    if not self._heal().startswith(("Healed", "Party is already")):
+                        return f"Couldn't heal on the way to the Safari Zone — heal(), then {call} again."
+                    continue
+                if "Can't get to" in out or "No route" in out or "gated" in out:
+                    return f"Can't reach the Safari Zone: {out}"
+            if tuple(self.reader.read_current_map()) != SAFARI_ENTRANCE:
+                return f"Didn't reach the Safari Zone entrance yet — call {call} again to continue (it resumes)."
+        self._walk_to(*SAFARI_TRIGGER)             # the trigger tile starts the attendant's "play for ¥500?" dialogue
+        for _ in range(10):
+            self.mgba.tick(60)
+            if self._menus.choice_live():
+                self._menus.answer_prompt("yes")
+            else:
+                self._advance_to_control(tries=20)
+            if tuple(self.reader.read_current_map()) == SAFARI_CENTER and self._in_safari_zone():
+                return None
+        if self.reader.read_money() >= SAFARI_FEE and not self._in_safari_zone():
+            return ("The attendant didn't let you in (your party and every PC box may be full — pc('deposit') or release some, "
+                    f"then {call} again).")
+        return f"Couldn't get into the Safari Zone — talk to the attendant at the entrance hall counter, then {call} again."
+
+    def _leave_safari_zone(self) -> None:
+        """Walk back out through the entrance hall ('leaving early?' → YES) and onto the street."""
+        for _ in range(6):
+            if not self._in_safari_zone():
+                break
+            self._go_to("Safari Zone Entrance", mode="flee")
+            self._advance_to_control(tries=30)                # 'Are you going to leave early?' defaults to YES
+        if tuple(self.reader.read_current_map()) == SAFARI_ENTRANCE:
+            self._go_to("Fuchsia City", mode="flee")
+
+    def _talk_to(self, spots) -> bool:
+        for stand, face in spots:
+            if self._press_on_tile(stand, face):
+                return True
+        return False
+
+    def _safari_expedition(self, call: str, want_teeth: bool, want_hm03: bool, auto_trainers: bool = False) -> str | None:
+        """One paid visit: the Gold Teeth and/or the Secret House's HM03, then back out. None when everything wanted is in
+        hand, else the message to hand back (a battle, no money, out of steps…)."""
+        need = lambda: ((want_teeth and not self.reader.read_flag(FLAG_GOLD_TEETH_TAKEN) and not self.reader.read_flag(FLAG_GOT_HM04))  # noqa: E731
+                        or (want_hm03 and not self.reader.read_flag(FLAG_GOT_HM03)))
+        if not need():
+            return None
+        if (msg := self._enter_safari_zone(call, auto_trainers)):
+            return msg
+        if (msg := self._safari_leg("Safari Zone (West)", call, auto_trainers)):
+            return msg
+        if want_teeth and not self.reader.read_flag(FLAG_GOLD_TEETH_TAKEN) and not self.reader.read_flag(FLAG_GOT_HM04):
+            problem = ""
+            for _ in range(6):                   # a wild encounter can cut the walk short: hand it over, or just retry
+                _what, problem = self._pick_ball(*GOLD_TEETH_TILE)
+                if not problem and self.reader.read_flag(FLAG_GOLD_TEETH_TAKEN):
+                    break
+                if (b := self._quest_battle(call, "the Gold Teeth")):
+                    return b
+                if not self._in_safari_zone():
+                    return f"The Safari Zone visit ended before the Gold Teeth were found — {call} again to re-enter (¥{SAFARI_FEE})."
+            if not self.reader.read_flag(FLAG_GOLD_TEETH_TAKEN):
+                return f"Couldn't pick up the Gold Teeth at {GOLD_TEETH_TILE}: {problem or 'no change'} — {call} again to retry."
+        if want_hm03 and not self.reader.read_flag(FLAG_GOT_HM03):
+            if (msg := self._safari_leg("Safari Zone Secret House", call, auto_trainers)):
+                return msg
+            if not self._talk_to(ATTENDANT_SPOTS):
+                if (b := self._quest_battle(call, "the Secret House")):
+                    return b
+                return "Couldn't reach the man in the Secret House — walk_to (6,6), face up, press A."
+            for _ in range(10):
+                if self.reader.read_flag(FLAG_GOT_HM03):
+                    break
+                self._advance_to_control(tries=30)
+            if not self.reader.read_flag(FLAG_GOT_HM03):
+                return f"Talked to the man but no HM03 yet — {call} again."
+            self._advance_to_control(tries=24)
+        self._leave_safari_zone()
+        return None
+
+    def _get_surf(self, auto_trainers: bool = False) -> str:
+        if self._knows_move(SURF_MOVE_ID):
+            return "A Pokémon in your party already knows Surf — use_hm('surf') at a shore, or just go_to."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        if (msg := self._safari_expedition("quest('surf')", want_teeth=True, want_hm03=True, auto_trainers=auto_trainers)):
+            return msg
+        out = self._teach_move("HM03", "", "")
+        teeth = " You also have the Gold Teeth — quest('strength') takes them to the Warden." if (
+            self.reader.read_flag(FLAG_GOLD_TEETH_TAKEN) and not self.reader.read_flag(FLAG_GOT_HM04)) else ""
+        if not self._knows_move(SURF_MOVE_ID):
+            return f"Got HM03 but couldn't teach it: {out} — teach_move('HM03') yourself (pick a Pokémon that can learn Surf).{teeth}"
+        return (f"Got HM03 and {out} Surf needs the Soul Badge to use outside battle; use_hm('surf') at a shore, and go_to "
+                f"does it for you when water blocks the way.{teeth}")
+
+    def _get_strength(self, auto_trainers: bool = False) -> str:
+        if self._knows_move(STRENGTH_MOVE_ID):
+            return "A Pokémon in your party already knows Strength — use_hm('strength') next to a boulder."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        if not self.reader.read_flag(FLAG_GOT_HM04):
+            if (msg := self._safari_expedition("quest('strength')", want_teeth=True, want_hm03=not self.reader.read_flag(FLAG_GOT_HM03),
+                                               auto_trainers=auto_trainers)):
+                return msg
+            if tuple(self.reader.read_current_map()) != WARDENS_HOUSE:
+                for _ in range(10):
+                    out = self._go_to("Warden's House", mode="yield", auto_trainers=auto_trainers, resume_call="quest('strength')")
+                    if tuple(self.reader.read_current_map()) == WARDENS_HOUSE:
+                        break
+                    if self.reader.detect_context() == GameContext.IN_BATTLE:
+                        return out
+                if tuple(self.reader.read_current_map()) != WARDENS_HOUSE:
+                    return "Didn't reach the Warden's House yet — call quest('strength') again to continue (it resumes)."
+            if not self._talk_to(WARDEN_SPOTS):
+                return "Couldn't reach the Warden — walk_to (3,6), face up, press A."
+            for _ in range(12):
+                if self.reader.read_flag(FLAG_GOT_HM04):
+                    break
+                self._advance_to_control(tries=30)
+            if not self.reader.read_flag(FLAG_GOT_HM04):
+                return "Talked to the Warden but no HM04 yet — do you have the Gold Teeth? quest('strength') again."
+            self._advance_to_control(tries=24)
+        out = self._teach_move("HM04", "", "")
+        extra = " You also have HM03 (Surf): quest('surf') teaches it." if (
+            self.reader.read_flag(FLAG_GOT_HM03) and not self._knows_move(SURF_MOVE_ID)) else ""
+        if not self._knows_move(STRENGTH_MOVE_ID):
+            return f"Got HM04 but couldn't teach it: {out} — teach_move('HM04') yourself.{extra}"
+        return f"Got HM04 and {out} Move boulders with use_hm('strength').{extra}"
 
     def _has_ss_ticket(self) -> bool:
         return (SS_TICKET_ITEM in self.reader.read_key_items()

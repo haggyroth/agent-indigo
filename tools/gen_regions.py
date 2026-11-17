@@ -26,6 +26,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from game.tilemap_reader import bridge_tiles, deck_step_ok   # noqa: E402  (the same rule the live walker uses)
+
 ELEV_FLOOR = 3
 DIRW = {"up": "North", "down": "South", "left": "West", "right": "East"}
 ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -101,10 +104,15 @@ def grid_for(pf, layout):
             if i + 1 < len(raw):
                 v = raw[i] | (raw[i + 1] << 8)
                 g[y][x] = ((v >> 12) & 0xF) == ELEV_FLOOR and ((v >> 10) & 0x3) == 0   # collision==0
-    return g, w, h
+    decks, ramps = bridge_tiles(lambda x, y: raw[(y * w + x) * 2] | (raw[(y * w + x) * 2 + 1] << 8) if (y * w + x) * 2 + 1 < len(raw) else 0xFFFF,
+                                w, h)
+    for x, y in decks | ramps:
+        g[y][x] = True
+    return g, w, h, decks, ramps
 
 
-def components(g, w, h):
+def components(g, w, h, decks=frozenset(), ramps=frozenset()):
+    ok = deck_step_ok(decks, ramps)
     lab = [[-1] * w for _ in range(h)]
     n = 0
     for y in range(h):
@@ -116,7 +124,7 @@ def components(g, w, h):
                     cx, cy = stack.pop()
                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                         nx, ny = cx + dx, cy + dy
-                        if 0 <= nx < w and 0 <= ny < h and g[ny][nx] and lab[ny][nx] < 0:
+                        if 0 <= nx < w and 0 <= ny < h and g[ny][nx] and lab[ny][nx] < 0 and ok((cx, cy), (nx, ny)):
                             lab[ny][nx] = n
                             stack.append((nx, ny))
                 n += 1
@@ -150,13 +158,13 @@ def main():
         lay = layouts.get(d.get("layout"))
         if not lay:
             continue
-        g, w, h = grid_for(pf, lay)
+        g, w, h, decks, ramps = grid_for(pf, lay)
         for o in d.get("object_events") or []:
             if any(k in o.get("graphics_id", "") for k in BLOCKER_GFX):
                 ox, oy = int(o["x"]), int(o["y"])
                 if 0 <= ox < w and 0 <= oy < h:
                     g[oy][ox] = False
-        lab, n = components(g, w, h)
+        lab, n = components(g, w, h, decks, ramps)
         touch = set()
         for wv in d.get("warp_events") or []:
             touch |= departure_labels(lab, w, h, int(wv["x"]), int(wv["y"]))

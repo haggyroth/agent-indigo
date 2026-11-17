@@ -43,11 +43,11 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 34): [Req("key_item", POKE_FLUTE,
                   "A Snorlax blocks Route 16 — you need the Poké Flute (Mr. Fuji, Lavender Town).")],
     (3, 8): [Req("hm", "Surf", "Cinnabar Island is across the sea: teach Surf (HM03 from the Safari "
-                 "Zone) to a Pokémon, then use_hm('Surf') / go_to.")],
+                 "Zone — quest('surf')) to a Pokémon, then use_hm('Surf') / go_to.")],
     (3, 37): [Req("hm", "Surf", "Route 19 is open water — you need Surf.")],
     (3, 38): [Req("hm", "Surf", "Route 20 is open water — you need Surf.")],
     (1, 83): [Req("hm", "Surf", "Seafoam Islands needs Surf (and Strength for its boulders).")],
-    (1, 39): [Req("hm", "Strength", "Victory Road's boulders need Strength (HM04, Safari Zone).")],
+    (1, 39): [Req("hm", "Strength", "Victory Road's boulders need Strength (HM04 — quest('strength')).")],
     (3, 42): [Req("badges", 8, "Route 23's checkpoints only let you through with all 8 badges.")],
 }
 

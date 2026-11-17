@@ -56,6 +56,19 @@ class Addr:
     # action, 0x0802E439 on later turns (live-verified). Both mean "the FIGHT/BAG/
     # POKEMON/RUN menu is up and waiting for input".
     CTRL_CHOOSE_ACTION_ALT = 0x0802E439
+    # Safari Zone battles have their own controller (battle_controller_safari.c): its HandleInputChooseAction is up while the
+    # BALL / BAIT / GO NEAR / RUN menu waits (live-verified). The 2x2 menu cursor (ACTION_CURSOR): 0 BALL, 1 BAIT, 2 GO NEAR
+    # (throw a rock), 3 RUN.
+    CTRL_SAFARI_ACTION = 0x080DD739
+    # …and on every later turn the menu is the same function under another value (like the normal battle's ALT), seen while it
+    # waited for input; A pressed there re-commits the cursor, so BOTH count as "the menu is up".
+    CTRL_SAFARI_ACTION_ALT = 0x080DD57D
+    SAFARI_MENU = (CTRL_SAFARI_ACTION, CTRL_SAFARI_ACTION_ALT)
+    SAFARI_CURSOR = {"ball": 0, "bait": 1, "rock": 2, "run": 3}
+    # gNumSafariBalls (u8) and gSafariZoneStepCounter (u16): EnterSafariMode sets 30 / 600 (live: found by scanning EWRAM for
+    # that pair right after paying the entrance fee). Both read 0 outside the Safari Zone.
+    SAFARI_BALLS = 0x02039994
+    SAFARI_STEPS = 0x02039996
     # gBattleOutcome (u8) — 0 during battle, set at the end: 1=WON, 4=RAN(fled),
     # 6=enemy fled, 7=CAUGHT. Derived + verified live (0 in-battle, 4 after flee).
     # The definitive "was it caught?" signal (party count lags; action-menu value
@@ -183,6 +196,7 @@ class Addr:
     SAVE_COUNTER        = 0x0203AA34
     BATTLE_TYPE_FLAGS   = 0x02022B4C
     BATTLE_TYPE_TRAINER = 0x08   # gBattleTypeFlags & this != 0 → a trainer battle
+    BATTLE_TYPE_SAFARI  = 0x80   # …and this one → a Safari Zone battle (BALL / BAIT / GO NEAR / RUN, no party or bag)
 
     # Bag key-items pocket, inside gSaveBlock1 (deref SAVEBLOCK1_PTR — the block
     # is DMA-relocated, so always re-read the pointer). 30 slots × 4 bytes

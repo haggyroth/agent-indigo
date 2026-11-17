@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from agent.tool_docs import END, START, render_markdown
-from agent.tools import BATTLE_TOOLS, TOOLS, tools_for
+from agent.tools import BATTLE_TOOLS, SAFARI_CONTEXT, SAFARI_TOOLS, TOOLS, tools_for
 from game.state import GameContext
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -86,3 +86,11 @@ def test_claude_md_tool_table_is_current():
     text = (ROOT / "CLAUDE.md").read_text()
     block = text[text.index(START):text.index(END) + len(END)]
     assert block == render_markdown(), "CLAUDE.md's tool table is stale — run: python tools/gen_tool_docs.py"
+
+
+def test_a_safari_battle_offers_its_own_menu_and_nothing_that_needs_a_bag_or_party():
+    n = names(SAFARI_CONTEXT)
+    assert n == set(SAFARI_TOOLS) and "safari" in n
+    assert not n & {"use_move", "switch_pokemon", "use_item", "catch", "flee_battle", "go_to"}
+    assert "safari" not in names(GameContext.IN_BATTLE) and "safari" not in names(GameContext.OVERWORLD)
+    assert "safari" in names(GameContext.IN_MENU)                # uncertain screens still get everything

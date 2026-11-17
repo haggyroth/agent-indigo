@@ -287,7 +287,9 @@ class NavMixin:
                 if (x, y) in blocked:
                     return None
                 return self.tilemap.ledge_dir(x, y)
-            path = find_path((px, py), (tx, ty), _passable, w, h, ledge=_ledge)
+            from game.tilemap_reader import deck_step_ok
+            path = find_path((px, py), (tx, ty), _passable, w, h, ledge=_ledge,
+                             edge_ok=deck_step_ok(self.tilemap.decks, self.tilemap.ramps))
             if path is None:
                 # Could be a genuinely blocked target, or a transient (an NPC on
                 # the only corridor, a not-yet-settled map). Settle and retry a few
@@ -480,6 +482,15 @@ class NavMixin:
         events.emit("trip", f"{'trainer' if trainer else 'wild encounter'} on the way to {target_name} — handed to the model",
                     major=False)
         again = call or f"go_to({(resume or target_name)!r})"
+        if self._in_safari_battle():
+            try:
+                foe = self.reader.read_enemy_lead()
+                what = f"{foe.species_name} L{foe.level}" if foe and foe.species_id else "Pokémon"
+            except Exception:
+                what = "Pokémon"
+            return (f"A SAFARI battle started at {here} on the way to {target_name}: a wild {what}. There are no moves here — "
+                    f"use safari('ball' | 'bait' | 'rock' | 'run') (the observation says whether it is worth a ball), then call "
+                    f"{again} to continue. Steps and Safari Balls are limited.")
         if trainer:
             return (f"A TRAINER battle started at {here} on the way to {target_name} (you can't flee it). Win it with "
                     f"use_move / switch_pokemon / use_item, then call {again} to continue.")
@@ -880,10 +891,10 @@ class NavMixin:
             cur_node = node_for(*cur, px, py)
             fails = self._edge_fail
             avoid = {k for k, n in fails.items() if n >= 2}
-            route = route_to(cur_node, target_map, avoid_edges=avoid)
+            route = route_to(cur_node, target_map, avoid_edges=avoid, avoid_maps=self._avoid_maps)
             if not route and avoid:
                 fails.clear()          # every known path is blocked — forget and retry fresh
-                route = route_to(cur_node, target_map)
+                route = route_to(cur_node, target_map, avoid_maps=self._avoid_maps)
             if not route:
                 return self._stop("no_route", f"No route to {target_name} from {MAP_NAMES.get(cur, cur)} "
                                               f"(it may be behind a locked/blocked area).")

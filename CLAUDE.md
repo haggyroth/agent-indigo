@@ -228,6 +228,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `advance_dialog` | battle + overworld | — | Press A through NPC/sign/system dialogue until it finishes or a choice (Yes/No / menu) needs your decision. |
 | `close_menus` | battle + overworld | — | Back out of every open menu, prompt and dialogue with B until you are on the free field again. |
 | `flee_battle` | battle | — | Run from a WILD battle (trainer battles can't be fled). |
+| `safari` | menus / naming screens | action, nickname? | One turn of a SAFARI ZONE battle (the menu is BALL / BAIT / GO NEAR / RUN — no moves, party or Bag). |
 | `catch` | battle | nickname? | Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's). |
 | `enter_name` | menus / naming screens | name | Type a name on the naming screen when one is open (a nickname, or the player/rival name in a new game) and confirm it. |
 | `read_game_state` | overworld | — | Read current game state: party HP, battle status, badges, location. |
@@ -237,7 +238,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 34 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 35 tools in total.
 <!-- TOOLS:END -->
 
 The opponent is identified from memory (`gEnemyParty`), so there is no

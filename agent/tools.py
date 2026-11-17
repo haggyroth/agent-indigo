@@ -171,11 +171,13 @@ TOOLS = [
         "name": "quest",
         "description": "Scripted story quests. quest() lists them and where you stand (✔ done / ▶ available / … blocked); "
                        "quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty: Cerulean's exits stay blocked "
-                       "without it); quest('cut') = HM01 Cut from the S.S. Anne's Captain (REQUIRED before Vermilion Gym). "
+                       "without it); quest('cut') = HM01 Cut from the S.S. Anne's Captain (REQUIRED before Vermilion Gym); quest('surf') = HM03 "
+                       "from the Safari Zone's Secret House and quest('strength') = HM04 via the Safari Zone's Gold Teeth "
+                       "(each pays the ¥500 entry; wild Pokémon inside are fought with safari()). "
                        "A wild Pokémon or trainer on the way ENDS the call — play it, then call quest again to resume. "
                        "auto_trainers=true fights the trainers on the way for you.",
         "parameters": {"type": "object", "properties": {
-            "name": {"type": "string", "enum": ["ss_ticket", "cut"], "description": "omit to list the quests"},
+            "name": {"type": "string", "enum": ["ss_ticket", "cut", "surf", "strength"], "description": "omit to list the quests"},
             "auto_trainers": {"type": "boolean",
                               "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
         }, "required": []},
@@ -295,6 +297,17 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {}},
     }},
     {"type": "function", "function": {
+        "name": "safari",
+        "description": "One turn of a SAFARI ZONE battle (the menu is BALL / BAIT / GO NEAR / RUN — no moves, party or Bag). "
+                       "action='ball' throws a Safari Ball (30 per visit; the 'nickname' works like catch's), 'bait' halves the "
+                       "catch rate but calms it (flees less), 'rock' doubles the catch rate but angers it (flees more), 'run' "
+                       "leaves. A common line: rock, rock, ball. Steps are limited too (see the SAFARI line).",
+        "parameters": {"type": "object", "properties": {
+            "action": {"type": "string", "enum": ["ball", "bait", "rock", "run"]},
+            "nickname": {"type": "string", "description": "for action='ball': a funny nickname to give if it is caught"}},
+            "required": ["action"]},
+    }},
+    {"type": "function", "function": {
         "name": "catch",
         "description": "Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's). Weaken it first — "
                        "low HP, or sleep / paralysis — it may break free, so throw again. ALWAYS pass a `nickname` "
@@ -371,7 +384,9 @@ TOOLS = [
 # provider's prompt cache survives a whole battle or a whole walk.
 BATTLE_TOOLS = ("use_move", "switch_pokemon", "use_item", "catch", "flee_battle", "inspect_pokemon", "team_report",
                 "press_button", "advance_dialog", "answer_prompt", "close_menus")
-_BATTLE_ONLY = frozenset({"use_move", "switch_pokemon", "catch", "flee_battle"})
+_BATTLE_ONLY = frozenset({"use_move", "switch_pokemon", "catch", "flee_battle", "safari"})
+SAFARI_TOOLS = ("safari", "inspect_pokemon", "team_report", "press_button", "advance_dialog", "answer_prompt", "close_menus")
+SAFARI_CONTEXT = "SAFARI_BATTLE"          # a battle whose gBattleTypeFlags has the Safari bit: its own menu, its own tools
 _NAMING_ONLY = frozenset({"enter_name"})          # naming screens are never the free overworld or a battle
 
 _USE_ITEM_BATTLE = ("Use a Bag item on your ACTIVE Pokémon — a Potion (Super / Hyper / Max) or a status cure "
@@ -388,6 +403,8 @@ def tools_for(context=None) -> list:
     """The tool schemas to offer in `context` (a game.state.GameContext, its name, or None = everything)."""
     from game.state import GameContext
     name = getattr(context, "name", context)
+    if name == SAFARI_CONTEXT:
+        return [t for t in TOOLS if t["function"]["name"] in SAFARI_TOOLS]
     if name == GameContext.IN_BATTLE.name:
         out = [t for t in TOOLS if t["function"]["name"] in BATTLE_TOOLS]
         return [_with_description(t, _USE_ITEM_BATTLE) if t["function"]["name"] == "use_item" else t for t in out]
