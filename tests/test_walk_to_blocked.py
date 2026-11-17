@@ -19,6 +19,8 @@ class FakeWorld:
     """Doubles as mgba + reader + tilemap. `grid[y][x]` is tilemap-passable;
     `mystery` tiles look passable but silently block the step (the hidden
     obstacle). Taps update the simulated player position."""
+    decks = ramps = frozenset()           # no bridges on the test maps
+
     def is_surfing(self):
         return False
 

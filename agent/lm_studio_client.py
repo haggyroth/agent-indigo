@@ -5,7 +5,7 @@ import re
 import time
 from pathlib import Path
 from openai import OpenAI
-from agent.tools import tools_for, normalize_button
+from agent.tools import SAFARI_CONTEXT, tools_for, normalize_button
 from agent.history import trim_messages, strip_control_tokens
 from game.memory_reader import LeafGreenReader
 from game.mgba_client import MGBAClient
@@ -279,7 +279,15 @@ class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMix
         """The screen the tool list is gated on (re-read every round: a go_to can turn into a battle mid-step). Any
         failure to read it means 'offer everything'."""
         try:
-            return self.reader.detect_context()
+            from game.state import GameContext
+            ctx = self.reader.detect_context()
+            if ctx == GameContext.IN_BATTLE:
+                try:
+                    if self._in_safari_battle():
+                        return SAFARI_CONTEXT
+                except Exception:
+                    log_once("client._tool_context.safari", "client._tool_context: could not tell if this is a Safari battle")
+            return ctx
         except Exception:
             log_once("client._tool_context", "client._tool_context: tolerated failure (continuing with a default)")
             return None
@@ -420,6 +428,8 @@ class AgentClient(SkillBase, SkillState, PCMixin, PartyMixin, QuestMixin, NavMix
                 return self._field_use_item(args["item"], str(args.get("target", "") or ""))
             case "save_game":
                 return self._save_game()
+            case "safari":
+                return self._safari(str(args.get("action", "")), str(args.get("nickname", "") or ""))
             case "give_item":
                 return self._give_item(str(args["item"]), str(args.get("pokemon", "") or ""))
             case "switch_pokemon":

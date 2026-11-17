@@ -64,6 +64,9 @@ MAP_NAMES: dict[tuple[int, int], str] = {
     (1, 47): "Silph Co. 1F",
     (1, 48): "Silph Co. 2F",
     (1, 63): "Safari Zone (Center)",
+    (1, 71): "Safari Zone Secret House",
+    (11, 0): "Safari Zone Entrance",
+    (11, 7): "Warden's House",
     (1, 64): "Safari Zone (East)",
     (1, 65): "Safari Zone (North)",
     (1, 66): "Safari Zone (West)",
@@ -134,7 +137,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "S"),
 
     (5, "Get HM03 Surf (Safari Zone Secret House) and HM04 Strength (Warden, Fuchsia)",
-     "The Safari Zone is in the north part of Fuchsia City. Surf: the Secret House at the far (north) end of the Safari Zone gives HM03. Strength: find the Warden's Gold Teeth in the Safari Zone (far west area) and return them to the Warden's house in Fuchsia for HM04.",
+     "Call quest('surf') and quest('strength'): they pay the ¥500 entry, walk Safari Zone Center → East → North → West (the areas only connect that way), take the Gold Teeth and HM03 from the Secret House, and return the teeth to the Warden in Fuchsia for HM04. Wild Pokémon inside are fought with safari('ball'|'bait'|'rock'|'run').",
      None),
 
     (6, "Surf to Cinnabar Island and defeat Blaine (Fire type)",
@@ -271,7 +274,7 @@ ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
     },
     (3, 7): {  # Fuchsia City
         "post_flute_heading_south":        "Gym is in the CENTER-SOUTH (Koga — Poison). Before the Gym, visit the Safari Zone (north entrance) — HM03 Surf is in the Secret House at the far end of the Safari Zone; find the Gold Teeth for the Warden (Fuchsia) to get HM04 Strength.",
-        "post_koga_need_surf":             "Enter Safari Zone (north), get HM03 Surf from the Secret House at the far end; find Gold Teeth in the far-west area and give them to the Warden (Fuchsia) for HM04 Strength. Then Surf south to Cinnabar Island.",
+        "post_koga_need_surf":             "quest('surf') (Safari Zone Secret House) and quest('strength') (Gold Teeth → the Warden in Fuchsia). Then Surf south to Cinnabar Island.",
         "post_surf_to_saffron_or_cinnabar": "Exit SOUTH and SURF down Route 19-20 to Cinnabar Island. Or fly to Saffron and clear Silph Co.",
     },
     (3, 8): {  # Cinnabar Island

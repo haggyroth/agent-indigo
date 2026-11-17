@@ -524,3 +524,149 @@ def test_save_game_writes_a_real_save_and_records_it(live):
     assert live.wild_battle()
     assert "Save from the free overworld" in live.c._execute("save_game", "{}")
     assert live.m.read32(Addr.SAVE_COUNTER) == n1 + 1                       # and nothing was written in the battle
+
+
+def _fly_to_fuchsia(live):
+    live.load("vermilion")
+    live.patch_mon(0, moves=[33, 19, 0, 0], pps=[35, 15, 0, 0])
+    live.set_badges(0b111)
+    live.set_flag(0x897)                                     # Fuchsia visited
+    out = live.c._execute("fly_to", json.dumps({"town": "Fuchsia"}))
+    assert live.r.read_current_map() == (3, 7), out
+
+
+def _into_the_safari_zone(live, money=5000):
+    """Stage: pay the entrance fee by hand (walk onto a trigger tile and say YES) — the quest driver does this itself."""
+    _fly_to_fuchsia(live)
+    live.set_money(money)
+    live.c._execute("go_to", json.dumps({"destination": "Safari Zone Entrance"}))
+    live.c._walk_to(4, 3)
+    for _ in range(8):
+        live.m.tick(120)
+        live.c._advance_to_control(tries=20)
+        if live.r.read_current_map() == (1, 63):
+            break
+    assert live.r.read_current_map() == (1, 63), live.r.read_current_map()
+
+
+def _safari_encounter(live, tries=500):
+    g = live.c._nearest_grass()
+    live.c._walk_to(*g)
+    for _ in range(tries):
+        if live.c._wander_step():
+            live.m.tick(200)
+            return True
+    return False
+
+
+def test_safari_battle_menu_ball_bait_rock_run(live):
+    """#215: a Safari battle has its own menu and tool list; safari(action) drives BALL / BAIT / GO NEAR / RUN."""
+    from agent.tools import SAFARI_CONTEXT, tools_for
+    _into_the_safari_zone(live)
+    assert live.m.read8(Addr.SAFARI_BALLS) == 30 and live.m.read16(Addr.SAFARI_STEPS) > 500
+    assert "SAFARI ZONE:" in _observation(live, False)
+    assert _safari_encounter(live) and live.c._in_safari_battle()
+    assert live.c._tool_context() == SAFARI_CONTEXT
+    assert {t["function"]["name"] for t in tools_for(live.c._tool_context())} == {
+        "safari", "inspect_pokemon", "team_report", "press_button", "advance_dialog", "answer_prompt", "close_menus"}
+    live.m.tick(120)
+    obs = _observation(live, True)
+    assert "SAFARI battle:" in obs and "Safari Balls" in obs and "safari('ball'" in obs, obs
+    assert "no longer" not in live.c._execute("safari", json.dumps({"action": "wave"})) and "one of: ball" in live.c._execute(
+        "safari", json.dumps({"action": "wave"}))
+    out = live.c._execute("safari", json.dumps({"action": "bait"}))
+    assert ("threw bait" in out and "LESS likely to flee" in out) or "ran away" in out, out
+    if live.c._in_safari_battle():
+        out = live.c._execute("safari", json.dumps({"action": "rock"}))
+        assert ("threw a rock" in out) or "ran away" in out, out
+    if live.c._in_safari_battle():
+        before = live.m.read8(Addr.SAFARI_BALLS)
+        out = live.c._execute("safari", json.dumps({"action": "ball"}))
+        assert live.m.read8(Addr.SAFARI_BALLS) == before - 1, out
+        assert "Gotcha" in out or "broke free" in out, out
+    if live.c._in_safari_battle():
+        out = live.c._execute("safari", json.dumps({"action": "run"}))
+        assert "Got away" in out
+    assert live.r.detect_context() in (GameContext.OVERWORLD, GameContext.IN_BATTLE)
+
+
+def _observation(live, in_battle):
+    import copy
+    import main
+    from agent.observation import build_observation
+    s = live.r.read_state()
+    run = main._RunState()
+    run.current_enemy = "FOE"
+    return build_observation(state=s, diff=live.r.diff(None, s), in_battle=in_battle, run=run, reader=live.r,
+                             tilemap=live.rt.tilemap, ltm=copy.deepcopy(live.rt.ltm), stm=copy.deepcopy(live.rt.stm),
+                             map_key=(s.map_bank, s.map_id))
+
+
+def test_safari_ball_throws_consume_balls_and_a_catch_is_handled_end_to_end(live):
+    """#215: safari('ball') = catch() in the Safari menu: counted by gNumSafariBalls, 'broke free' keeps the battle going, and a
+    catch (with a nickname) leaves a clean overworld with the Pokémon in the party or the PC."""
+    _into_the_safari_zone(live)
+    caught = ""
+    thrown = 0
+    for _ in range(4):                                       # a few encounters: catch rates are low, so allow some luck
+        if not (_safari_encounter(live) and live.c._in_safari_battle()):
+            continue
+        live.m.tick(120)
+        for _ in range(6):
+            if not live.c._in_safari_battle():
+                break
+            before = live.m.read8(Addr.SAFARI_BALLS)
+            out = live.c._execute("safari", json.dumps({"action": "ball", "nickname": "Safari Sam"}))
+            if out.startswith("No ball thrown"):                 # nickname critique (no ball spent): ask again, as the model would
+                out = live.c._execute("safari", json.dumps({"action": "ball", "nickname": "Dusty Rhinoplasty"}))
+            thrown += before - live.m.read8(Addr.SAFARI_BALLS)
+            if out.startswith("Gotcha"):
+                caught = out
+                break
+        if caught:
+            break
+        if live.c._in_safari_battle():
+            live.c._execute("safari", json.dumps({"action": "run"}))
+    assert thrown >= 1
+    assert live.r.detect_context() in (GameContext.OVERWORLD, GameContext.IN_BATTLE), live.r.detect_context()
+    if caught:
+        assert live.r.detect_context() == GameContext.OVERWORLD
+        assert len(live.r.read_party()) == 2 or live.r.read_boxes(), "the catch went nowhere"
+
+
+def _safari_quest(live, name, rounds=40):
+    """Run quest(name); a Safari battle ends the call — run from it (the model would throw balls) and resume."""
+    out = ""
+    for _ in range(rounds):
+        out = live.c._execute("quest", json.dumps({"name": name}))
+        if live.c._in_safari_battle():
+            live.c._execute("safari", json.dumps({"action": "run"}))
+            continue
+        if "again to continue" not in out:
+            break
+    return out
+
+
+def test_quest_strength_goes_through_the_safari_zone_to_the_warden(live):
+    """#215: pays ¥500, picks up the Gold Teeth (and the Secret House's HM03 on the same visit), walks out and takes the teeth to
+    the Warden for HM04, then teaches it."""
+    _fly_to_fuchsia(live)
+    live.set_money(5000)
+    had03 = live.r.read_flag(0x239)
+    out = _safari_quest(live, "strength")
+    assert out.startswith("Got HM04"), out
+    assert live.r.read_flag(0x23A) and live.r.read_flag(0x189) and (had03 or live.r.read_flag(0x239))
+    assert live.r.read_money() == 4500 and not live.c._in_safari_zone()
+    assert any(70 in (p.move_ids or []) for p in live.r.read_party())
+    assert live.r.detect_context() == GameContext.OVERWORLD
+    assert "already done" in live.c._execute("quest", json.dumps({"name": "strength"}))
+
+
+def test_quest_surf_takes_the_secret_house_hm_and_the_gold_teeth_on_one_visit(live):
+    """#215: one paid visit gets HM03 from the Secret House AND the Gold Teeth (so quest('strength') only has to see the Warden)."""
+    _fly_to_fuchsia(live)
+    live.set_money(5000)
+    out = _safari_quest(live, "surf")
+    assert live.r.read_flag(0x239) and live.r.read_flag(0x189), out           # HM03 and the Gold Teeth taken
+    assert "quest('strength')" in out and live.r.read_money() == 4500 and not live.c._in_safari_zone(), out
+    assert live.r.detect_context() == GameContext.OVERWORLD

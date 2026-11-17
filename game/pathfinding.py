@@ -12,7 +12,7 @@ import heapq
 _MOVES = (("Up", 0, -1), ("Down", 0, 1), ("Left", -1, 0), ("Right", 1, 0))
 
 
-def find_path(start, goal, passable, width, height, max_nodes=8000, ledge=None):
+def find_path(start, goal, passable, width, height, max_nodes=8000, ledge=None, edge_ok=None):
     """Shortest 4-connected path from start to goal over passable tiles.
 
     Returns a list of direction strings, [] if already at goal, or None if no
@@ -24,6 +24,9 @@ def find_path(start, goal, passable, width, height, max_nodes=8000, ledge=None):
     direction hops 2 tiles across (a single D-pad press) to the tile beyond, if
     that landing tile is passable. This lets A* use downhill ledges that plain
     passability treats as walls (the Route 1 top-of-map trap).
+
+    `edge_ok(a, b) -> bool` optionally vetoes a single step between two passable tiles (a bridge deck cannot be entered
+    straight from floor: only through its ramps).
     """
     if start == goal:
         return []
@@ -57,6 +60,8 @@ def find_path(start, goal, passable, width, height, max_nodes=8000, ledge=None):
             if not (0 <= nx < width and 0 <= ny < height):
                 continue
             if passable(nx, ny):
+                if edge_ok is not None and not edge_ok(cur, (nx, ny)):
+                    continue
                 step = (nx, ny)
             elif ledge is not None and ledge(nx, ny) == name:
                 # Hop the ledge: land two tiles along, must be in-bounds/passable.

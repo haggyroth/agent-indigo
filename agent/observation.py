@@ -164,10 +164,43 @@ def _trip(t: Tick) -> list[str]:
     return []
 
 
+def _safari_status(t: Tick) -> list[str]:
+    """Inside the Safari Zone the visit ends when EITHER the steps or the Safari Balls run out (you are walked out)."""
+    c = t.reader.client
+    balls, steps = c.read8(Addr.SAFARI_BALLS), c.read16(Addr.SAFARI_STEPS)
+    if not (balls or steps):
+        return []
+    return [f"SAFARI ZONE: {steps} steps and {balls} Safari Balls left — at 0 of either you are escorted out. Wild Pokémon here "
+            "are fought with safari('ball' | 'bait' | 'rock' | 'run'), not moves. Walking out through the entrance ends the visit early."]
+
+
+def _safari_battle(t: Tick) -> list[str]:
+    """A Safari battle has no moves, party or Bag: the foe, the stock of balls, and what BAIT / ROCK do."""
+    r, party = t.reader, t.state.party
+    enemy = r.read_enemy_lead()
+    balls, steps = r.client.read8(Addr.SAFARI_BALLS), r.client.read16(Addr.SAFARI_STEPS)
+    out = []
+    if enemy:
+        out.append(f"SAFARI battle: {enemy.species_name} L{enemy.level} — you have {balls} Safari Balls and {steps} steps left. "
+                   "Act with safari('ball'|'bait'|'rock'|'run').")
+        v = catch_evaluate(party, enemy.species_id, enemy.level or 0, dex_owned=r.read_dex_owned(enemy.species_id),
+                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])))
+        if v.catch:
+            taken = [p.nickname for p in party if p.nickname]
+            out.append(f"Worth catching: {v.reason}. A rock doubles the catch rate (but it may flee), bait halves it (but calms it); "
+                       "rock then ball is the usual line. When you throw the ball, pass a funny, inventive nickname you make up"
+                       + (f" (taken: {', '.join(taken)})" if taken else "") + ".")
+        else:
+            out.append(f"Not worth a ball: {v.reason}. safari('run') unless you want it for the Pokédex.")
+    return out
+
+
 def _battle(t: Tick) -> list[str]:
     """Moves/PP of the ACTIVE battler, the foe, volatile conditions, catch advice. (party[0] is not necessarily the one
     fighting after a switch; a Disabled move's PP is zeroed so it is never suggested.)"""
     r, run, party, stm = t.reader, t.run, t.state.party, t.stm
+    if r.client.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI:
+        return _safari_battle(t)
     lead, out = party[0], []
     _ids, a_names, a_pp, d_slot, d_turns = r.read_active_battle_usable_pp()
     if any(a_names):
@@ -372,6 +405,8 @@ def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool,
     """The one-line observation the LLM sees each tick (sections joined with ' | ')."""
     t = Tick(state, diff, in_battle, run, reader, tilemap, ltm, stm, map_key, trip)
     parts = _header(t)
+    if not in_battle and t.overworld:
+        parts += _safari_status(t)
     if state.party:
         parts += _lead_line(t)
         if not in_battle and t.overworld:

@@ -318,13 +318,13 @@ class BattleMixin:
             return "Not in a battle — nothing to flee."
         if self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
             return "Can't run from a trainer battle — win it or switch Pokémon."
-        if self._battle_trapped():
+        if not self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI and self._battle_trapped():
             return self._trapped_message("run")
         for _ in range(20):
             if self.reader.detect_context() != GameContext.IN_BATTLE:
                 return "Got away safely — fled the wild battle."
             self._wait_idle()
-            if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) == Addr.CTRL_CHOOSE_ACTION:
+            if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in (Addr.CTRL_CHOOSE_ACTION, *Addr.SAFARI_MENU):
                 self.mgba.write8(Addr.ACTION_CURSOR, Addr.ACTION_RUN)   # select RUN
                 self.mgba.hold("A", 20)                                 # commit
             else:
@@ -419,7 +419,7 @@ class BattleMixin:
             # plays (it goes stale), so with the foe down it proves nothing: keep advancing until a
             # live foe is out again or the battle ends.
             if not foe_down and self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in (
-                    Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE):
+                    Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE, *Addr.SAFARI_MENU):
                 who = (f" Opponent: {foe.species_name} {foe.current_hp}/{foe.max_hp}."
                        if foe and foe.max_hp and foe.current_hp > 0 else "")
                 return f"Battle text finished — it's your turn.{who} Call use_move / switch_pokemon / catch."
@@ -476,9 +476,11 @@ class BattleMixin:
             return "Not in a battle — you can only catch a wild Pokémon during its battle."
         if self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
             return "You can't catch a trainer's Pokémon — only wild ones. Win with use_move."
-        balls0 = self._ball_count()
+        safari = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI)
+        balls0 = self.mgba.read8(Addr.SAFARI_BALLS) if safari else self._ball_count()
         if balls0 <= 0:
-            return "No Poké Balls — buy some at a Mart with shop(), then catch."
+            return ("No Safari Balls left — run, or walk out of the Safari Zone." if safari
+                    else "No Poké Balls — buy some at a Mart with shop(), then catch.")
         party_before = len(self.reader.read_party())
         try:
             foe_pid = self.reader.read_enemy_lead().personality      # identifies the new catch afterwards (IV report)
@@ -503,36 +505,46 @@ class BattleMixin:
                         "space/. , ! ? only) and call catch(nickname=...) again.")
             self._nick_refused = None
             nickname = sanitize(nickname)
-        if not self._open_battle_bag():
-            return "Couldn't open the Bag in battle — try catch again."
-        self._wait_idle()
-        self.mgba.tick(12)
-        # Switch to the Poké Balls pocket (Right cycles Items→Key Items→Balls).
-        SD = Addr.BAG_MENU_STATE
-        for _ in range(8):
-            if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) == Addr.BAG_POCKET_BALLS:
-                break
-            self.mgba.tap("Right")
+        if safari:
+            committed = self._safari_commit("ball")
+            for _ in range(30):                      # the counter drops when the throw is executed, a moment after the choice
+                if self.mgba.read8(Addr.SAFARI_BALLS) < balls0:
+                    break
+                self.mgba.tick(10)
+            if not committed or self.mgba.read8(Addr.SAFARI_BALLS) >= balls0:
+                self._exit_battle_menus()
+                return "Couldn't throw a Safari Ball this time — you're back in the battle; try again."
+        else:
+            if not self._open_battle_bag():
+                return "Couldn't open the Bag in battle — try catch again."
             self._wait_idle()
-            self.mgba.tick(8)
-        if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) != Addr.BAG_POCKET_BALLS:
-            self._exit_battle_menus()
-            return "Couldn't reach the Poké Balls pocket — try catch again."
-        # Throw the ball. Selecting the ball opens a USE/CANCEL context menu (USE is
-        # the default); A there throws it. Press A until a ball is actually consumed —
-        # self-verifying, so a dropped input in the list→context→USE chain just means
-        # another press instead of stranding us mid-menu (the old flaky spot).
-        self._wait_idle()
-        for _ in range(10):
-            self.mgba.tap("A")
+            self.mgba.tick(12)
+            # Switch to the Poké Balls pocket (Right cycles Items→Key Items→Balls).
+            SD = Addr.BAG_MENU_STATE
+            for _ in range(8):
+                if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) == Addr.BAG_POCKET_BALLS:
+                    break
+                self.mgba.tap("Right")
+                self._wait_idle()
+                self.mgba.tick(8)
+            if self.mgba.read16(SD + Addr.BAG_POCKET_OFF) != Addr.BAG_POCKET_BALLS:
+                self._exit_battle_menus()
+                return "Couldn't reach the Poké Balls pocket — try catch again."
+            # Throw the ball. Selecting the ball opens a USE/CANCEL context menu (USE is
+            # the default); A there throws it. Press A until a ball is actually consumed —
+            # self-verifying, so a dropped input in the list→context→USE chain just means
+            # another press instead of stranding us mid-menu (the old flaky spot).
             self._wait_idle()
-            self.mgba.tick(10)
-            if self._ball_count() < balls0:
-                break
-        if self._ball_count() >= balls0:
-            self._exit_battle_menus()
-            return ("Couldn't throw the ball this time — you're back in the battle; "
-                    "try catch() again.")
+            for _ in range(10):
+                self.mgba.tap("A")
+                self._wait_idle()
+                self.mgba.tick(10)
+                if self._ball_count() < balls0:
+                    break
+            if self._ball_count() >= balls0:
+                self._exit_battle_menus()
+                return ("Couldn't throw the ball this time — you're back in the battle; "
+                        "try catch() again.")
         # A ball was thrown. Resolve using gBattleOutcome — the ONLY reliable verdict:
         # a transient action-menu handler flickers through even a successful catch, and
         # the party count lags. == B_OUTCOME_CAUGHT the instant the catch succeeds.
@@ -558,7 +570,7 @@ class BattleMixin:
             # that bounced the cursor between Bag and Run for ~120 iterations. So skip it whenever the
             # action/move menu is actually up (a broken-free ball returns there).
             at_menu = self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in (
-                Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE)
+                Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE, *Addr.SAFARI_MENU)
             # A ball that broke free drops back to the action menu and stays there; a successful catch
             # only FLICKERS through that menu value (≤ ~6 iterations, live-traced) before the Yes/No.
             # So a long unbroken stretch at the menu with no catch means it broke free — stop waiting
@@ -569,7 +581,8 @@ class BattleMixin:
             if nickname and not at_menu and not named and self._battle_yesno_live():
                 named = self._give_nickname(nickname)    # YES -> naming screen -> OK
                 continue
-            self.mgba.tap("B")
+            # Safari battle text waits for A (B does nothing there), but the post-catch "nickname?" box must still be declined with B.
+            self.mgba.tap("A" if safari and not at_menu and not self._battle_yesno_live() else "B")
         self._exit_battle_menus()            # clear any prompt; never strand in a menu
         if caught or self.mgba.read8(OUTCOME) == Addr.B_OUTCOME_CAUGHT or named.startswith("Named"):
             extra = f" {named}" if named else ""
@@ -591,6 +604,78 @@ class BattleMixin:
             return f"Gotcha! Caught the wild Pokémon — it's on your team now.{extra}"
         return ("It broke free! Weaken it more with use_move (bring its HP low, or "
                 "inflict a status like sleep), then catch() again.")
+
+    # ── Safari Zone battles ──────────────────────────────────────────────────────────────────────────
+    # The Safari battle menu is BALL / BAIT / GO NEAR / RUN: no moves, no party, no Bag. BALL throws a Safari Ball (30 per
+    # visit), BAIT halves the catch rate but calms the foe (it flees less), GO NEAR (throw a rock) doubles the catch rate but
+    # angers it (it flees more), RUN always works. `catch()` and `flee_battle()` map onto BALL and RUN in this mode.
+    def _in_safari_battle(self) -> bool:
+        from game.constants import Addr
+        from game.state import GameContext
+        return (self.reader.detect_context() == GameContext.IN_BATTLE
+                and bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI))
+
+    def _safari_commit(self, action: str) -> bool:
+        """Wait for the Safari menu, put its cursor on `action` and press A — ONCE per attempt (A at the menu commits whatever the
+        cursor is on, so it is never pressed to "advance text"). True once the controller has visibly taken the turn (it left the
+        menu for a moment) or the battle ended; False if the menu never came up or the press never registered."""
+        from game.constants import Addr
+        from game.state import GameContext
+
+        def over() -> bool:
+            return self.reader.detect_context() != GameContext.IN_BATTLE or bool(self.mgba.read8(Addr.BATTLE_OUTCOME))
+
+        for _attempt in range(3):
+            for _ in range(60):                  # the menu comes up by itself after the intro / the previous turn
+                if over():
+                    return True
+                self._wait_idle()
+                if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in Addr.SAFARI_MENU:
+                    break
+                self.mgba.tick(10)
+            else:
+                return False
+            self.mgba.write8(Addr.ACTION_CURSOR, Addr.SAFARI_CURSOR[action])
+            self.mgba.hold("A", 20)
+            for _ in range(25):                  # the turn shows as the controller leaving the menu values for a while
+                if over() or self.mgba.read32(Addr.BATTLE_CTRL_FUNC) not in Addr.SAFARI_MENU:
+                    return True
+                self.mgba.tick(2)
+        return False
+
+    def _safari(self, action: str, nickname: str = "") -> str:
+        """safari(action): ball | bait | rock | run — one turn of a Safari Zone battle."""
+        from game.constants import Addr
+        from game.state import GameContext
+        action = str(action or "").lower().strip().replace("go near", "rock").replace("throw ", "")
+        if action not in Addr.SAFARI_CURSOR:
+            return "safari(action) is one of: ball (throw a Safari Ball), bait, rock, run."
+        if not self._in_safari_battle():
+            return "Not in a Safari Zone battle."
+        if action == "ball":
+            return self._catch(nickname)
+        if action == "run":
+            return self._flee_battle()
+        foe = self.reader.read_enemy_lead()
+        name = (foe.species_name if foe else "") or "the Pokémon"
+        if not self._safari_commit(action):
+            return "The Safari menu didn't come up — try again."
+        for _ in range(80):                       # the throw and the foe's reaction play out by themselves; wait for the next menu
+            self._wait_idle()
+            if self.reader.detect_context() != GameContext.IN_BATTLE or self.mgba.read8(Addr.BATTLE_OUTCOME):
+                for _ in range(30):               # the battle is over: let the fade finish
+                    if self.reader.detect_context() != GameContext.IN_BATTLE:
+                        break
+                    self.mgba.tick(20)
+                self._advance_to_control(tries=12)          # the fade back to the field
+                return f"{name} ran away (the battle is over) — carry on."
+            if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in Addr.SAFARI_MENU:
+                break
+            self.mgba.tick(10)
+        balls = self.mgba.read8(Addr.SAFARI_BALLS)
+        what = ("threw bait — it eats, so it is LESS likely to flee but HARDER to catch (catch rate halved)" if action == "bait" else
+                "threw a rock — it is angry: EASIER to catch (rate doubled) but MORE likely to flee")
+        return f"You {what}. {name} is still here. {balls} Safari Balls left."
 
     def _caught_quality(self, pid: int) -> str:
         """'Quality: good (71%) — IV 64% […], Jolly (helps its physical role); vs your Pidgey (55%): a clear upgrade.'
@@ -722,7 +807,7 @@ class BattleMixin:
             # is up — so the HP numbers reflect it rather than lagging one exchange behind.
             for _ in range(20):
                 if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in (
-                        Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT):
+                        Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, *Addr.SAFARI_MENU):
                     break
                 if self.reader.detect_context() != GameContext.IN_BATTLE:
                     break
@@ -851,7 +936,7 @@ class BattleMixin:
         # Advance the "come back! / go!" send-out text so the caller lands cleanly.
         for _ in range(6):
             if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in (
-                    Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE):
+                    Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE, *Addr.SAFARI_MENU):
                 break
             self._battle_press("A")
         return f"Switched in {mon.species_name} (L{mon.level}). It's now your active Pokémon."

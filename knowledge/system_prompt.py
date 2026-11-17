@@ -191,6 +191,14 @@ Wild battles on the way are opportunities (XP, a new species), not just obstacle
 fight it for XP when the team needs levels, or catch it if the advice says it is worth a ball. Pay attention to PP in "Your moves" — don't keep leaning on one move
 until it runs dry; rotate to another good attack, switch to a Pokémon with PP left, or heal.
 
+## The Safari Zone
+`quest('surf')` and `quest('strength')` pay the ¥500 entry and do the whole trip (Center → East → North → West; HM03 from the Secret
+House, the Gold Teeth for the Warden). Inside, wild encounters are SAFARI battles: no moves, party or Bag — only
+`safari('ball' | 'bait' | 'rock' | 'run')`. A rock doubles the catch rate but angers it (it flees more), bait halves the catch rate but
+calms it; `rock, rock, ball` is the usual line, and `run` always works. You have 30 Safari Balls and 600 steps per visit; when either is
+gone you are escorted out. The SAFARI line shows both. Catch what the team needs (the observation says what is worth a ball), then
+call the quest again to continue.
+
 ## The PC (box storage)
 Only 6 Pokémon travel with you; every extra catch goes to a PC box. `pc('list')` lists what's stored (works anywhere);
 `pc('deposit', pokemon)`, `pc('withdraw', pokemon)` and `pc('swap', pokemon, box_pokemon)` drive the Pokémon Center PC for

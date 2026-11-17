@@ -41,6 +41,7 @@ class SkillState:
     _balance_warned = None       # …and the lopsided-team warning
     _trainer_losses = lazy(dict)  # {map: n} lost trainer battles per map (a mandatory trainer beating an under-levelled team)
     _edge_fail = lazy(dict)       # {(map, direction): n} seamless-edge crossings that failed
+    _avoid_maps = ()              # maps travel must not route through (the Safari Zone quest keeps clear of its own exit)
 
     # ── overworld: grind / heal / shop ──────────────────────────────────────────────────────────
     _grind_run = None            # the grind session in progress (None = none); abandoned by any other travel tool

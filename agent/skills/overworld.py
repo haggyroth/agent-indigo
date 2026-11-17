@@ -12,6 +12,35 @@ class OverworldMixin:
     def _bag_and_keys(self) -> tuple[dict, int]:
         return self.reader.read_bag(), self.reader.read_key_item_count()
 
+    def _pick_ball(self, bx: int, by: int) -> tuple[str, str]:
+        """Walk next to the item ball at (bx, by), face it, press A and clear the 'found ITEM!' text. Returns (what was
+        picked up, "") or ("", why not). Confirmed by the bag / key-item total rising or the ball vanishing."""
+        from knowledge.shopping import ITEM_NAMES
+        if not self._approach_adjacent(bx, by):
+            return "", f"couldn't reach the item at ({bx},{by})"
+        before_bag, before_keys = self._bag_and_keys()
+        picked = False
+        for _ in range(6):
+            px, py = self.reader.read_player_pos()
+            face = self._facing_dir(px, py, bx, by)
+            if face:
+                self.mgba.tap(face)          # turn to face the ball (bumps it, no move)
+            self.mgba.tap("A")               # pick up
+            self.mgba.tick(15)
+            self._advance_to_control()       # advance "found ITEM!" text to control
+            after_bag, after_keys = self._bag_and_keys()
+            if after_keys > before_keys or sum(after_bag.values()) > sum(before_bag.values()) \
+                    or (bx, by) not in self.reader.read_item_ball_tiles():
+                picked = True
+                break
+        if not picked:
+            return "", f"the item at ({bx},{by}) didn't respond"
+        after_bag, after_keys = self._bag_and_keys()
+        new = [ITEM_NAMES.get(iid, f"item#{iid}") for iid, q in after_bag.items() if q > before_bag.get(iid, 0)]
+        if after_keys > before_keys:
+            new.append("a key item")
+        return (", ".join(new) if new else "an item"), ""
+
     def _pick_up_items(self) -> str:
         """Collect every item ball currently visible on this map. For each, walks up
         next to it, faces it, presses A, and advances the 'found ITEM!' text — the
@@ -19,7 +48,6 @@ class OverworldMixin:
         pickup by the bag/key-item total rising (or the ball vanishing). Item balls
         are surfaced in the observation so the model knows to call this."""
         from game.state import GameContext
-        from knowledge.shopping import ITEM_NAMES
         if self.reader.detect_context() != GameContext.OVERWORLD:
             return "Can only pick up items while walking around (not in a menu/battle)."
         got: list[str] = []
@@ -29,31 +57,10 @@ class OverworldMixin:
                 break
             px, py = self.reader.read_player_pos()
             bx, by = min(balls, key=lambda t: abs(t[0] - px) + abs(t[1] - py))
-            if not self._approach_adjacent(bx, by):
-                return self._pickup_result(got, f"couldn't reach the item at ({bx},{by})")
-            before_bag, before_keys = self._bag_and_keys()
-            picked = False
-            for _ in range(6):
-                px, py = self.reader.read_player_pos()
-                face = self._facing_dir(px, py, bx, by)
-                if face:
-                    self.mgba.tap(face)          # turn to face the ball (bumps it, no move)
-                self.mgba.tap("A")               # pick up
-                self.mgba.tick(15)
-                self._advance_to_control()       # advance "found ITEM!" text to control
-                after_bag, after_keys = self._bag_and_keys()
-                if after_keys > before_keys or sum(after_bag.values()) > sum(before_bag.values()) \
-                        or (bx, by) not in self.reader.read_item_ball_tiles():
-                    picked = True
-                    break
-            if not picked:
-                return self._pickup_result(got, f"the item at ({bx},{by}) didn't respond")
-            after_bag, after_keys = self._bag_and_keys()
-            new = [ITEM_NAMES.get(iid, f"item#{iid}") for iid, q in after_bag.items()
-                   if q > before_bag.get(iid, 0)]
-            if after_keys > before_keys:
-                new.append("a key item")
-            got.append(", ".join(new) if new else "an item")
+            names, problem = self._pick_ball(bx, by)
+            if problem:
+                return self._pickup_result(got, problem)
+            got.append(names)
         return self._pickup_result(got)
 
     @staticmethod

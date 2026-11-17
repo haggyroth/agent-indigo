@@ -21,6 +21,14 @@ def test_schemas_require_only_what_is_always_needed():
     assert by["quest"]["required"] == [] and by["reorder_party"]["required"] == ["first"]
 
 
+def test_the_safari_quests_are_registered_and_offered():
+    from agent.tools import TOOLS
+    enum = next(t for t in TOOLS if t["function"]["name"] == "quest")["function"]["parameters"]["properties"]["name"]["enum"]
+    assert enum == ["ss_ticket", "cut", "surf", "strength"]
+    text = listing({"ss_ticket"})
+    assert "▶ surf" in text and "▶ strength" in text and resolve("Strength").key == "strength"
+
+
 def test_quest_listing_shows_done_available_and_blocked():
     text = listing(set())
     assert "▶ ss_ticket" in text and "… cut" in text and "quest('ss_ticket')" in text

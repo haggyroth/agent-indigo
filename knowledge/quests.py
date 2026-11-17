@@ -19,6 +19,10 @@ QUESTS: tuple[Quest, ...] = (
           "without it Cerulean's south and east exits stay blocked"),
     Quest("cut", "HM01 Cut from the S.S. Anne's Captain, taught to a Pokémon",
           "a Cut tree blocks Vermilion Gym's door", needs=("ss_ticket",)),
+    Quest("surf", "HM03 Surf from the Safari Zone Secret House (¥500 entry, ~200 of the 600 steps)",
+          "Cinnabar Island and every water route need it"),
+    Quest("strength", "HM04 Strength: the Safari Zone's Gold Teeth, returned to the Warden in Fuchsia",
+          "Victory Road's boulders (and Seafoam's) need it"),
 )
 BY_KEY = {q.key: q for q in QUESTS}
 

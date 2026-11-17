@@ -238,7 +238,7 @@ def _battle_settled(reader) -> bool:
     the previous battle's leftovers that sit there during the intro."""
     from game.constants import Addr
     return reader.client.read32(Addr.BATTLE_CTRL_FUNC) in (
-        Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE)
+        Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE, *Addr.SAFARI_MENU)
 
 
 def _observe_battle(reader) -> None:
