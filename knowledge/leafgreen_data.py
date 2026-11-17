@@ -32,10 +32,9 @@ GYM_LEADER_APPROACH: dict[tuple[int, int], tuple[int, int]] = {
 # strings match GYMS[*]["leader"] / long_term gyms_beaten. Map ids from the
 # pokefirered map_groups.json (same set as map_graph MAP_KIND == "gym").
 # Level of each leader's strongest Pokémon (FireRed/LeafGreen), by leader name.
-GYM_ACE_LEVEL: dict[str, int] = {
-    "Brock": 14, "Misty": 21, "Lt. Surge": 24, "Erika": 29,
-    "Koga": 43, "Sabrina": 43, "Blaine": 47, "Giovanni": 50,
-}
+from knowledge.gym_advice import ace_levels   # noqa: E402  (levels come from the generated decomp parties — #211)
+
+GYM_ACE_LEVEL: dict[str, int] = ace_levels()
 
 GYM_MAP_LEADER: dict[tuple[int, int], str] = {
     (6, 2):  "Brock",      # Pewter City Gym
@@ -56,69 +55,47 @@ GYMS: list[dict] = [
     {
         "number": 1, "leader": "Brock", "city": "Pewter City",
         "type": "Rock", "badge": "Boulder Badge", "badge_bit": 0,
-        "key_threat": "Geodude L12, Onix L14",
-        "counter": "Grass or Water. Vine Whip wins.",
     },
     {
         "number": 2, "leader": "Misty", "city": "Cerulean City",
         "type": "Water", "badge": "Cascade Badge", "badge_bit": 1,
-        "key_threat": "Starmie L21 (has Recover)",
-        "counter": "Grass or Electric. Hit fast — Recover stalls.",
     },
     {
         "number": 3, "leader": "Lt. Surge", "city": "Vermilion City",
         "type": "Electric", "badge": "Thunder Badge", "badge_bit": 2,
-        "key_threat": "Raichu L24",
-        "counter": "Ground. Diglett from Diglett's Cave trivializes.",
     },
     {
         "number": 4, "leader": "Erika", "city": "Celadon City",
         "type": "Grass", "badge": "Rainbow Badge", "badge_bit": 3,
-        "key_threat": "Vileplume L29 (Sleep Powder)",
-        "counter": "Fire/Ice/Flying/Poison. Lum Berry blocks sleep.",
     },
     {
         "number": 5, "leader": "Koga", "city": "Fuchsia City",
         "type": "Poison", "badge": "Soul Badge", "badge_bit": 4,
-        "key_threat": "Weezing L43 (Self-Destruct)",
-        "counter": "Ground or Psychic. Bring Antidotes + Full Heals.",
     },
     {
         "number": 6, "leader": "Sabrina", "city": "Saffron City",
         "type": "Psychic", "badge": "Marsh Badge", "badge_bit": 5,
-        "key_threat": "Alakazam L43",
-        "counter": "Bug (2x). Dark moves only if high SpAtk. Ghost is immune, not 2x.",
     },
     {
         "number": 7, "leader": "Blaine", "city": "Cinnabar Island",
         "type": "Fire", "badge": "Volcano Badge", "badge_bit": 6,
-        "key_threat": "Arcanine L47",
-        "counter": "Water. Any Surf user. Requires Surf HM to reach.",
     },
     {
         "number": 8, "leader": "Giovanni", "city": "Viridian City",
         "type": "Ground", "badge": "Earth Badge", "badge_bit": 7,
-        "key_threat": "Rhydon L50",
-        "counter": "Water/Grass/Ice. Ice Beam for Rhydon.",
     },
 ]
 
 # ── Elite Four ────────────────────────────────────────────────────────────────
 
+# Parties, ace levels and watch-outs come from knowledge.gym_advice (generated from the decomp), not from this file.
 ELITE_FOUR: list[dict] = [
-    {"trainer": "Lorelei", "type": "Ice", "key_threat": "Lapras L54",
-     "counter": "Electric, Rock, Fighting"},
-    {"trainer": "Bruno",   "type": "Fighting", "key_threat": "Machamp L56",
-     "counter": "Psychic, Flying"},
-    {"trainer": "Agatha",  "type": "Ghost", "key_threat": "Gengar L58",
-     "counter": "Ground, Psychic"},
-    {"trainer": "Lance",   "type": "Dragon", "key_threat": "Dragonite L60",
-     "counter": "Ice Beam is critical. Dragonite survives most else."},
+    {"trainer": "Lorelei", "type": "Ice"}, {"trainer": "Bruno", "type": "Fighting"},
+    {"trainer": "Agatha", "type": "Ghost"}, {"trainer": "Lance", "type": "Dragon"},
 ]
 
 # The Champion is a separate fight after Lance (not an Elite Four member).
-CHAMPION: dict = {"trainer": "Gary", "type": "Mixed", "key_threat": "Alakazam + Rhydon + starter counter",
-                  "counter": "Ice Beam for Rhydon; Psychic for Fighting; counter Gary's starter."}
+CHAMPION: dict = {"trainer": "Gary", "type": "Mixed"}
 
 # ── HM Requirements ───────────────────────────────────────────────────────────
 

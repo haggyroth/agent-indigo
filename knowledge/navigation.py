@@ -110,7 +110,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "E"),
 
     (3, "Defeat Erika (Grass type) at Celadon City Gym — use Fire, Ice, Flying, or Poison",
-     "Celadon Gym is in the west side of Celadon City. Also get TM26 Earthquake and Game Corner TMs (Thunderbolt/Ice Beam/Flamethrower) while here.",
+     "Celadon Gym is in the west side of Celadon City. The Game Corner prize room sells TM13 Ice Beam, TM24 Thunderbolt, TM35 Flamethrower, TM30 Shadow Ball and TM23 Iron Tail for coins.",
      "W"),
 
     (4, "Clear the Rocket Hideout under the Game Corner in Celadon to get the Silph Scope",
@@ -142,7 +142,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "S"),
 
     (7, "Return to Viridian City and defeat Giovanni (Ground type) at Gym 8",
-     "Fly or walk north from Pallet Town to Viridian City. Giovanni's Gym is in the north-west. Use Water, Grass, or Ice moves. Ice Beam is essential for Rhydon.",
+     "Fly or walk north from Pallet Town to Viridian City. Giovanni's Gym is in the north-west; team_report shows his party and the types to hit it with.",
      "N"),
 
     (8, "Head to the Pokemon League via Route 23 and Victory Road",
@@ -150,7 +150,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "N"),
 
     (8, "Defeat the Elite Four: Lorelei (Ice), Bruno (Fighting), Agatha (Ghost), Lance (Dragon), then Champion Gary",
-     "Save before each trainer. Lorelei: Electric/Rock/Fighting. Bruno: Psychic/Flying. Agatha: Ground/Psychic. Lance: Ice Beam is critical — Dragonite survives most other moves. Gary: bring Ice Beam for Rhydon, Psychic for Fighting-types.",
+     "Save before each trainer. team_report shows every opponent's real party, what their attacks are and what to hit them with.",
      "N"),
 ]
 

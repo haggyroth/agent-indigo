@@ -232,6 +232,12 @@ def team_report(party, boxes=None, gyms_beaten=()) -> str:
                      f"{fit.safe_members}/{len(party)} members safe from his types"
                      + (f"; no answer for {', '.join(fit.uncovered_species)}" if fit.uncovered_species else "")
                      + (" ✔ answered" if fit.answers else " ✘ NOT answered"))
+        from knowledge.gym_advice import brief
+        lines.append(brief(fit.leader))
+    elif len(set(gyms_beaten or [])) >= 8:
+        from knowledge.gym_advice import brief
+        lines.append("Elite Four, in order:")
+        lines.extend("  " + brief(n) for n in ("Lorelei", "Bruno", "Agatha", "Lance", "Gary"))
     for g in gaps(party, boxes, gyms_beaten):
         lines.append(f"Gap ({g.code}): {g.text}")
     return "\n".join(lines)

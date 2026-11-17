@@ -26,7 +26,7 @@ PIDGEY = lambda: mon("Pidgey", ["Gust", "Tackle"])                              
 def test_gym_and_e4_teams_come_from_the_decomp():
     assert [ID_ for ID_, _l, _m in TRAINER_TEAMS["Brock"]] == [ID["Geodude"], ID["Onix"]]
     assert TRAINER_TEAMS["Lt. Surge"][-1][:2] == (ID["Raichu"], 24)
-    assert len(TRAINER_TEAMS) == 12
+    assert len(TRAINER_TEAMS) == 15           # 8 leaders + 4 Elite Four + the Champion's three starter variants
 
 
 def test_every_counter_on_the_shortlist_really_exists_in_leafgreen():
