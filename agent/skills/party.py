@@ -84,6 +84,28 @@ class PartyMixin:
                     f"open_menu('Pokemon') and do it by hand. Order now: {self._party_names()}.")
         return f"Swapped slots {a + 1} and {b + 1}. Party order: {self._party_names()}."
 
+    def _inspect_pokemon(self, who: str) -> str:
+        """Stats, IVs, EVs, nature, Hidden Power and a quality grade for a party member (slot / name) or a boxed
+        Pokémon ('box:slot' or a name found only in the PC), with how it compares to the team."""
+        from knowledge.mon_quality import assess, compare_text, describe
+        party = self.reader.read_party()
+        i = None if ":" in str(who) else self._resolve_party_target(str(who), party)
+        if i is not None:
+            mon = party[i]
+            others = [p for j, p in enumerate(party) if j != i]
+        else:
+            from agent.skills.pc import resolve_boxed
+            mon, why = resolve_boxed(str(who), self.reader.read_boxes())
+            if mon is None:
+                return f"Can't find {who!r} in your party or the PC. {why}".strip()
+            others = party
+        out = describe(mon)
+        if assess(mon) is not None:
+            cmp = compare_text(mon, others)
+            if cmp:
+                out += f"\nCompared with your team: {cmp}."
+        return out
+
     def _wanted_species(self, party=None) -> dict:
         """{species id: reason} the team is missing (knowledge.team) — fed to catch_policy.evaluate. {} on any hiccup."""
         try:

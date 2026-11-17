@@ -214,7 +214,10 @@ class PCMixin:
             if can_learn(m["species_id"], ITEM_HM01 + HM_MOVES.index(hm)):
                 hms.append(hm)
         moves = ", ".join(m["move_names"]) or "no moves"
-        return (f"  {m['box'] + 1}:{m['slot']} {name} ({m['species_name']} L{m['level']}, {types}) — {moves}"
+        from knowledge.mon_quality import assess
+        q = assess(m)
+        grade = f", {q.grade} {q.score:.0%}" if q else ""
+        return (f"  {m['box'] + 1}:{m['slot']} {name} ({m['species_name']} L{m['level']}, {types}{grade}) — {moves}"
                 + (f" — can learn {'/'.join(hms)}" if hms else ""))
 
     # ── guards ───────────────────────────────────────────────────────────────────

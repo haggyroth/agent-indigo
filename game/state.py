@@ -26,6 +26,11 @@ class PokemonStatus:
     pp: list[int] = field(default_factory=lambda: [0]*4)
     nickname: str = ""    # the mon's given name ("" when unreadable)
     personality: int = 0  # PID: identifies the same Pokémon across party reorders, evolutions and level-ups
+    ivs: tuple = ()       # (HP, Atk, Def, Spe, SpA, SpD) individual values 0-31 — () when unreadable
+    evs: tuple = ()       # same order, effort values 0-255
+    friendship: int = 0
+    ability_slot: int = 0
+    stats: tuple = ()     # the game's own computed (maxHP, Atk, Def, Spe, SpA, SpD) — party Pokémon only
 
     @property
     def hp_percent(self) -> float:

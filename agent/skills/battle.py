@@ -490,6 +490,10 @@ class BattleMixin:
         if balls0 <= 0:
             return "No Poké Balls — buy some at a Mart with shop(), then catch."
         party_before = len(self.reader.read_party())
+        try:
+            foe_pid = self.reader.read_enemy_lead().personality      # identifies the new catch afterwards (IV report)
+        except Exception:
+            foe_pid = 0
         # Vet the nickname BEFORE spending a ball: the naming keyboard only types letters, digits,
         # space and . , ! ? — and the model's first idea is often just the species name ("Zubat",
         # "Kakuna1"). Refuse ONCE per species with the reason (no ball thrown) so it invents something
@@ -584,11 +588,15 @@ class BattleMixin:
         self._exit_battle_menus()            # clear any prompt; never strand in a menu
         if caught or self.mgba.read8(OUTCOME) == Addr.B_OUTCOME_CAUGHT or named.startswith("Named"):
             extra = f" {named}" if named else ""
+            quality = self._caught_quality(foe_pid)
+            if quality:
+                extra += f" {quality}"
             try:
                 from agent import events
                 foe0 = events.current_foe() or (getattr(self, "_current_opponent", "") or "").title() or "Pokémon"
                 events.emit("catch", f"CAUGHT {foe0}" + (f" — {named.strip(' .')}" if named else "")
-                            + (" (party full → PC box)" if party_before >= 6 else ""), species=foe0)
+                            + (" (party full → PC box)" if party_before >= 6 else "")
+                            + (f" · {quality.split(' — ')[0].replace('Quality: ', '')}" if quality else ""), species=foe0)
             except Exception:
                 pass
             if party_before >= 6:
@@ -597,6 +605,27 @@ class BattleMixin:
             return f"Gotcha! Caught the wild Pokémon — it's on your team now.{extra}"
         return ("It broke free! Weaken it more with use_move (bring its HP low, or "
                 "inflict a status like sleep), then catch() again.")
+
+    def _caught_quality(self, pid: int) -> str:
+        """'Quality: good (71%) — IV 64% […], Jolly (helps its physical role); vs your Pidgey (55%): a clear upgrade.'
+        for the Pokémon just caught (found by personality value in the party or the PC). Reported AFTER the catch — a
+        human has no IV readout before it — see config.IV_PEEK_BEFORE_CATCH for the opt-in pre-catch peek."""
+        if not pid:
+            return ""
+        try:
+            from knowledge.mon_quality import assess, compare_text
+            party = self.reader.read_party()
+            mon = next((p for p in party if p.personality == pid), None)
+            if mon is None:
+                mon = next((b for b in self.reader.read_boxes() if b.get("personality") == pid), None)
+            q = assess(mon) if mon is not None else None
+            if q is None:
+                return ""
+            others = [p for p in party if p.personality != pid]
+            cmp = compare_text(mon, others)
+            return f"Quality: {q.summary()}" + (f"; {cmp}" if cmp else "") + "."
+        except Exception:
+            return ""
 
     @staticmethod
     def _resolve_party_target(target: str, party) -> int | None:
@@ -969,6 +998,10 @@ class BattleMixin:
                 ctx["user_level"] = mine.level
                 if mine.max_hp:
                     ctx["user_hp_frac"] = mine.current_hp / mine.max_hp
+                from knowledge.mon_quality import hidden_power
+                hp = hidden_power(mine.ivs)
+                if hp:
+                    ctx["hidden_power"] = hp
             foe = self.reader.read_enemy_lead()
             if foe is not None:
                 ctx["foe_level"] = foe.level

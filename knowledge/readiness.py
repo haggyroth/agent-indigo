@@ -81,6 +81,10 @@ def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=
         from knowledge.team import gaps
         for g in gaps(party, boxes, gyms_beaten)[:2]:
             needs.append(Need("should", "hunt" if g.code == "gym" else "hm", f"team gap — {g.text}"))
+    if boxes and not blocking(needs):
+        from knowledge.mon_quality import upgrade_swaps
+        for line in upgrade_swaps(party, boxes, limit=1):
+            needs.append(Need("should", "upgrade", f"better specimen in the PC — {line}"))
     if tms and not blocking(needs):
         from knowledge.bag import tm_advice
         for adv in tm_advice(party, tms):

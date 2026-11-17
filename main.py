@@ -1,7 +1,7 @@
 from datetime import datetime
 from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
-                    LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
+                    LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY, IV_PEEK_BEFORE_CATCH)
 from game.memory_reader import LeafGreenReader
 from game.state import GameContext, GameState, StateDiff, newly_fainted_slots
 from game.tilemap_reader import TilemapReader
@@ -20,6 +20,7 @@ from game.constants import Addr
 from game.pathfinding import door_centers
 from knowledge.battle import battle_summary, overworld_pp_summary
 from knowledge.move_semantics import catch_setup_hint
+from knowledge.mon_quality import hidden_power as _hidden_power
 from rich.console import Console
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -596,8 +597,14 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                                       wild=not run.battle_is_trainer,
                                       user_level=_me.level, user_hp_frac=_me.hp_percent,
                                       foe_level=(enemy.level or 0) if enemy else 0,
-                                      foe_hp=enemy.current_hp if enemy else 0)
+                                      foe_hp=enemy.current_hp if enemy else 0,
+                                      hidden_power=_hidden_power(_me.ivs))
             obs_parts.append(bsummary)
+            if IV_PEEK_BEFORE_CATCH and enemy and not run.battle_is_trainer:
+                from knowledge.mon_quality import assess as _assess_iv
+                _qf = _assess_iv(enemy)
+                if _qf is not None:
+                    obs_parts.append(f"Foe IVs (peek enabled): {_qf.summary()}")
             try:
                 from knowledge.battle import xp_share_hint as _xp_hint
                 _xp = _xp_hint(state.party, _act, enemy.level if enemy and enemy.max_hp else 0)

@@ -63,7 +63,8 @@ def annotate_moves(move_names: list[str],
                    wild: bool | None = None,
                    foe_asleep: bool = False,
                    user_level: int = 0,
-                   foe_level: int = 0) -> str:
+                   foe_level: int = 0,
+                   hidden_power: tuple | None = None) -> str:
     """Return a compact summary of each move with slot number, type, damage
     category, PP remaining, and effectiveness vs the opponent.
 
@@ -92,7 +93,10 @@ def annotate_moves(move_names: list[str],
             pp_tag += " WON'T STICK (already statused)"
 
         mtype = MOVE_TYPE.get(name)
-        role = role_tag(name, wild=wild, foe_asleep=foe_asleep, user_level=user_level, foe_level=foe_level)
+        if name == "Hidden Power" and hidden_power:
+            mtype = hidden_power[0]
+        role = role_tag(name, wild=wild, foe_asleep=foe_asleep, user_level=user_level, foe_level=foe_level,
+                        hidden_power=hidden_power)
         role = f" — {role}" if role else ""
         if name in STATUS_MOVES:
             # No damage, so type effectiveness is meaningless (it used to read "Leech Seed ×4 SUPER").
@@ -145,7 +149,8 @@ def battle_summary(move_names: list[str],
                    user_level: int = 0,
                    foe_level: int = 0,
                    foe_hp: int = 0,
-                   user_hp_frac: float = 1.0) -> str:
+                   user_hp_frac: float = 1.0,
+                   hidden_power: tuple | None = None) -> str:
     """Full battle analysis block injected into the obs string during IN_BATTLE.
 
     `attacker_types` (the acting Pokémon's types) enables a STAB bonus when
@@ -167,7 +172,7 @@ def battle_summary(move_names: list[str],
 
     foe_asleep = "asleep" in (opponent_status or "").lower()
     lines.append("Your moves: " + annotate_moves(move_names, opponent_name, pp_list, opp_statused, disabled_slot,
-                                                 disabled_turns, wild, foe_asleep, user_level, foe_level))
+                                                 disabled_turns, wild, foe_asleep, user_level, foe_level, hidden_power))
     if pp_list is not None and move_names and not any(
             n and idx < len(pp_list) and pp_list[idx] > 0 for idx, n in enumerate(move_names)):
         lines.append("No usable move left (all out of PP or Disabled): call use_move('Struggle') — it is "
@@ -207,11 +212,12 @@ def battle_summary(move_names: list[str],
                 continue  # can't use — no PP
             if idx == disabled_slot:
                 continue
-            mt = MOVE_TYPE.get(name)
+            mt = hidden_power[0] if (name == "Hidden Power" and hidden_power) else MOVE_TYPE.get(name)
             if mt:
                 eff = effectiveness_vs(mt, opp_types)
                 score = move_score(name, attacker_types, opp_types, user_level=user_level, foe_level=foe_level,
-                                   foe_asleep=foe_asleep, user_hp_frac=user_hp_frac, foe_hp=foe_hp)
+                                   foe_asleep=foe_asleep, user_hp_frac=user_hp_frac, foe_hp=foe_hp,
+                                   hidden_power=hidden_power)
                 if score > 0 or eff == 0:          # an immune move stays in the list so the all-immune warning fires
                     scored.append((score, eff, name))
         best_move = None

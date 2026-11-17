@@ -79,6 +79,10 @@ MAX_STEPS         = _env_int("MAX_STEPS", 0, minimum=0)
 #   "debug" (+ observations/reasoning). STATUS_EVERY: a one-line status (party, money, balls, tokens) every N ticks.
 LOG_LEVEL         = os.getenv("LOG_LEVEL", "events").strip().lower()
 STATUS_EVERY      = _env_int("STATUS_EVERY", 25, minimum=0)
+# IV_PEEK_BEFORE_CATCH: show a WILD Pokémon's IV quality in the battle observation before the catch. Off by default — a human
+#   player has no IV readout in Gen III, so the model judges a specimen after catching it (inspect_pokemon / the catch
+#   report). Turn on for selective-catching experiments; runs with it on are not comparable to runs with it off.
+IV_PEEK_BEFORE_CATCH = os.getenv("IV_PEEK_BEFORE_CATCH", "false").strip().lower() == "true"
 # USE_VISION: attach the live screenshot (and overhead area maps) to the model.
 # Set false for text-only models, or models whose vision is unstable/blows the
 # context window — the observation string carries the key state either way.

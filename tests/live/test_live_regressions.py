@@ -385,3 +385,36 @@ def test_thunder_stone_evolves_pikachu_and_rare_candy_levels_a_named_target(live
     assert "Raichu" in names and "Pikachu" not in names
     assert live.r.detect_context() == GameContext.OVERWORLD
     assert dict(live.r.read_items_pocket()).get(96, 0) == 0 and dict(live.r.read_items_pocket()).get(68) == 1
+
+
+def test_decoded_ivs_evs_and_nature_reproduce_the_games_own_stats(live):
+    """#208 golden check: base stats + decoded IVs / EVs / nature + the Gen III formula must equal the stats the game
+    stored in each party Pokémon — a mismatch anywhere (bit layout, nature table, formula) fails this."""
+    from knowledge.mon_quality import projected_stats
+    live.load("threemon")
+    checked = 0
+    for p in live.r.read_party():
+        assert len(p.ivs) == 6 and len(p.evs) == 6 and len(p.stats) == 6, p
+        assert all(0 <= v <= 31 for v in p.ivs) and all(0 <= v <= 255 for v in p.evs)
+        assert projected_stats(p.species_id, p.ivs, p.evs, p.personality, p.level) == p.stats, (
+            p.species_name, p.level, p.ivs, p.evs, p.personality % 25, p.stats)
+        checked += 1
+    assert checked >= 3
+
+
+def test_inspect_pokemon_and_the_catch_report_use_the_real_ivs(live):
+    """#208: inspect_pokemon on a party member and a PC mon; a fresh catch reports its quality after the fact."""
+    live.load("threemon")
+    out = live.c._execute("inspect_pokemon", json.dumps({"pokemon": "Bulbasaur"}))
+    assert "Bulbasaur L" in out and "IV" in out and "Stats: HP" in out and "Hidden Power would be" in out, out
+    assert "Compared with your team" in out
+    assert "Can't find" in live.c._execute("inspect_pokemon", json.dumps({"pokemon": "Mew"}))
+    assert live.wild_battle(), "no wild battle found"
+    live.set_foe_hp(1)
+    got = ""
+    for _ in range(6):
+        got = live.c._execute("catch", json.dumps({"nickname": "Judge"}))
+        if "Gotcha" in got:
+            break
+    assert "Gotcha" in got and "Quality: " in got, got
+    assert live.c._execute("pc_boxes", json.dumps({"detail": True})) is not None
