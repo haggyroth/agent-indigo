@@ -367,3 +367,21 @@ def test_swap_with_duplicates_resolves_the_exact_slot(live):
     assert out.startswith("Deposited") and "Withdrew" in out, out
     names = sorted(p.species_name for p in live.r.read_party())
     assert names == ["Bulbasaur", "Pikachu"], names
+
+
+def test_thunder_stone_evolves_pikachu_and_rare_candy_levels_a_named_target(live):
+    """#205: stones and Rare Candy through the real Bag → party screen flow (evolution scene driven with A)."""
+    live.load("threemon")
+    live.give_item(96, 1)                                  # Thunder Stone
+    live.give_item(68, 2)                                  # Rare Candy
+    refused = live.c._execute("use_item", json.dumps({"item": "Rare Candy"}))
+    assert "Say who gets" in refused, refused
+    lv0 = next(p for p in live.r.read_party() if p.species_name == "Caterpie").level
+    out = live.c._execute("use_item", json.dumps({"item": "Rare Candy", "target": "Caterpie"}))
+    assert f"L{lv0}→L{lv0 + 1}" in out, out
+    out = live.c._execute("use_item", json.dumps({"item": "Thunder Stone"}))
+    assert "evolved into Raichu" in out, out
+    names = [p.species_name for p in live.r.read_party()]
+    assert "Raichu" in names and "Pikachu" not in names
+    assert live.r.detect_context() == GameContext.OVERWORLD
+    assert dict(live.r.read_items_pocket()).get(96, 0) == 0 and dict(live.r.read_items_pocket()).get(68) == 1

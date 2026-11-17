@@ -10,6 +10,8 @@ target, and CONFIRM THE OUTCOME (item count dropped / HP rose / status cleared),
 """
 from game.constants import Addr, MOVE_NAMES  # noqa: F401  (MOVE_NAMES reserved for TM/HM use)
 from game.state import GameContext
+from knowledge.bag import CANDY_VITAMINS, STONES
+from knowledge.evolutions import EVO_BY_ITEM
 from knowledge.shopping import ITEM_NAMES
 
 # Which party condition each item addresses (target auto-pick when none is named).
@@ -57,6 +59,9 @@ class FieldItemMixin:
             hurt = [(p.current_hp / max(p.max_hp, 1), i) for i, p in enumerate(party)
                     if 0 < p.current_hp < p.max_hp]
             return min(hurt)[1] if hurt else None
+        if iid in STONES:
+            able = [i for i, p in enumerate(party) if (p.species_id, iid) in EVO_BY_ITEM]
+            return able[0] if able else None
         if iid in _REVIVE:
             dead = [i for i, p in enumerate(party) if p.current_hp == 0]
             return dead[0] if dead else None
@@ -88,6 +93,12 @@ class FieldItemMixin:
             return f"No {ITEM_NAMES.get(iid, item)} in your Items pocket (you have: {have})."
         party = self.reader.read_party()
         slot = None
+        if iid in CANDY_VITAMINS and not target:
+            return (f"Say who gets the {ITEM_NAMES[iid]}: use_item('{ITEM_NAMES[iid]}', target='<species or slot>') — "
+                    "it permanently changes that Pokémon, so choose deliberately.")
+        if iid in STONES and not target and sum((p.species_id, iid) in EVO_BY_ITEM for p in party) > 1:
+            return (f"More than one Pokémon can use the {ITEM_NAMES[iid]} — name one: "
+                    f"use_item('{ITEM_NAMES[iid]}', target='<species or slot>').")
         if iid not in _NO_TARGET:
             slot = self._pick_field_target(iid, party, target)
             if slot is None:
@@ -133,9 +144,14 @@ class FieldItemMixin:
                 self.mgba.tick(40)
                 if dict(self.reader.read_items_pocket()).get(iid, 0) < qty0:
                     break
-        # Advance the result text, then back out to the field.
-        for _ in range(4):
+        # Advance the result text, then back out to the field. A stone starts an EVOLUTION scene (B would cancel it:
+        # drive it with A) and a Rare Candy / vitamin prints level-up and stat boxes (B dismisses them).
+        for _ in range(6 if iid in STONES or iid in CANDY_VITAMINS else 4):
             self.mgba.tick(30)
+            if self._in_evolution_scene():
+                self._finish_evolution()
+                self._settle_evolution()
+                continue
             self.mgba.tap("B")
         self._menus.close_menus()
         qty1 = dict(self.reader.read_items_pocket()).get(iid, 0)
@@ -148,6 +164,16 @@ class FieldItemMixin:
             return f"Used {name} ({qty1} left)."
         p = after[slot] if slot < len(after) else None
         who = (p.species_name if p else "Pokémon") or "Pokémon"
+        if iid in STONES:
+            now = next((q for q in after if q.personality == party[slot].personality), p)
+            if now is not None and now.species_id != party[slot].species_id:
+                return f"Used {name}: {party[slot].species_name} evolved into {now.species_name}! ({qty1} left)"
+            return f"Used {name} on {party[slot].species_name} but it didn't evolve (the evolution may have been cancelled)."
+        if iid in CANDY_VITAMINS:
+            now = next((q for q in after if q.personality == party[slot].personality), p)
+            if now is not None and now.level != party[slot].level:
+                return f"Used {name} on {now.species_name}: L{party[slot].level}→L{now.level} ({qty1} left)."
+            return f"Used {name} on {who} ({qty1} left)."
         hp0, st0 = before[slot]
         if p is not None and p.current_hp != hp0:
             return f"Used {name} on {who}: HP {hp0}->{p.current_hp}/{p.max_hp} ({qty1} left)."

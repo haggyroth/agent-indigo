@@ -17,6 +17,12 @@ ITEM_NAMES: dict[int, str] = {
     14: "Antidote", 18: "Paralyze Heal", 17: "Awakening", 15: "Burn Heal",
     16: "Ice Heal", 23: "Full Heal", 24: "Revive",
     86: "Repel", 83: "Super Repel", 84: "Max Repel", 85: "Escape Rope",
+    # Field/battle items the Bag driver (agent/skills/items.py) can use (not sold in every Mart).
+    63: "HP Up", 64: "Protein", 65: "Iron", 66: "Carbos", 67: "Calcium", 68: "Rare Candy", 70: "Zinc",
+    93: "Sun Stone", 94: "Moon Stone", 95: "Fire Stone", 96: "Thunder Stone", 97: "Water Stone", 98: "Leaf Stone",
+    74: "Dire Hit", 75: "X Attack", 76: "X Defend", 77: "X Speed", 78: "X Accuracy", 79: "X Special",
+    25: "Max Revive", 26: "Fresh Water", 27: "Soda Pop", 28: "Lemonade", 34: "Ether", 35: "Max Ether",
+    36: "Elixir", 37: "Max Elixir", 182: "Exp. Share",
 }
 
 # Mart buy prices (¥), from pokefirered src/data/items.json.

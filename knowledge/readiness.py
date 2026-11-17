@@ -32,7 +32,7 @@ def next_gym_target(gyms_beaten) -> tuple[str, int] | None:
     return nxt["leader"], max(5, GYM_ACE_LEVEL.get(nxt["leader"], 20) - 1)
 
 
-def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=(), dex=None) -> list[Need]:
+def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=(), dex=None, tms=None) -> list[Need]:
     needs: list[Need] = []
     if not party:
         return needs
@@ -76,6 +76,10 @@ def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=
     if tgt and top_level < tgt[1]:
         needs.append(Need("should", "level", f"{tgt[0]}'s gym is next (ace L{GYM_ACE_LEVEL.get(tgt[0], '?')}): "
                                              f"your best is L{top_level} — grind({tgt[1]}) first"))
+    if tms and not blocking(needs):
+        from knowledge.bag import tm_advice
+        for adv in tm_advice(party, tms):
+            needs.append(Need("should", "teach", f"TM upgrade — {adv.text}"))
     if dex and dex[0] < 151 and not blocking(needs) and balls >= 3:
         needs.append(Need("should", "dex", f"Pokédex {dex[0]}/151 caught ({dex[1]} seen) — a SECONDARY goal: also catch "
                                            "species you don't own yet (a full party sends them to the PC box). Beating "

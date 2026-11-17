@@ -5,6 +5,23 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the model knows what is in its Bag (#205)
+- **TM upgrades.** `knowledge/bag.py::tm_advice` scores each owned TM against every compatible party member with the battle
+  ranker's expected-damage function (`move_score`: STAB, accuracy, a +15% bonus for a new damaging type) and only flags clear
+  upgrades (≥ 55 and ≥ 1.3× the move it replaces via `pick_forget`; a free slot needs a new type or ≥ 1.2× the best attack).
+  They appear as `TM upgrade — teach_move('TM13', pokemon='Lapras', forget='Growl') — Ice Beam (~164) replaces Growl` readiness
+  items (a "should", never over a heal). HMs are never advised as upgrades.
+- **Bag digest.** A `BAG — TMs: … | HMs: HM01 Cut (known by Ivysaur), HM03 Surf (NOT taught yet) | Items: Thunder Stone, Rare
+  Candy×2` line shows when the contents change and every 30 ticks, plus `Fire Stone: Growlithe can evolve (→ Arcanine)` notes
+  (`tools/gen_evolutions.py` → `knowledge/evolutions.py`, item-triggered evolutions from the decomp).
+- **`teach_move` preview.** A single-use TM that would make a Pokémon with four moves forget one first returns the plan
+  ("Would teach Ice Beam to Lapras, forgetting Growl … confirm with teach_move(…, forget='Growl')"); naming `forget` or
+  `confirm=true` commits. HMs and free slots are unchanged.
+- **`use_item` for stones, Rare Candy and vitamins.** Evolution stones pick the Pokémon that can use them (or ask when several
+  can) and the evolution scene is played with A (B would cancel it); Rare Candy / HP Up / Protein / Iron / Carbos / Calcium /
+  Zinc require a named `target` and report the level change. Verified live through the real Bag → party screen flow.
+- Not done: `give_item` / held items and berries, X-items in battle, buying TMs (Game Corner / Celadon) — tracked on #215.
+
 ### Fixed — battle outcome and progress accounting (#210)
 - **Real outcomes.** Battles are booked from `gBattleOutcome` (via the event stream's end-of-battle hook, which fires exactly
   once per battle wherever it was fought — including the hundreds inside `grind()` that the old main-loop edge detector never

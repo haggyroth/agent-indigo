@@ -712,8 +712,12 @@ class NavMixin:
             bag = self.reader.read_bag()
             balls = sum(bag.get(b, 0) for b in (1, 2, 3, 4))
             pots = sum(q for iid, q in self.reader.read_items_pocket() if iid in (13, 22, 21))
+            try:
+                tms = self.reader.read_tmhm_pocket()
+            except Exception:
+                tms = None
             return assess(self.reader.read_party(), balls, pots, self.reader.read_money(),
-                          self.ltm.data.get("gyms_beaten", []))
+                          self.ltm.data.get("gyms_beaten", []), tms=tms)
         except Exception:
             return []
 

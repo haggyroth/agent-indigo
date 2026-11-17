@@ -168,7 +168,7 @@ class TMHMMixin:
         self._menus.close_menus()
         return learned, msg
 
-    def _teach_move(self, tm: str, pokemon: str = "", forget: str = "") -> str:
+    def _teach_move(self, tm: str, pokemon: str = "", forget: str = "", confirm: bool = False) -> str:
         iid = resolve_tmhm(tm)
         if iid is None:
             return f"Don't recognise {tm!r}. Use e.g. 'TM09', 'HM01', 'Cut', 'Giga Drain'."
@@ -209,6 +209,15 @@ class TMHMMixin:
                 notes.append(f"{p.species_name} knows 4 moves and none is safe to forget "
                              f"({', '.join(moves)}); pass forget='<move>' to choose one.")
                 continue
+            if not label.startswith("HM") and len(moves) >= 4 and not forget and not confirm:
+                # A TM is single-use and a full moveset means a move is lost: show the plan and let the model
+                # confirm (or choose another move to forget) instead of committing on the default pick.
+                fi = pick_forget(p.move_names, move, MOVE_POWER)
+                if fi is not None:
+                    gone = p.move_names[fi]
+                    return (f"Would teach {move} to {p.species_name}, forgetting {gone} (moves now: {', '.join(moves)}); "
+                            f"{label} is used up. Confirm with teach_move('{label}', pokemon='{p.species_name}', "
+                            f"forget='{gone}') — or name a different move to forget.")
             ok, note = self._teach_once(iid, slot, forget)
             if ok:
                 left = dict(self.reader.read_tmhm_pocket()).get(iid, 0)
