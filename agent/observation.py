@@ -28,6 +28,7 @@ from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
+from knowledge.matchup import Foe, better_matchup, low_hp_advice, roster
 from knowledge.mon_quality import assess as assess_iv, hidden_power
 from knowledge.move_semantics import catch_setup_hint
 from knowledge.navigation import DIRECTION_BUTTON, MAP_NAMES, get_travel_direction, infer_building_type
@@ -46,6 +47,7 @@ if TYPE_CHECKING:                       # annotations only — main.py owns thes
 
 BALL_IDS = (1, 2, 3, 4)
 POTION_IDS = (13, 22, 21, 20, 19)
+HEAL_HP = {13: ("Potion", 20), 22: ("Super Potion", 50), 21: ("Hyper Potion", 200), 20: ("Max Potion", 999), 19: ("Full Restore", 999)}
 BAG_SIG_ITEMS = (63, 64, 65, 66, 67, 68, 70, 93, 94, 95, 96, 97, 98)     # vitamins, candy, stones: the bag-digest signature
 
 
@@ -99,7 +101,12 @@ def _header(t: Tick) -> list[str]:
 
 def _lead_line(t: Tick) -> list[str]:
     lead = t.state.party[0]
-    out = [f"Lead: {lead.species_name or '?'} L{lead.level} HP={lead.current_hp}/{lead.max_hp} ({lead.status})"]
+    word = "Lead"
+    if t.in_battle:       # after a switch party[0] is NOT the one fighting: name the ACTIVE battler (a fainted lead read as "healthy")
+        active = _safe("active", t.reader.read_active_battle_species, 0)
+        lead, word = next((p for p in t.state.party if p.species_id == active), lead), "Active"
+    state = "FAINTED" if lead.current_hp <= 0 else lead.status
+    out = [f"{word}: {lead.species_name or '?'} L{lead.level} HP={lead.current_hp}/{lead.max_hp} ({state})"]
     if not t.in_battle and lead.max_hp and lead.hp_percent < 0.40 and t.overworld:       # proactive heal nudge
         out.append(f"⚠ Lead HP low ({lead.hp_percent:.0%}) — call heal() to restore the party at the nearest Pokémon Center")
     return out
@@ -218,24 +225,32 @@ def _battle(t: Tick) -> list[str]:
     r, run, party, stm = t.reader, t.run, t.state.party, t.stm
     if r.client.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI:
         return _safari_battle(t)
-    lead, out = party[0], []
+    out = []
+    active = r.read_active_battle_species()
+    me = next((p for p in party if p.species_id == active), party[0])      # the ACTIVE battler, not necessarily slot 1
     _ids, a_names, a_pp, d_slot, d_turns = r.read_active_battle_usable_pp()
     if any(a_names):
         move_names, pp_view = list(a_names), a_pp
     else:
-        move_names, pp_view, d_slot, d_turns = list(lead.move_names), lead.pp, None, 0
-    lead_types = POKEMON_TYPES.get((lead.species_name or "").upper().strip(), ())
+        move_names, pp_view, d_slot, d_turns = list(me.move_names), me.pp, None, 0
+    lead_types = POKEMON_TYPES.get((me.species_name or "").upper().strip(), ())     # STAB comes from the mon using the move
     enemy = r.read_enemy_lead()
-    active = r.read_active_battle_species()
     backups = [f"{p.species_name} (slot {i + 1})" for i, p in enumerate(party)
                if p.species_id != active and healthy_enough(p, 0.3) and can_attack(p)]
     hint = ("Teammates that can still attack: " + ", ".join(backups) + " — switch_pokemon to one.") if backups else ""
-    me = next((p for p in party if p.species_id == active), lead)
-    out.append(battle_summary(move_names, run.current_enemy, lead.hp_percent, pp_view, attacker_types=lead_types,
+    out.append(battle_summary(move_names, run.current_enemy, me.hp_percent, pp_view, attacker_types=lead_types,
                               opponent_status=enemy.status if enemy else "", disabled_slot=d_slot, disabled_turns=d_turns,
                               backup_hint=hint, wild=not run.battle_is_trainer, user_level=me.level, user_hp_frac=me.hp_percent,
                               foe_level=(enemy.level or 0) if enemy else 0, foe_hp=enemy.current_hp if enemy else 0,
                               hidden_power=hidden_power(me.ivs)))
+    if enemy and enemy.max_hp:           # who is down, who is up, and who matches up well against THIS foe
+        foe = Foe(name=enemy.species_name or run.current_enemy, level=enemy.level or 0, hp=enemy.current_hp, max_hp=enemy.max_hp,
+                  **_safe("foe_battler", r.read_foe_battler, {}))        # live moves / Spe / Atk / ability sharpen the maths
+        heals = _safe("heals", lambda: [HEAL_HP[i] for i, q in r.read_items_pocket() if q and i in HEAL_HP], [])
+        for line in (roster(party, active, foe=foe), better_matchup(party, active, foe=foe),
+                     low_hp_advice(party, active, foe, heals, wild=not run.battle_is_trainer)):
+            if line:
+                out.append(line)
     boosters = _safe("boosters", lambda: booster_note(r.read_items_pocket(), run.battle_is_trainer), "")
     if boosters:
         out.append(boosters)

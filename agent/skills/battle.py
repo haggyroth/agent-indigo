@@ -881,6 +881,7 @@ class BattleMixin:
         from game.constants import Addr
         from game.state import GameContext
         from game.menu import forced_party_screen
+        from knowledge.matchup import switch_options
         forced = forced_party_screen(self.mgba, self.reader)
         if not forced and self.reader.detect_context() != GameContext.IN_BATTLE:
             return "switch_pokemon is only for battles."
@@ -894,10 +895,11 @@ class BattleMixin:
             return err
         mon = party[slot]
         if mon.current_hp == 0:
-            return f"{mon.species_name} has fainted — pick a Pokémon with HP left."
+            return (f"{mon.species_name} has fainted — it cannot be sent out. "
+                    f"{switch_options(party, self.mgba.read16(Addr.BATTLE_MON0_SPECIES))}")
         active_species = self.mgba.read16(Addr.BATTLE_MON0_SPECIES)
         if mon.species_id == active_species and not forced:
-            return f"{mon.species_name} is already the one battling."
+            return f"{mon.species_name} is already the one battling. {switch_options(party, active_species)}"
         target_species = mon.species_id
         if not forced and not self._open_party_menu():
             return "Couldn't open the party menu — try switch_pokemon again."

@@ -287,6 +287,18 @@ class LeafGreenReader:
         """Current HP of the active player battler (gBattleMons[0].hp @ +0x28)."""
         return self.client.read16(Addr.BATTLE_MON0_SPECIES + 0x28)
 
+    def read_foe_battler(self) -> dict:
+        """The foe's LIVE battler (gBattleMons[1], layout per pokefirered BattlePokemon): its moves (names), computed Atk /
+        Spe / SpA and ability id. Right for a trainer's 2nd+ mon too (gEnemyParty[0] is only their first). {} when empty."""
+        bm = Addr.BATTLE_MON0_SPECIES + 0x58
+        c = self.client
+        if not c.read16(bm):
+            return {}
+        ids = [c.read16(bm + 0x0C + 2 * i) for i in range(4)]
+        return {"moves": tuple(MOVE_NAMES.get(m, "") for m in ids if m),
+                "attack": c.read16(bm + 0x02), "speed": c.read16(bm + 0x06), "sp_attack": c.read16(bm + 0x08),
+                "ability": c.read8(bm + 0x20)}
+
     def read_enemy_lead(self) -> PokemonStatus | None:
         """Decode the opponent's active Pokémon (gEnemyParty[0]) — the wild mon or
         the trainer's current lead. gEnemyParty is a fixed global (not DMA-relocated),

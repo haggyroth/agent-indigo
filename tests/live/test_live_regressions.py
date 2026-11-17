@@ -732,3 +732,17 @@ def test_go_to_route_4_before_brock_stops_with_the_reason_instead_of_looping_at_
     assert live.c.last_trip_stop["reason"] == "gated"
     out = live.c._execute("grind", json.dumps({"level": 13}))
     assert live.r.read_current_map() not in ((3, 21), (3, 22)), out         # grind's relocation must not head for gated grass either
+
+
+def test_foe_battler_read_matches_the_real_wild_mon_and_feeds_the_observation(live):
+    """gBattleMons[1]: real moves / Speed / Attack / ability for the foe, and the roster + low-HP line built from them."""
+    live.load("threemon")
+    assert live.wild_battle()
+    foe = live.r.read_foe_battler()
+    assert foe["moves"] and all(foe["moves"]) and foe["speed"] > 0 and foe["attack"] > 0 and foe["sp_attack"] > 0, foe
+    enemy = live.r.read_enemy_lead()
+    from knowledge.matchup import Foe, roster
+    party = live.r.read_party()
+    line = roster(party, live.r.read_active_battle_species(),
+                  foe=Foe(name=enemy.species_name, level=enemy.level, hp=enemy.current_hp, max_hp=enemy.max_hp, **foe))
+    assert line.startswith(f"Party vs {enemy.species_name.title()}") and "ACTIVE" in line, line
