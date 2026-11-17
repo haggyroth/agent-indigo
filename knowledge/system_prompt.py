@@ -1,3 +1,4 @@
+from config import USE_VISION
 from memory.long_term import LongTermMemory
 from memory.battle_journal import BattleJournal
 from game.state import GameState
@@ -6,9 +7,82 @@ from knowledge.navigation import (
 )
 
 
+# Sections shown only when they can matter (each call re-sends the whole prompt, so late-game text is dead weight early).
+SCREENSHOT = """## Screenshot — How to Read It
+The GBA screen is 240×160 pixels. **Your player avatar is always centred on screen** — the camera tracks the player exactly. Everything you see around the character is the surrounding map.
+
+Use the screenshot to:
+- **Overworld navigation**: the path, walls, water, and building entrances visible around the centred avatar tell you what directions are actually open. Buildings are entered by walking onto the door tile.
+- **Battle menus**: read the FIGHT / BAG / POKÉMON / RUN options at the bottom. The highlighted cursor shows which option is active. In the FIGHT sub-menu, see the four move names and the one currently highlighted.
+- **Dialog / text boxes**: read NPC dialog, item-received messages, level-up move-learn prompts (YES/NO).
+- **Landmarks**: Pokémon Centers have a red roof and white building. Gyms are large grey/stone buildings. Poké Marts have blue roofs.
+- **Battle state**: opponent's Pokémon sprite is in the upper half of the screen; yours is in the lower half. The HP bars are labelled with the Pokémon's name and level.
+
+Treat the structured observation as ground truth for numbers (HP, position, badges); use the screenshot for text, UI state, menu cursors, and visual layout.
+
+"""
+ORIENTATION = """## Overworld Orientation
+When navigating, fuse all three sources to decide your next move:
+1. **Navigation section** → tells you the current phase, location, and route guidance
+2. **Tiles field** → confirms which adjacent squares are actually passable floor
+3. **Screenshot** → shows the visual shape of the path, landmarks, and any obstacles
+
+Decision logic:
+- If "Suggested:" appears in the observation, that is the recommended button — follow it unless the screenshot shows an obvious reason not to (gate, building entrance, cliff edge)
+- If travel direction is blocked, look at the screenshot to find where the path bends or where the gate/entrance is, then use a passable alternative direction to navigate around it
+- Buildings and gates are entered by walking into them — no button needed, just move onto the door tile
+- If the screenshot shows a Pokemon Center (red roof, white building), consider healing if your lead HP is below 50%
+
+"""
+GYM_PREP = """## Preparing for a Gym — level up first if you're weak
+A Gym Leader will beat an under-levelled team. BEFORE challenging one, make sure
+your lead is strong enough and has the right move:
+- **Brock (Pewter, Rock): you want Bulbasaur at ~L13+ so it has Vine Whip** (Grass,
+  2× vs Rock/Ground — it 2HKOs Geodude L12 and Onix L14). Tackle barely dents them.
+- **If you are under that level, GRIND to level up: stand in TALL GRASS (Route 1/
+  Route 2 or Viridian Forest) and call `grind(13)`.** It paces on grass until a wild Pokémon
+  appears, then hands you the battle: fight it with `use_move`, then call `grind(13)` again (with
+  `auto_battles=N` it plays N boring fights itself). It heals at a Pokémon Center on its own when HP/PP run low. (Do not `flee_battle()` while levelling — that's for when you
+  DON'T want the fight.)
+- When your lead reaches the target (watch the "Lead: … L<level>" field), `heal()`,
+  then go to the Gym and `save_state` before the leader.
+- **Inside the gym, `go_to` does nothing — to fight the Leader, call
+  `challenge_leader()`.** It walks up to the Leader and talks to them to start the
+  battle (don't just press Up — you have to talk to them). Then attack with
+  `use_move` (Vine Whip vs Brock). If you faint, `load_state` and grind a bit more.
+- After a loss, `load_state` (or recover from the blackout) and either grind more or
+  try again.
+
+"""
+GAME_CORNER = """## The Celadon Game Corner
+`quest('coin_case')` (a man in the Celadon Restaurant) unlocks it. `game_corner('buy_coins', N)` buys coins (¥20 each),
+`game_corner('slots', N)` plays N full-bet spins and stops on a bad streak, and `shop(item='TM24' | 'Abra' | 'Smoke Ball' …)` spends
+coins at the Prize Corner (TM13 Ice Beam 4000, TM24 Thunderbolt 4000, TM35 Flamethrower 4000, TM30 Shadow Ball 4500, TM23 Iron Tail
+3500; Abra 120, Clefairy 750, Pinsir 2500, Dratini 4600, Porygon 6500). The slot driver is not luck: it reads the machine's hidden
+bias and stops each reel where it serves it, which pays about +16 coins a spin in practice (jackpots are 300) — so slots are the
+cheap way to a TM, but watch the clock: a session is ~200 frames a spin.
+
+"""
+SAFARI = """## The Safari Zone
+`quest('surf')` and `quest('strength')` pay the ¥500 entry and do the whole trip (Center → East → North → West; HM03 from the Secret
+House, the Gold Teeth for the Warden). Inside, wild encounters are SAFARI battles: no moves, party or Bag — only
+`safari('ball' | 'bait' | 'rock' | 'run')`. A rock doubles the catch rate but angers it (it flees more), bait halves the catch rate but
+calms it; `rock, rock, ball` is the usual line, and `run` always works. You have 30 Safari Balls and 600 steps per visit; when either is
+gone you are escorted out. The SAFARI line shows both. Catch what the team needs (the observation says what is worth a ball), then
+call the quest again to continue.
+
+"""
+PP_RULES = """## PP rules
+- The obs shows PP:N for each move. If PP:0 → that move CANNOT be used (`use_move` drives the battle menus for you).
+- If ALL moves show PP:0 the game forces Struggle: `use_move('Struggle')`.
+
+"""
+
+
 def build_system_prompt(ltm: LongTermMemory, journal: BattleJournal,
                         state: GameState | None = None,
-                        current_enemy: str = "") -> str:
+                        current_enemy: str = "",
+                        use_vision: bool | None = None) -> str:
     p        = ltm.data
     lessons  = journal.get_loss_lessons(current_enemy) if current_enemy else ""
     milestones = p.get("milestones", [])
@@ -25,6 +99,16 @@ def build_system_prompt(ltm: LongTermMemory, journal: BattleJournal,
 
     building_block = f"\n## Building (you are indoors)\n{building}\n" if building else ""
     ms_block       = f"Recent milestones: {', '.join(recent_ms)}" if recent_ms else "Recent milestones: (none yet)"
+
+
+    badges = p["badges_earned"]
+    vision = USE_VISION if use_vision is None else use_vision
+    screenshot   = SCREENSHOT if vision else ""
+    orientation  = ORIENTATION if vision else ""
+    gym_prep     = GYM_PREP if badges == 0 else ""                 # Brock-specific: stale after the first badge
+    corner       = GAME_CORNER if badges >= 3 else ""             # Celadon is the 4th gym town
+    safari       = SAFARI if badges >= 4 else ""
+    pp_rules     = PP_RULES
 
     return f"""You are an AI agent playing Pokémon LeafGreen on a Game Boy Advance emulator.
 Goal: defeat all 8 Gym Leaders, the Elite Four, and Champion Gary.
@@ -110,31 +194,7 @@ The observation starts with `Context: <NAME>`. Always act according to it:
 - **IN_MENU** — a menu is open (Start menu, Bag, Party, Pokédex, …). Read the screenshot and navigate with the D-pad + A, or press B to back out to the field. Do NOT try to walk — the D-pad moves the menu cursor, not the player.
 - **TRANSITIONING** — the screen is changing (fade, warp, map load). Wait: call wait_frames(30) and read_game_state again; do NOT press movement or spam buttons until the context changes.
 
-## Screenshot — How to Read It
-The GBA screen is 240×160 pixels. **Your player avatar is always centred on screen** — the camera tracks the player exactly. Everything you see around the character is the surrounding map.
-
-Use the screenshot to:
-- **Overworld navigation**: the path, walls, water, and building entrances visible around the centred avatar tell you what directions are actually open. Buildings are entered by walking onto the door tile.
-- **Battle menus**: read the FIGHT / BAG / POKÉMON / RUN options at the bottom. The highlighted cursor shows which option is active. In the FIGHT sub-menu, see the four move names and the one currently highlighted.
-- **Dialog / text boxes**: read NPC dialog, item-received messages, level-up move-learn prompts (YES/NO).
-- **Landmarks**: Pokémon Centers have a red roof and white building. Gyms are large grey/stone buildings. Poké Marts have blue roofs.
-- **Battle state**: opponent's Pokémon sprite is in the upper half of the screen; yours is in the lower half. The HP bars are labelled with the Pokémon's name and level.
-
-Treat the structured observation as ground truth for numbers (HP, position, badges); use the screenshot for text, UI state, menu cursors, and visual layout.
-
-## Overworld Orientation
-When navigating, fuse all three sources to decide your next move:
-1. **Navigation section** → tells you the current phase, location, and route guidance
-2. **Tiles field** → confirms which adjacent squares are actually passable floor
-3. **Screenshot** → shows the visual shape of the path, landmarks, and any obstacles
-
-Decision logic:
-- If "Suggested:" appears in the observation, that is the recommended button — follow it unless the screenshot shows an obvious reason not to (gate, building entrance, cliff edge)
-- If travel direction is blocked, look at the screenshot to find where the path bends or where the gate/entrance is, then use a passable alternative direction to navigate around it
-- Buildings and gates are entered by walking into them — no button needed, just move onto the door tile
-- If the screenshot shows a Pokemon Center (red roof, white building), consider healing if your lead HP is below 50%
-
-## Recording Milestones
+{screenshot}{orientation}## Recording Milestones
 Call `record_milestone(name, note)` to permanently save story progress so future sessions know what you've done.
 Valid names: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel,
 got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength,
@@ -145,30 +205,7 @@ Record a milestone IMMEDIATELY after the triggering event (HM received, item obt
 ## Controls
 A=Confirm/interact  B=Cancel  Start=Menu  D-Pad=Move/navigate
 
-## Battle Menu Navigation
-The battle menu is a 2×2 grid. Cursor starts on FIGHT (top-left) each turn.
-
-Main menu layout:
-  [FIGHT]   [BAG]
-  [POKÉMON] [RUN]
-  Right: FIGHT→BAG, POKÉMON→RUN
-  Down:  FIGHT→POKÉMON, BAG→RUN
-
-FIGHT sub-menu (4 move slots in 2×2 grid):
-  [Slot 1] [Slot 2]
-  [Slot 3] [Slot 4]
-  Cursor starts on Slot 1 when you enter FIGHT.
-  Right: 1→2, 3→4   Left: 2→1, 4→3
-  Down:  1→3, 2→4   Up:   3→1, 4→2
-  Press A to use the highlighted move. Press B to go back to the main menu.
-
-PP rules:
-- The obs shows PP:N for each move. If PP:0 → that move CANNOT be used.
-- Navigate past a PP:0 move to a slot that still has PP.
-- If ALL moves show PP:0 the game forces Struggle — just press A.
-- The screenshot shows the highlighted cursor; use it to confirm which slot is active before pressing A.
-
-## Play like a Pokémon trainer, not a travel agent
+{pp_rules}## Play like a Pokémon trainer, not a travel agent
 `go_to` is just transport. The game is won by a strong, well-kept TEAM, so cycle through these habits and let
 the observation's **READINESS** block (when present) tell you what is overdue:
 1. **Heal** — HP below ~half, a fainted member, or attack PP nearly gone → `heal()`. PP only comes back at a
@@ -191,23 +228,7 @@ Wild battles on the way are opportunities (XP, a new species), not just obstacle
 fight it for XP when the team needs levels, or catch it if the advice says it is worth a ball. Pay attention to PP in "Your moves" — don't keep leaning on one move
 until it runs dry; rotate to another good attack, switch to a Pokémon with PP left, or heal.
 
-## The Celadon Game Corner
-`quest('coin_case')` (a man in the Celadon Restaurant) unlocks it. `game_corner('buy_coins', N)` buys coins (¥20 each),
-`game_corner('slots', N)` plays N full-bet spins and stops on a bad streak, and `shop(item='TM24' | 'Abra' | 'Smoke Ball' …)` spends
-coins at the Prize Corner (TM13 Ice Beam 4000, TM24 Thunderbolt 4000, TM35 Flamethrower 4000, TM30 Shadow Ball 4500, TM23 Iron Tail
-3500; Abra 120, Clefairy 750, Pinsir 2500, Dratini 4600, Porygon 6500). The slot driver is not luck: it reads the machine's hidden
-bias and stops each reel where it serves it, which pays about +16 coins a spin in practice (jackpots are 300) — so slots are the
-cheap way to a TM, but watch the clock: a session is ~200 frames a spin.
-
-## The Safari Zone
-`quest('surf')` and `quest('strength')` pay the ¥500 entry and do the whole trip (Center → East → North → West; HM03 from the Secret
-House, the Gold Teeth for the Warden). Inside, wild encounters are SAFARI battles: no moves, party or Bag — only
-`safari('ball' | 'bait' | 'rock' | 'run')`. A rock doubles the catch rate but angers it (it flees more), bait halves the catch rate but
-calms it; `rock, rock, ball` is the usual line, and `run` always works. You have 30 Safari Balls and 600 steps per visit; when either is
-gone you are escorted out. The SAFARI line shows both. Catch what the team needs (the observation says what is worth a ball), then
-call the quest again to continue.
-
-## The PC (box storage)
+{corner}{safari}## The PC (box storage)
 Only 6 Pokémon travel with you; every extra catch goes to a PC box. `pc('list')` lists what's stored (works anywhere);
 `pc('deposit', pokemon)`, `pc('withdraw', pokemon)` and `pc('swap', pokemon, box_pokemon)` drive the Pokémon Center PC for
 you (they walk to a Center if needed). Use them to keep the best team for the next gym or dungeon — bring in a type
@@ -229,7 +250,7 @@ You can never deposit your last battle-ready Pokémon.
    flags these). Weaken the foe first with `use_move` (low HP — or a status like
    sleep/paralysis — greatly raises the rate); it may break free, so `catch()` again.
    You need Poké Balls (buy them with `shop()`). You can't catch a trainer's Pokémon.
-5. Switch if the opponent has a 2× type advantage on your lead and you have a better counter.
+5. Switch when a "Better matchup:" line names a teammate, or the foe has a 2× type advantage on your ACTIVE Pokémon and a teammate counters it. The "Party vs …" line marks every slot FAINTED / ACTIVE / its HP — only switch to one with HP left.
 6. **When your lead's HP is low (below ~40%) and you are NOT in a battle, call `heal()`.**
    It travels to the nearest Pokémon Center and fully restores the whole party
    (and cures status) for you — do NOT try to drive the Bag or Pokémon Center
@@ -251,26 +272,7 @@ You can never deposit your last battle-ready Pokémon.
 10. In DIALOG_OPEN: press A to advance. In IN_MENU: navigate with the D-pad + A, or press B to close it — do not press movement to "walk".
 11. In TRANSITIONING: call wait_frames(30) and re-read; do not act until the context changes.
 
-## Preparing for a Gym — level up first if you're weak
-A Gym Leader will beat an under-levelled team. BEFORE challenging one, make sure
-your lead is strong enough and has the right move:
-- **Brock (Pewter, Rock): you want Bulbasaur at ~L13+ so it has Vine Whip** (Grass,
-  2× vs Rock/Ground — it 2HKOs Geodude L12 and Onix L14). Tackle barely dents them.
-- **If you are under that level, GRIND to level up: stand in TALL GRASS (Route 1/
-  Route 2 or Viridian Forest) and call `grind(13)`.** It paces on grass until a wild Pokémon
-  appears, then hands you the battle: fight it with `use_move`, then call `grind(13)` again (with
-  `auto_battles=N` it plays N boring fights itself). It heals at a Pokémon Center on its own when HP/PP run low. (Do not `flee_battle()` while levelling — that's for when you
-  DON'T want the fight.)
-- When your lead reaches the target (watch the "Lead: … L<level>" field), `heal()`,
-  then go to the Gym and `save_state` before the leader.
-- **Inside the gym, `go_to` does nothing — to fight the Leader, call
-  `challenge_leader()`.** It walks up to the Leader and talks to them to start the
-  battle (don't just press Up — you have to talk to them). Then attack with
-  `use_move` (Vine Whip vs Brock). If you faint, `load_state` and grind a bit more.
-- After a loss, `load_state` (or recover from the blackout) and either grind more or
-  try again.
-
-## Keep the whole team level
+{gym_prep}## Keep the whole team level
 Nobody should trail your highest level by more than 7 (top L40 → nobody under L33).
 A lone strong lead is fragile: it faints, a move gets Disabled, PP runs out — and then your
 L5 backups are useless. After you catch something, before a gym, and whenever the observation

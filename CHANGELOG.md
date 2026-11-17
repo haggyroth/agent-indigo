@@ -5,6 +5,22 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — the model sent out fainted Pokémon and misread type matchups (watched run 20261117-141900)
+- **The battle observation named the wrong Pokémon.** `Lead:` was always party slot 1, so after a switch a fainted Ivysaur showed as
+  `HP=0/50 (healthy)` while Kakuna fought, and the model tried to switch it back in six times. In battle it now reads `Active: …` (the mon
+  actually fighting, `FAINTED` when it is down). The same slot-1 mistake fed the wrong *types* into STAB (Kakuna's Poison Sting was scored with
+  Ivysaur's Grass/Poison) and the wrong HP into the low-HP warning; both now use the active battler.
+- **Party-vs-foe line in every battle** (`knowledge/matchup.py`): every slot as `FAINTED` / `ACTIVE` / HP, and for each living teammate its best
+  move's multiplier against this foe and how hard the foe's own types hit it. A `Better matchup: switch_pokemon('X') — …` line appears only when
+  the active mon is badly placed (its best attack resisted/immune, or the foe's STAB is super effective on it) and a healthy teammate clearly
+  beats it (no needless free hit).
+- **`switch_pokemon` refusals list the options** ("Can switch to: 4:Sky High(Pidgey) (7/22)") instead of a bare "has fainted".
+
+### Changed — system-prompt token trim (~1.4k tokens per call early, more with vision off)
+- Sections are shown only when they can matter: Game Corner from 3 badges, Safari Zone from 4, the Brock gym-prep section at 0 badges only,
+  and the Screenshot / Overworld-orientation sections only with `USE_VISION=true`. The raw battle-menu grid (which `use_move` drives) became
+  a two-line PP rule. Decision priority #5 now points at the new `Party vs …` / `Better matchup:` lines.
+
 ### Fixed — four things a watched grind run showed (run 20261117-133255)
 - **grind no longer plans around closed roads.** Relocation picked Route 4, 24 and 25 (all behind Brock's gate), stopped "gated" 18 times,
   spent its three attempts and then claimed there was no grass anywhere. Gated candidates are now skipped up front without using an attempt
