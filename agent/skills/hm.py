@@ -17,6 +17,7 @@ _HMS = {
     "rock smash": (249, "Rock Smash"), "rocksmash": (249, "Rock Smash"), "smash": (249, "Rock Smash"),
     "strength": (70, "Strength"),
     "flash": (148, "Flash"), "fly": (19, "Fly"),
+    "dig": (91, "Dig"), "teleport": (100, "Teleport"),
 }
 # Moves that appear in the party sub-menu, in the game's own order (party_menu.h sFieldMoves).
 _FIELD_MOVE_IDS = (148, 15, 19, 70, 57, 249, 127, 100, 91, 208, 135, 230)
@@ -55,11 +56,16 @@ class HMMixin:
     def _use_hm(self, name: str) -> str:
         key = str(name).strip().lower()
         if key not in _HMS:
-            return (f"'{name}' isn't supported. Field HMs here: Surf, Cut, Rock Smash, Strength "
-                    f"(Flash/Fly use the party menu and aren't automated yet).")
+            return (f"'{name}' isn't supported. Field moves here: Surf, Cut, Rock Smash, Strength, Flash, Dig, Teleport "
+                    f"(Fly is fly_to).")
         move_id, label = _HMS[key]
         if self.reader.detect_context() != GameContext.OVERWORLD:
             return "Only usable while walking around the overworld."
+        if label in ("Dig", "Teleport"):
+            from knowledge.escape import why_not
+            blocked = why_not(label, self.reader.read_current_map())
+            if blocked:
+                return blocked
         if not self._party_knows(move_id):
             return (f"No Pokémon in your party knows {label}. Teach it with teach_move("
                     f"'{label}') (needs the HM item and the TM Case).")
@@ -67,6 +73,8 @@ class HMMixin:
             return self._flash()
         if label == "Fly":
             return "Use fly_to('<town>') — Fly needs a destination."
+        if label in ("Dig", "Teleport"):
+            return self._leave_by_move(label, move_id)
         return self._surf() if label == "Surf" else self._use_on_object(label)
 
     # ── party sub-menu field moves (Flash, Fly) ─────────────────────────────
@@ -134,6 +142,28 @@ class HMMixin:
         if lit:
             return "Used Flash — the cave is lit up."
         return "Flash had no effect here (it only works in a dark cave like Rock Tunnel)."
+
+    def _leave_by_move(self, label: str, move_id: int) -> str:
+        """Dig / Teleport: party sub-menu entry -> 'Escape from here and return to X?' (YES) -> the warp. Confirmed by the map
+        changing; on failure the menus are closed so the model is back on the field."""
+        from knowledge.navigation import MAP_NAMES
+        start = self.reader.read_current_map()
+        err = self._party_field_move(move_id)
+        if err:
+            return err
+        if not self._answer_field_yes():
+            self._menus.close_menus()
+            return f"{label} didn't ask for confirmation — it can't be used here."
+        for _ in range(40):
+            self.mgba.tick(30)
+            self._advance_to_control(tries=2)
+            if self.reader.read_current_map() != start and self.reader.detect_context() == GameContext.OVERWORLD:
+                break
+        now = self.reader.read_current_map()
+        if now == start:
+            self._menus.close_menus()
+            return f"{label} had no effect (still on the same map)."
+        return f"Used {label}: now in {MAP_NAMES.get(tuple(now), now)}."
 
     def _fly_to(self, town: str) -> str:
         key = str(town).strip().lower()

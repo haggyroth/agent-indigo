@@ -11,6 +11,7 @@ target, and CONFIRM THE OUTCOME (item count dropped / HP rose / status cleared),
 from game.constants import Addr, MOVE_NAMES  # noqa: F401  (MOVE_NAMES reserved for TM/HM use)
 from game.state import GameContext
 from knowledge.bag import CANDY_VITAMINS, STONES
+from knowledge.escape import ROPE_ID, why_not
 from knowledge.evolutions import EVO_BY_ITEM
 from knowledge.shopping import ITEM_NAMES
 
@@ -91,6 +92,10 @@ class FieldItemMixin:
         if iid not in order:
             have = ", ".join(ITEM_NAMES.get(i, f"#{i}") for i in order) or "nothing"
             return f"No {ITEM_NAMES.get(iid, item)} in your Items pocket (you have: {have})."
+        if iid == ROPE_ID:
+            blocked = why_not("Escape Rope", self.reader.read_current_map())
+            if blocked:
+                return blocked
         party = self.reader.read_party()
         slot = None
         if iid in CANDY_VITAMINS and not target:
@@ -160,6 +165,11 @@ class FieldItemMixin:
         if qty1 >= qty0:
             return (f"{name} had no effect (nothing consumed) — e.g. HP already full or the "
                     f"wrong target. Check read_game_state.")
+        if iid == ROPE_ID:
+            from knowledge.navigation import MAP_NAMES
+            self._advance_to_control(tries=20)
+            now = self.reader.read_current_map()
+            return f"Used {name} ({qty1} left): now in {MAP_NAMES.get(tuple(now), now)}."
         if slot is None:
             return f"Used {name} ({qty1} left)."
         p = after[slot] if slot < len(after) else None

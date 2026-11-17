@@ -226,7 +226,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `get_cut` | overworld | auto_trainers? | Get HM01 Cut from the S.S.  Anne's Captain and teach it (needs the SS Ticket first). |
 | `teach_move` | overworld | tm, pokemon?, forget?, confirm? | Teach a TM/HM to a party Pokémon via the TM Case. |
 | `fly_to` | overworld | town | Fly to a visited town (needs a Pokémon that knows Fly + the Thunder Badge, outdoors): Pallet, Viridian, Pewter, Cerulean, Lavender, Vermilion, Celadon, Fuchsia, Cinnabar, Saffron, Indigo Plateau. |
-| `use_hm` | overworld | move | Use a field HM: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut (nearest tree), Rock Smash, Strength (then walk into the boulder). |
+| `use_hm` | overworld | move | Use a field move: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut (nearest tree), Rock Smash, Strength (then walk into the boulder), Flash (lights a cave). |
 | `open_menu` | overworld | menu | Open a Start-menu entry and land on its screen: Pokemon, Bag, Pokedex, Player, Save, Option or Exit. |
 | `answer_prompt` | battle + overworld | answer | Answer an open YES/NO box (e.g.  'Would you like to save?', shop or NPC questions). |
 | `advance_dialog` | battle + overworld | — | Press A through NPC/sign/system dialogue until it finishes or a choice (Yes/No / menu) needs your decision. |
