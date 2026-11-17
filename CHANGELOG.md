@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — forced-switch dead end (unwatched Gemma run, 200 steps)
+- After the active Pokémon fainted the game's forced "Choose a POKéMON" screen reads as TRANSITIONING, and the observation said
+  "dialog/transition not advancing — press A". Pressing A on the fainted lead only shows "has no energy left to battle!", so the
+  run spent its last 319 tool calls (40% of the run) pressing A / waiting. Now the observation says `FORCED SWITCH … call
+  switch_pokemon(...)` (with the party-vs-foe roster), `press_button` / `advance_dialog` on that screen point at `switch_pokemon`
+  instead of pressing, and `switch_pokemon` first dismisses the "no energy" message (it blocked the cursor and made the switch fail).
+
 ### Added — sharper battle advice (watched-run follow-up)
 - `Foe` read from the live battler (`gBattleMons[1]`: real moves, Speed, Atk/SpA, ability) via `read_foe_battler()`.
 - The `Party vs …` roster now uses the foe's KNOWN moves (not just its types), shows who outspeeds whom, and flags
