@@ -221,7 +221,7 @@ class BattleMixin:
         if MOVE_POWER.get(move_label, 0) > 0:
             self._status_streak = (None, 0)
             return ""
-        last, n = getattr(self, "_status_streak", (None, 0))
+        last, n = self._status_streak
         n = n + 1 if last == move_label else 1
         self._status_streak = (move_label, n)
         if n >= 2:
@@ -495,7 +495,7 @@ class BattleMixin:
             species = (foe.species_name or "") if foe else ""
             taken = [p.nickname for p in self.reader.read_party()]
             why = critique(nickname, species, taken)
-            asked = getattr(self, "_nick_refused", None)
+            asked = self._nick_refused
             if why and asked != species:
                 self._nick_refused = species
                 return (f"No ball thrown — {why}. Pick a more inventive nickname for this {species or 'Pokémon'} "
@@ -578,7 +578,7 @@ class BattleMixin:
                 extra += f" {quality}"
             try:
                 from agent import events
-                foe0 = events.current_foe() or (getattr(self, "_current_opponent", "") or "").title() or "Pokémon"
+                foe0 = events.current_foe() or (self._current_opponent or "").title() or "Pokémon"
                 events.emit("catch", f"CAUGHT {foe0}" + (f" — {named.strip(' .')}" if named else "")
                             + (" (party full → PC box)" if party_before >= 6 else "")
                             + (f" · {quality.split(' — ')[0].replace('Quality: ', '')}" if quality else ""), species=foe0)

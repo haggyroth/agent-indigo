@@ -6,7 +6,7 @@ class MenuMixin:
 
     @property
     def _menus(self) -> MenuDriver:
-        d = getattr(self, "_menu_driver", None)
+        d = self._menu_driver
         if d is None:
             d = self._menu_driver = MenuDriver(self.mgba, self.reader)
         return d

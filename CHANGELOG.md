@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — the skills' shared state is declared in one place (#214, part 3)
+- `agent/skills/state.py::SkillState` lists every field the skills keep between tool calls (trip and stall bookkeeping, the grind
+  session, the benched ace, move-learn baselines, warning-once flags, the Vermilion cans…), each with its owner skill, meaning and
+  default. `AgentClient` inherits it. The two per-instance dicts (`_trainer_losses`, `_edge_fail`) use a small `lazy` descriptor.
+- The implicit patterns are gone: no more `getattr(self, "_trip", None)` fallbacks or `self.__dict__.setdefault(...)`; a skill reads
+  a plain attribute. Class-level declarations scattered through `nav`, `overworld` and `movelearn` moved here.
+- Guard tests (`tests/test_skill_state.py`): no `self.__dict__` / getattr-fallback on declared state, and any attribute a skill
+  assigns on `self` outside `__init__` must be declared in `SkillState` — a new hidden field fails CI instead of becoming a bug.
+
 ### Changed — the observation builder leaves `main.py` (#214, part 2)
 - `agent/observation.py` replaces the 370-line `build_observation` that lived inline in `main.py` (1,199 → 819 lines). It is now a
   composition of named sections — header, lead, readiness + bag digest, shortcuts (Escape Rope / Dig / Teleport, Repel), trip,
