@@ -335,3 +335,35 @@ def test_go_to_hands_a_worthwhile_wild_pokemon_to_the_model_instead_of_fleeing(l
     stop = live.c._handle_travel_battle("somewhere", mode="yield")
     assert stop and "appeared at" in stop and live.c._ball_count() == balls
     assert live.r.detect_context() == GameContext.IN_BATTLE
+
+
+def _copy_boxmon(live, src, dst):
+    base = live.r._storage_ptr() + 4
+    for i in range(80):
+        live.m.write8(base + dst * 80 + i, live.m.read8(base + src * 80 + i))
+
+
+def test_deposit_into_a_full_box_goes_to_the_next_box(live):
+    """#206: the displayed box is full (30/30) — the old code pressed A three times and the game refused."""
+    live.load("threemon")
+    assert _pc(live, "pc_deposit", pokemon="Pikachu").startswith("Deposited")
+    for slot in range(1, 30):                              # fill box 1 with copies of that Pokémon
+        _copy_boxmon(live, 0, slot)
+    assert len(live.r.read_boxes()) == 30
+    out = _pc(live, "pc_deposit", pokemon="Caterpie")
+    assert out.startswith("Deposited") and "Box 2" in out and "earlier boxes are full" in out, out
+    assert [m["species_name"] for m in live.r.read_boxes() if m["box"] == 1] == ["Caterpie"]
+    assert len(live.r.read_party()) == 1
+
+
+def test_swap_with_duplicates_resolves_the_exact_slot(live):
+    """#206: a name matching several boxed Pokémon is listed, never guessed; box:slot swaps the right one."""
+    live.load("threemon")
+    assert _pc(live, "pc_deposit", pokemon="Pikachu").startswith("Deposited")
+    _copy_boxmon(live, 0, 30 + 14)                         # a second Pikachu in box 2, slot 14
+    amb = _pc(live, "pc_swap", party_pokemon="Caterpie", box_pokemon="pikachu")
+    assert "2 Pokémon match" in amb and "Nothing was deposited" in amb and len(live.r.read_party()) == 2
+    out = _pc(live, "pc_swap", party_pokemon="Caterpie", box_pokemon="2:14")
+    assert out.startswith("Deposited") and "Withdrew" in out, out
+    names = sorted(p.species_name for p in live.r.read_party())
+    assert names == ["Bulbasaur", "Pikachu"], names

@@ -363,13 +363,14 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             case "get_ss_ticket":
                 return self._get_ss_ticket(bool(args.get("auto_trainers", False)))
             case "pc_boxes":
-                return self._pc_boxes()
+                return self._pc_boxes(bool(args.get("detail", False)))
             case "pc_deposit":
-                return self._pc_deposit(str(args["pokemon"]))
+                return self._pc_deposit(str(args["pokemon"]), bool(args.get("force", False)))
             case "pc_withdraw":
                 return self._pc_withdraw(str(args["pokemon"]))
             case "pc_swap":
-                return self._pc_swap(str(args["party_pokemon"]), str(args["box_pokemon"]))
+                return self._pc_swap(str(args["party_pokemon"]), str(args["box_pokemon"]),
+                                     bool(args.get("force", False)))
             case "reorder_party":
                 return self._reorder_party(str(args["first"]), str(args["second"]))
             case "set_lead":

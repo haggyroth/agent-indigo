@@ -443,8 +443,11 @@ class LeafGreenReader:
         if not base or not (0 <= box < self.BOX_COUNT and 0 <= slot < self.BOX_SLOTS):
             return None
         addr = base + 4 + (box * self.BOX_SLOTS + slot) * self.BOXMON_SIZE      # u8 currentBox, 3 pad bytes (u32 alignment)
-        raw = bytes(self.client.read_range(addr, self.BOXMON_SIZE)) + bytes(20)
-        if not any(raw[:80]):
+        return self._decode_box_mon(bytes(self.client.read_range(addr, self.BOXMON_SIZE)), box, slot)
+
+    def _decode_box_mon(self, raw80: bytes, box: int, slot: int) -> dict | None:
+        raw = raw80 + bytes(20)
+        if len(raw80) < self.BOXMON_SIZE or not any(raw[:80]):
             return None
         try:
             sub = decrypt_substructs(raw)
@@ -466,11 +469,16 @@ class LeafGreenReader:
                 "move_names": [MOVE_NAMES.get(m, "") for m in ids if m]}
 
     def read_boxes(self) -> list[dict]:
-        """Every occupied PC slot, box by box."""
+        """Every occupied PC slot, box by box (one memory read per box)."""
+        base = self._storage_ptr()
+        if not base:
+            return []
         out = []
+        size = self.BOX_SLOTS * self.BOXMON_SIZE
         for b in range(self.BOX_COUNT):
+            blob = bytes(self.client.read_range(base + 4 + b * size, size))
             for sl in range(self.BOX_SLOTS):
-                mon = self.read_box_mon(b, sl)
+                mon = self._decode_box_mon(blob[sl * self.BOXMON_SIZE:(sl + 1) * self.BOXMON_SIZE], b, sl)
                 if mon:
                     out.append(mon)
         return out

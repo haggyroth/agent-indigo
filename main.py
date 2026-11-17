@@ -637,6 +637,15 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 obs_parts.append(
                     "MART — " + rec + ". Call shop() to buy the recommended "
                     "restock automatically.")
+        # In a Pokémon Center the PC is right here: say what is in the boxes so the model remembers it exists.
+        if MAP_KIND.get((state.map_bank, state.map_id)) == "pokecenter":
+            try:
+                stored = len(reader.read_boxes())
+            except Exception:
+                stored = 0
+            if stored:
+                obs_parts.append(f"PC: {stored} Pokémon stored in the boxes — pc_boxes(detail=true) to look, "
+                                 "pc_swap / pc_withdraw to bring one into the party.")
     # Inside a gym: point the agent at the Leader — UNLESS this Leader is
     # already beaten, in which case say so and tell it to leave (the agent
     # looped in/out of Pewter Gym re-challenging Brock). go_to is useless
