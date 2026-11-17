@@ -1,5 +1,6 @@
 # Pure game data for Pokemon LeafGreen (FireRed/LeafGreen US v1.0).
-# No I/O. Zero imports. All data sourced from CLAUDE.md.
+# No I/O. Zero imports. Hand-written from the pret/pokefirered decomp (verified by tests/test_game_data.py when the
+# decomp is checked out at ~/Projects/pokefirered); the generated tables (species_data, move_data, …) are in their own files.
 
 # ── Gym-leader approach tiles ─────────────────────────────────────────────────
 # Inside a gym, go_to is useless (you're already there) — the agent has to WALK
@@ -103,17 +104,19 @@ GYMS: list[dict] = [
 # ── Elite Four ────────────────────────────────────────────────────────────────
 
 ELITE_FOUR: list[dict] = [
-    {"trainer": "Lorelei", "type": "Ice", "key_threat": "Lapras L60",
+    {"trainer": "Lorelei", "type": "Ice", "key_threat": "Lapras L54",
      "counter": "Electric, Rock, Fighting"},
-    {"trainer": "Bruno",   "type": "Fighting", "key_threat": "Machamp L58",
+    {"trainer": "Bruno",   "type": "Fighting", "key_threat": "Machamp L56",
      "counter": "Psychic, Flying"},
     {"trainer": "Agatha",  "type": "Ghost", "key_threat": "Gengar L58",
      "counter": "Ground, Psychic"},
-    {"trainer": "Lance",   "type": "Dragon", "key_threat": "Dragonite L62",
+    {"trainer": "Lance",   "type": "Dragon", "key_threat": "Dragonite L60",
      "counter": "Ice Beam is critical. Dragonite survives most else."},
-    {"trainer": "Gary",    "type": "Mixed", "key_threat": "Alakazam + Rhydon + starter counter",
-     "counter": "Ice Beam for Rhydon; Psychic for Fighting; counter Gary's starter."},
 ]
+
+# The Champion is a separate fight after Lance (not an Elite Four member).
+CHAMPION: dict = {"trainer": "Gary", "type": "Mixed", "key_threat": "Alakazam + Rhydon + starter counter",
+                  "counter": "Ice Beam for Rhydon; Psychic for Fighting; counter Gary's starter."}
 
 # ── HM Requirements ───────────────────────────────────────────────────────────
 
@@ -123,9 +126,9 @@ HM_REQUIREMENTS: dict[str, dict] = {
     "Fly":      {"hm": "HM02", "required_for": "fast travel",
                  "location": "Route 16 house (need Cut)"},
     "Surf":     {"hm": "HM03", "required_for": "all water routes — required for Gym 7",
-                 "location": "Safari Zone warden quest (Gold Teeth)"},
+                 "location": "Safari Zone Secret House (end of the Safari Zone)"},
     "Strength": {"hm": "HM04", "required_for": "boulders in caves — required for Victory Road",
-                 "location": "Safari Zone warden quest (Gold Teeth)"},
+                 "location": "Safari Zone Warden (return his Gold Teeth)"},
     "Flash":    {"hm": "HM05", "required_for": "Rock Tunnel navigation (optional)",
                  "location": "Route 2 Oak's aide"},
 }
@@ -168,7 +171,7 @@ KEY_ITEMS: list[dict] = [
      "required_for": "Wake Snorlax blocking Routes 12 and 16"},
     {"item": "Lapras",       "location": "Silph Co. (free gift, L25)",
      "note": "Only one available. Excellent Surf + Ice Beam user."},
-    {"item": "TM26 Earthquake",  "location": "Silph Co.",
+    {"item": "TM26 Earthquake",  "location": "Viridian Gym (Giovanni's reward)",
      "note": "Critical — Ground/Physical 100 power"},
     {"item": "TM13 Ice Beam",    "location": "Celadon Game Corner (4000 coins)",
      "note": "Critical — covers Dragon/Ground/Flying. Essential for Lance."},

@@ -133,8 +133,8 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "Fuchsia is south of Celadon via Cycling Road (Route 17) or south of Lavender via Routes 12-15. Bring Antidotes and Full Heals — Koga uses Toxic and Smokescreen. Ground/Psychic moves are effective.",
      "S"),
 
-    (5, "Get HM03 Surf and HM04 Strength from the Safari Zone warden in Fuchsia",
-     "The Safari Zone is in the north part of Fuchsia City. Find the warden's house (east side of Fuchsia). He gives Surf and Strength after you find his Gold Teeth in the Safari Zone (far west area).",
+    (5, "Get HM03 Surf (Safari Zone Secret House) and HM04 Strength (Warden, Fuchsia)",
+     "The Safari Zone is in the north part of Fuchsia City. Surf: the Secret House at the far (north) end of the Safari Zone gives HM03. Strength: find the Warden's Gold Teeth in the Safari Zone (far west area) and return them to the Warden's house in Fuchsia for HM04.",
      None),
 
     (6, "Surf to Cinnabar Island and defeat Blaine (Fire type)",
@@ -267,11 +267,11 @@ ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
     },
     (3, 10): {  # Saffron City
         "post_flute_heading_south":        "The city is occupied by Rockets — most buildings are blocked. You need to clear Silph Co. to unlock Sabrina's Gym. But first head to Fuchsia for Surf.",
-        "post_surf_to_saffron_or_cinnabar": "Enter Silph Co. (tall building, center-west). 11 floors, teleporter maze. Fight Gary on 7F, Giovanni on 11F. You get Lapras (free gift) and TM Earthquake. Then challenge Sabrina's Gym (east).",
+        "post_surf_to_saffron_or_cinnabar": "Enter Silph Co. (tall building, center-west). 11 floors, teleporter maze. Fight Gary on 7F, Giovanni on 11F. You get Lapras (free gift). Then challenge Sabrina's Gym (east).",
     },
     (3, 7): {  # Fuchsia City
-        "post_flute_heading_south":        "Gym is in the CENTER-SOUTH (Koga — Poison). Before the Gym, visit the Safari Zone (north entrance) — find Gold Teeth for the Warden (east house), he gives you HM03 Surf and HM04 Strength.",
-        "post_koga_need_surf":             "Enter Safari Zone (north), find Gold Teeth in far-west area, give to Warden (east house) for Surf + Strength HMs. Then Surf south to Cinnabar Island.",
+        "post_flute_heading_south":        "Gym is in the CENTER-SOUTH (Koga — Poison). Before the Gym, visit the Safari Zone (north entrance) — HM03 Surf is in the Secret House at the far end of the Safari Zone; find the Gold Teeth for the Warden (Fuchsia) to get HM04 Strength.",
+        "post_koga_need_surf":             "Enter Safari Zone (north), get HM03 Surf from the Secret House at the far end; find Gold Teeth in the far-west area and give them to the Warden (Fuchsia) for HM04 Strength. Then Surf south to Cinnabar Island.",
         "post_surf_to_saffron_or_cinnabar": "Exit SOUTH and SURF down Route 19-20 to Cinnabar Island. Or fly to Saffron and clear Silph Co.",
     },
     (3, 8): {  # Cinnabar Island
