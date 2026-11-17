@@ -29,7 +29,7 @@ from knowledge.mon_quality import assess as assess_iv, hidden_power
 from knowledge.move_semantics import catch_setup_hint
 from knowledge.navigation import DIRECTION_BUTTON, MAP_NAMES, get_travel_direction, infer_building_type
 from knowledge.party import can_attack, healthy_enough
-from knowledge.readiness import assess as readiness_assess, render as readiness_render
+from knowledge.readiness import assess as readiness_assess, render as readiness_render, battles_total, save_note
 from knowledge.repel import REPEL_IDS, VAR_REPEL_STEP_COUNT, note as repel_note
 from knowledge.shopping import shopping_summary
 from knowledge.team import wanted_species
@@ -115,8 +115,10 @@ def _readiness_and_bag(t: Tick) -> list[str]:
     tms, items = _safe("bag_pockets", lambda: (r.read_tmhm_pocket(), r.read_items_pocket()), (None, []))
     # The PC contents are only read where the PC is: "you already own one — pc('swap') it in".
     boxes = _safe("boxes", lambda: r.read_boxes() if MAP_KIND.get(t.here) == "pokecenter" else None, None)
-    block = readiness_render(readiness_assess(party, balls, pots, money, t.ltm.data.get("gyms_beaten", []),
-                                              dex=dex, tms=tms, boxes=boxes))
+    d = t.ltm.data
+    due = save_note(d.get("badges_earned", 0), battles_total(d), d.get("saved_badges"), d.get("saved_battles", 0))
+    block = readiness_render(readiness_assess(party, balls, pots, money, d.get("gyms_beaten", []),
+                                              dex=dex, tms=tms, boxes=boxes, save_due=due))
     if block:
         out.append(block)
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
