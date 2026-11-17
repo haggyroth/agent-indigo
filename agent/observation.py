@@ -28,7 +28,7 @@ from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
-from knowledge.matchup import better_matchup, roster
+from knowledge.matchup import Foe, better_matchup, low_hp_advice, roster
 from knowledge.mon_quality import assess as assess_iv, hidden_power
 from knowledge.move_semantics import catch_setup_hint
 from knowledge.navigation import DIRECTION_BUTTON, MAP_NAMES, get_travel_direction, infer_building_type
@@ -47,6 +47,7 @@ if TYPE_CHECKING:                       # annotations only — main.py owns thes
 
 BALL_IDS = (1, 2, 3, 4)
 POTION_IDS = (13, 22, 21, 20, 19)
+HEAL_HP = {13: ("Potion", 20), 22: ("Super Potion", 50), 21: ("Hyper Potion", 200), 20: ("Max Potion", 999), 19: ("Full Restore", 999)}
 BAG_SIG_ITEMS = (63, 64, 65, 66, 67, 68, 70, 93, 94, 95, 96, 97, 98)     # vitamins, candy, stones: the bag-digest signature
 
 
@@ -243,9 +244,11 @@ def _battle(t: Tick) -> list[str]:
                               foe_level=(enemy.level or 0) if enemy else 0, foe_hp=enemy.current_hp if enemy else 0,
                               hidden_power=hidden_power(me.ivs)))
     if enemy and enemy.max_hp:           # who is down, who is up, and who matches up well against THIS foe
-        foe_lv = enemy.level or 0
-        for line in (roster(party, active, enemy.species_name or run.current_enemy, foe_lv),
-                     better_matchup(party, active, enemy.species_name or run.current_enemy, foe_lv)):
+        foe = Foe(name=enemy.species_name or run.current_enemy, level=enemy.level or 0, hp=enemy.current_hp, max_hp=enemy.max_hp,
+                  **_safe("foe_battler", r.read_foe_battler, {}))        # live moves / Spe / Atk / ability sharpen the maths
+        heals = _safe("heals", lambda: [HEAL_HP[i] for i, q in r.read_items_pocket() if q and i in HEAL_HP], [])
+        for line in (roster(party, active, foe=foe), better_matchup(party, active, foe=foe),
+                     low_hp_advice(party, active, foe, heals, wild=not run.battle_is_trainer)):
             if line:
                 out.append(line)
     boosters = _safe("boosters", lambda: booster_note(r.read_items_pocket(), run.battle_is_trainer), "")

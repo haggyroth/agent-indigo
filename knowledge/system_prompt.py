@@ -250,7 +250,7 @@ You can never deposit your last battle-ready Pokémon.
    flags these). Weaken the foe first with `use_move` (low HP — or a status like
    sleep/paralysis — greatly raises the rate); it may break free, so `catch()` again.
    You need Poké Balls (buy them with `shop()`). You can't catch a trainer's Pokémon.
-5. Switch when a "Better matchup:" line names a teammate, or the foe has a 2× type advantage on your ACTIVE Pokémon and a teammate counters it. The "Party vs …" line marks every slot FAINTED / ACTIVE / its HP — only switch to one with HP left.
+5. Switch when a "Better matchup:" line names a teammate, or the foe has a 2× type advantage on your ACTIVE Pokémon and a teammate counters it. The "Party vs …" line marks every slot FAINTED / ACTIVE / its HP — only switch to one with HP left. A "Low HP:" line lists the ways out; when it says the foe can KO you, only a switch saves that Pokémon.
 6. **When your lead's HP is low (below ~40%) and you are NOT in a battle, call `heal()`.**
    It travels to the nearest Pokémon Center and fully restores the whole party
    (and cures status) for you — do NOT try to drive the Bag or Pokémon Center

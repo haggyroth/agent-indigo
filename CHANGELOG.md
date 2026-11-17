@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — sharper battle advice (watched-run follow-up)
+- `Foe` read from the live battler (`gBattleMons[1]`: real moves, Speed, Atk/SpA, ability) via `read_foe_battler()`.
+- The `Party vs …` roster now uses the foe's KNOWN moves (not just its types), shows who outspeeds whom, and flags
+  absorb/immunity abilities (Levitate, Volt/Water Absorb, Flash Fire) so those moves count as ×0.
+- `Low HP:` line when the active mon is under ~⅓ HP, or ≤60% and the foe's best hit (Gen III formula) would KO it: finish a
+  nearly-dead foe, switch (the only save from a KO), heal only with an item that survives the hit, or flee a wild foe.
+- `switch_pokemon` accepts the `Nickname(Species)` labels the roster prints.
+
 ### Fixed — the model sent out fainted Pokémon and misread type matchups (watched run 20261117-141900)
 - **The battle observation named the wrong Pokémon.** `Lead:` was always party slot 1, so after a switch a fainted Ivysaur showed as
   `HP=0/50 (healthy)` while Kakuna fought, and the model tried to switch it back in six times. In battle it now reads `Active: …` (the mon
