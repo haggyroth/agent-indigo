@@ -211,6 +211,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `shop` | overworld | — | Restock at a Poké Mart (travels there if needed): buys the badge-scaled par levels of Balls, Potions and cures with the money you have. |
 | `switch_pokemon` | battle | target | Switch your active Pokémon (species name or 1-based slot). |
 | `use_item` | battle + overworld | item, target? | Use a Bag item.  In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status cure. |
+| `give_item` | overworld | item, pokemon | Make a party Pokémon HOLD a Bag item (Leftovers, Exp. |
 | `pick_up_items` | overworld | — | Collect the item balls on this map (see 'Items on the ground:' in the observation). |
 | `use_move` | battle | move | Use one of your active Pokémon's moves by name (the 'Your moves' list). |
 | `grind` | overworld | level?, catch?, auto_battles? | Level up on wild Pokémon in tall grass.  It walks to a route whose wild levels fit the Pokémon being trained; each wild encounter then ENDS the call — you fight it, then call grind again (the session persists). |
@@ -240,7 +241,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 37 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 38 tools in total.
 <!-- TOOLS:END -->
 
 The opponent is identified from memory (`gEnemyParty`), so there is no

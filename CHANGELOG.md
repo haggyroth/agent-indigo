@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — held items, battle boosters, Repel strategy (#215)
+- **`give_item(item, pokemon)`**: Bag → Items pocket → GIVE → the Pokémon, confirmed by the Pokémon's held item changing; an item
+  already held is swapped back into the Bag (the game's own prompt is answered). `PokemonStatus.held_item` is decoded from the Growth
+  substructure (party and PC). Item effects are generated from the decomp (`tools/gen_held_items.py` → `knowledge/held_items_data.py`).
+- **Who should carry what** (`knowledge/held_items.py`): a type-boost item to the highest-level Pokémon that attacks with that type,
+  Leftovers / Shell Bell / Quick Claw to the ace, Exp. Share / Lucky Egg to whoever lags, Light Ball / Thick Club / … to their
+  species. The observation shows "Holding: …" and one `give_item(…)` suggestion per unheld item, alongside the bag digest.
+  Berries (the separate Berry Pouch) are not handled.
+- **X-items in battle**: `use_item('X Attack' | 'X Defend' | 'X Speed' | 'X Special' | 'X Accuracy' | 'Dire Hit' | 'Guard Spec.')`
+  works (verified live) and says what it did; a battle observation line lists them and when they are worth a turn (a trainer ace,
+  not a wild Pokémon).
+- **Repel strategy** (`knowledge/repel.py`): "Repel active: N steps left" and, where every wild Pokémon on the map is at or below the
+  lead's level, you hold a Repel, the team is built (≥ 4) and nothing there is wanted, a one-line suggestion to use one.
+- Not done (still on the list): Game Corner prizes and TM purchases at the Celadon Dept. Store, Safari Zone quests, cartridge saves.
+
 ### Added — Escape Rope, Dig and Teleport (out of battle)
 - **`use_hm('Dig')` / `use_hm('Teleport')`** drive the party sub-menu and the "return to …?" prompt, and are confirmed by the map
   changing. Dig = leave a cave/forest/dungeon for its entrance (what an Escape Rope does); Teleport = outdoors only, warps to the

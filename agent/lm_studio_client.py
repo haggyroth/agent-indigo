@@ -418,6 +418,8 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                 if self.reader.detect_context() == GameContext.IN_BATTLE:
                     return self._use_item(args["item"])
                 return self._field_use_item(args["item"], str(args.get("target", "") or ""))
+            case "give_item":
+                return self._give_item(str(args["item"]), str(args.get("pokemon", "") or ""))
             case "switch_pokemon":
                 return self._switch_pokemon(str(args["target"]))
             case "challenge_leader":

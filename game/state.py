@@ -30,6 +30,7 @@ class PokemonStatus:
     evs: tuple = ()       # same order, effort values 0-255
     friendship: int = 0
     ability_slot: int = 0
+    held_item: int = 0    # item id the Pokémon is holding (0 = none)
     stats: tuple = ()     # the game's own computed (maxHP, Atk, Def, Spe, SpA, SpD) — party Pokémon only
 
     @property

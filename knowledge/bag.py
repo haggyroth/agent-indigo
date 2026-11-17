@@ -128,3 +128,23 @@ def bag_digest(party, tmhm, items, limit_chars: int = 320) -> str:
         parts.append("Items: " + ", ".join(stuff))
     line = " | ".join(parts)
     return ("BAG — " + line)[:limit_chars] if line else ""
+
+
+# Battle-only Items-pocket boosters: id -> (name, what it does, for how long). Each costs the turn it is used on.
+BATTLE_BOOSTERS = {
+    75: ("X Attack", "+1 Attack stage"), 76: ("X Defend", "+1 Defense stage"), 77: ("X Speed", "+1 Speed stage"),
+    78: ("X Accuracy", "+1 accuracy stage"), 79: ("X Special", "+1 Sp. Atk stage"),
+    74: ("Dire Hit", "raises the critical-hit rate"), 73: ("Guard Spec.", "stops the foe lowering your stats for 5 turns"),
+}
+
+
+def booster_note(items, trainer: bool) -> str:
+    """'X Attack ×2 (+1 Attack stage), …' for the battle boosters in the bag, with when they are worth a turn. '' when none."""
+    have = [f"{BATTLE_BOOSTERS[i][0]}" + (f" ×{q}" if q > 1 else "") + f" ({BATTLE_BOOSTERS[i][1]})"
+            for i, q in items if q > 0 and i in BATTLE_BOOSTERS]
+    if not have:
+        return ""
+    when = ("each costs your turn and lasts until the Pokémon leaves the field — worth it for a Gym Leader / Elite Four ace you "
+            "would otherwise lose to, not for routine fights" if trainer else
+            "each costs your turn — not worth it against a wild Pokémon")
+    return "Battle boosters in the bag: " + ", ".join(have) + f"; {when}. use_item('X Attack') applies it to your active Pokémon."

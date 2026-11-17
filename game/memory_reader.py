@@ -152,7 +152,7 @@ class LeafGreenReader:
         move_ids   = [0] * 4
         move_names = [""] * 4
         pp         = [0] * 4
-        ivs, evs, ability_slot, friendship = (), (), 0, 0
+        ivs, evs, ability_slot, friendship, held_item = (), (), 0, 0, 0
 
         if self.decrypt:
             try:
@@ -164,6 +164,7 @@ class LeafGreenReader:
                 ivs, ability_slot = parse_ivs(sub)
                 evs          = parse_evs(sub)
                 friendship   = sub["G"][9]
+                held_item    = int.from_bytes(sub["G"][2:4], "little")
             except Exception:
                 # decryption failed — Tier 1 data still valid
                 logger.warning("party mon decrypt failed for slot %d", slot, exc_info=True)
@@ -179,7 +180,7 @@ class LeafGreenReader:
             species_name=species_name, move_ids=move_ids, move_names=move_names, pp=pp,
             nickname="".join(nick).strip(),
             personality=int.from_bytes(raw[0:4], "little"),
-            ivs=ivs, evs=evs, friendship=friendship, ability_slot=ability_slot,
+            ivs=ivs, evs=evs, friendship=friendship, ability_slot=ability_slot, held_item=held_item,
             stats=tuple(int.from_bytes(raw[o:o + 2], "little") for o in (0x58, 0x5A, 0x5C, 0x5E, 0x60, 0x62)),
         )
 
@@ -476,7 +477,8 @@ class LeafGreenReader:
                 "nickname": "".join(nick).strip(), "level": level_from_exp(sid, exp),
                 "move_names": [MOVE_NAMES.get(m, "") for m in ids if m],
                 "personality": int.from_bytes(raw[0:4], "little"), "ivs": ivs, "evs": evs,
-                "friendship": sub["G"][9], "ability_slot": ability_slot}
+                "friendship": sub["G"][9], "ability_slot": ability_slot,
+                "held_item": int.from_bytes(sub["G"][2:4], "little")}
 
     def read_boxes(self) -> list[dict]:
         """Every occupied PC slot, box by box (one memory read per box)."""

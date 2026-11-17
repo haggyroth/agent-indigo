@@ -120,6 +120,15 @@ TOOLS = [
         }, "required": ["item"]},
     }},
     {"type": "function", "function": {
+        "name": "give_item",
+        "description": "Make a party Pokémon HOLD a Bag item (Leftovers, Exp. Share, Quick Claw, a type-boost item…; a held item "
+                       "already there is swapped back into the Bag). The 'Held items:' line suggests who should carry what.",
+        "parameters": {"type": "object", "properties": {
+            "item": {"type": "string", "description": "e.g. 'Leftovers', 'Exp. Share', 'Mystic Water'"},
+            "pokemon": {"type": "string", "description": "species name or 1-based slot"},
+        }, "required": ["item", "pokemon"]},
+    }},
+    {"type": "function", "function": {
         "name": "pick_up_items",
         "description": "Collect the item balls on this map (see 'Items on the ground:' in the observation). "
                        "Overworld only.",
@@ -390,8 +399,8 @@ _BATTLE_ONLY = frozenset({"use_move", "switch_pokemon", "catch", "flee_battle"})
 _NAMING_ONLY = frozenset({"enter_name"})          # naming screens are never the free overworld or a battle
 
 _USE_ITEM_BATTLE = ("Use a Bag item on your ACTIVE Pokémon — a Potion (Super / Hyper / Max) or a status cure "
-                    "(Antidote, Paralyze Heal, Awakening, Burn Heal, Ice Heal, Full Heal). It costs your turn. "
-                    "The 'Bag:' line shows what you have.")
+                    "(Antidote, Paralyze Heal, Awakening, Burn Heal, Ice Heal, Full Heal) — or a booster: X Attack / X Defend / "
+                    "X Speed / X Special / X Accuracy / Dire Hit. It costs your turn. The 'Bag:' line shows what you have.")
 
 
 def _with_description(tool: dict, description: str) -> dict:

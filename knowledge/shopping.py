@@ -20,7 +20,7 @@ ITEM_NAMES: dict[int, str] = {
     # Field/battle items the Bag driver (agent/skills/items.py) can use (not sold in every Mart).
     63: "HP Up", 64: "Protein", 65: "Iron", 66: "Carbos", 67: "Calcium", 68: "Rare Candy", 70: "Zinc",
     93: "Sun Stone", 94: "Moon Stone", 95: "Fire Stone", 96: "Thunder Stone", 97: "Water Stone", 98: "Leaf Stone",
-    74: "Dire Hit", 75: "X Attack", 76: "X Defend", 77: "X Speed", 78: "X Accuracy", 79: "X Special",
+    73: "Guard Spec.", 74: "Dire Hit", 75: "X Attack", 76: "X Defend", 77: "X Speed", 78: "X Accuracy", 79: "X Special",
     25: "Max Revive", 26: "Fresh Water", 27: "Soda Pop", 28: "Lemonade", 34: "Ether", 35: "Max Ether",
     36: "Elixir", 37: "Max Elixir", 182: "Exp. Share",
 }

@@ -963,6 +963,9 @@ class BattleMixin:
             return f"Used {ITEM_NAMES.get(iid, item)} — {p.species_name or 'lead'} healed +{gained} HP ({p.current_hp}/{p.max_hp})."
         if before_status != "healthy" and p.status == "healthy":
             return f"Used {ITEM_NAMES.get(iid, item)} — cured {p.species_name or 'lead'}'s {before_status}."
+        from knowledge.bag import BATTLE_BOOSTERS
+        if iid in BATTLE_BOOSTERS:
+            return f"Used {BATTLE_BOOSTERS[iid][0]} — {BATTLE_BOOSTERS[iid][1]} for {p.species_name or 'your active Pokémon'}."
         return f"Used {ITEM_NAMES.get(iid, item)}."
 
     def _exit_battle_menus(self) -> None:
