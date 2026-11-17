@@ -536,6 +536,16 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                     if _line:
                         obs_parts.append(_line)
                     obs_parts.extend(stone_notes(state.party, _items))
+        if not in_battle and state.context == GameContext.OVERWORLD and state.party:
+            from knowledge.escape import hint as _escape_hint
+            try:
+                _rope = dict(reader.read_items_pocket()).get(85, 0)
+            except Exception:
+                _rope = 0
+            _ids = {m for p in state.party for m in (p.move_ids or [])}
+            _eh = _escape_hint((state.map_bank, state.map_id), _ids, _rope)
+            if _eh:
+                obs_parts.append(_eh)
         if trip and not in_battle and state.context == GameContext.OVERWORLD:
             resume = (f"call {trip['call']} to resume." if trip.get("call") else
                       f"call go_to() with no destination — or go_to({trip['dest']!r}) — to resume.")

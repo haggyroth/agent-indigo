@@ -418,3 +418,27 @@ def test_inspect_pokemon_and_the_catch_report_use_the_real_ivs(live):
             break
     assert "Gotcha" in got and "Quality: " in got, got
     assert live.c._execute("pc_boxes", json.dumps({"detail": True})) is not None
+
+
+def test_escape_rope_leaves_the_forest_the_threemon_fixture_stands_in(live):
+    live.load("threemon")
+    assert live.r.read_current_map() == (1, 0)                       # Viridian Forest — allow_escaping
+    live.give_item(85, 2)                                            # Escape Rope
+    out = live.c._execute("use_item", json.dumps({"item": "Escape Rope"}))
+    assert out.startswith("Used Escape Rope (1 left): now in Route 2"), out
+    assert live.r.read_current_map() != (1, 0) and live.r.detect_context() == GameContext.OVERWORLD
+    again = live.c._execute("use_item", json.dumps({"item": "Escape Rope"}))          # outdoors now: refused, not consumed
+    assert "only works inside a cave" in again and dict(live.r.read_items_pocket()).get(85) == 1, again
+
+
+def test_dig_in_the_forest_then_teleport_outdoors(live):
+    """Dig and Teleport through the real party sub-menu → 'return to …?' prompt, each confirmed by the map changing."""
+    live.load("threemon")
+    live.patch_mon(0, moves=[33, 91, 100, 0], pps=[35, 10, 20, 0])
+    out = live.c._execute("use_hm", json.dumps({"move": "Dig"}))
+    assert out.startswith("Used Dig: now in Route 2"), out
+    assert "only works inside a cave" in live.c._execute("use_hm", json.dumps({"move": "Dig"}))
+    here = live.r.read_current_map()
+    out = live.c._execute("use_hm", json.dumps({"move": "Teleport"}))
+    assert out.startswith("Used Teleport: now in") and live.r.read_current_map() != here, out
+    assert live.r.detect_context() == GameContext.OVERWORLD

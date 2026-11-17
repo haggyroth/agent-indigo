@@ -225,6 +225,9 @@ You can never deposit your last battle-ready Pokémon.
    travels to the Mart and buys the right items for your badge count automatically —
    you don't drive the shop menu. Do this before a gym or a long route.
 8. save_state before every gym leader and every Elite Four member.
+   Getting out without walking (see the 'Exit shortcut' / 'Shortcut' line when one applies): in a cave, forest or dungeon an
+   Escape Rope or use_hm('Dig') warps you to its entrance; OUTDOORS use_hm('Teleport') warps to the last Pokémon Center you healed
+   at. They never work in a town building, and they abandon the trip or quest you are on.
 9. After a loss: load_state and try a different strategy.
 10. In DIALOG_OPEN: press A to advance. In IN_MENU: navigate with the D-pad + A, or press B to close it — do not press movement to "walk".
 11. In TRANSITIONING: call wait_frames(30) and re-read; do not act until the context changes.

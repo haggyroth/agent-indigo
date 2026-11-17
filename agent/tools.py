@@ -107,7 +107,7 @@ TOOLS = [
         "name": "use_item",
         "description": "Use a Bag item. In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status "
                        "cure. Out of battle: Potions, status cures, Revive, Repel, evolution stones (Thunder Stone "
-                       "on Pikachu evolves it), Rare Candy and vitamins. `target` = species or 1-based slot; omit it "
+                       "on Pikachu evolves it), Rare Candy and vitamins, Escape Rope (caves only: back to the entrance). `target` = species or 1-based slot; omit it "
                        "to auto-pick whoever needs the item (Rare Candy and vitamins require a target). The 'Bag:' "
                        "line shows what you have.",
         "parameters": {"type": "object", "properties": {
@@ -271,11 +271,13 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "use_hm",
-        "description": "Use a field HM: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut "
-                       "(nearest tree), Rock Smash, Strength (then walk into the boulder). A Pokémon must know the "
-                       "move and you need the badge; walk_to starts Surf by itself when only water blocks the route.",
+        "description": "Use a field move: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut "
+                       "(nearest tree), Rock Smash, Strength (then walk into the boulder), Flash (lights a cave). A Pokémon "
+                       "must know the move and you need the badge; walk_to starts Surf by itself when only water blocks the "
+                       "route. Dig = leave a cave/forest/dungeon for its entrance (same as an Escape Rope); Teleport = outdoors "
+                       "only, warps to the last Pokémon Center you healed at.",
         "parameters": {"type": "object", "properties": {
-            "move": {"type": "string", "enum": ["Surf", "Cut", "Rock Smash", "Strength", "Flash"]},
+            "move": {"type": "string", "enum": ["Surf", "Cut", "Rock Smash", "Strength", "Flash", "Dig", "Teleport"]},
         }, "required": ["move"]},
     }},
     {"type": "function", "function": {

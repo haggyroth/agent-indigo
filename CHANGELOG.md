@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Escape Rope, Dig and Teleport (out of battle)
+- **`use_hm('Dig')` / `use_hm('Teleport')`** drive the party sub-menu and the "return to …?" prompt, and are confirmed by the map
+  changing. Dig = leave a cave/forest/dungeon for its entrance (what an Escape Rope does); Teleport = outdoors only, warps to the
+  last Pokémon Center you healed at.
+- **Rules come from the decomp** (`tools/gen_escape_maps.py` → `knowledge/escape_maps.py`: `allow_escaping` and outdoor map types), so
+  a refusal says why ("Dig only works inside a cave, forest or dungeon…") instead of burning a turn or a rope. `use_item('Escape
+  Rope')` is gated the same way and reports where it landed. Note Viridian Forest is both escapable and teleportable (verified live).
+- **The model is told**: an "Exit shortcut: use_hm('Dig') or use_item('Escape Rope') (n left)…" / "Shortcut: use_hm('Teleport')…"
+  observation line only where it applies with this party and bag, plus a system-prompt rule (they abandon the current trip).
+- Tests: `tests/test_escape.py`, and live tests for rope, Dig and Teleport against the real ROM.
+
 ### Fixed — nav driver review (#216)
 - **Travel rules are data.** `knowledge/travel_rules.py`: `PC_TOWNS` and `NO_WALK` (the Cerulean → west "Route 4 ledges only go one
   way" rule) moved out of the skill code. The no-walk message now says what to do for *this* party: "Pidgeotto knows Fly: fly_to the
