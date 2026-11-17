@@ -5,6 +5,25 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — grind() rework: fixed floor, benched ace, level-fit routes, model-driven fights (#203)
+- **Encounters are handed to the model.** `grind` paces on grass until a wild Pokémon (or trainer) appears, then the call
+  ends with a brief (foe, catch verdict, who should fight, progress); the model plays it with `use_move` / `use_item` /
+  `catch` and calls `grind` again. The session (`AgentClient._grind_run`: floor, starting levels, battle count) persists
+  between calls. `auto_battles=N` autopilots the next N *boring* wild fights (foe ≤ active level + 2, nothing worth a
+  ball); a forced-replacement screen after a faint is handed over too (`switch_pokemon`). The `catch` flag now only
+  controls whether worthwhile wild Pokémon are pointed out — grind no longer throws balls or names catches itself.
+- **Fixed floor, not a moving target.** Balance mode trains everyone up to `top − 7` *measured when the session starts*,
+  capped at the next gym's recommended level (`knowledge.party.grind_floor`); the ace's gains no longer move the goal.
+- **The ace is benched.** `pick_finisher(..., bench=(ace,))` never picks the strongest mon as finisher unless nobody
+  else is fit (counted as `ace_fought`); the brief tells the model not to switch to it.
+- **Stop-loss.** After 20+ battles, if the ace gained 3+ levels while the lowest member gained ≤1, grind stops with a
+  diagnosis (`ace_runaway`). Sessions are also capped at 150 encounters.
+- **Routes chosen by wild level.** `tools/gen_encounters.py` → `knowledge/encounters.py` (LeafGreen land-encounter
+  min/avg/max level per map); `knowledge/grind_routes.best_grass` picks the reachable grass whose levels fit the
+  Pokémon being trained, and grind relocates when the trainee outgrows (or is outclassed by) the current route.
+- Relocation trips use `go_to`'s `flee` mode; `_restore_ace_lead` / `_grind_finish` never auto-play a battle; a stale
+  session is dropped when the model goes off to travel/heal/shop (`_grind_abandon`). `_no_attack_turn` unchanged.
+
 ### Changed — go_to hands encounters to the model (#202)
 - `go_to` no longer plays wild battles itself. When a wild Pokémon appears (or a trainer spots you) the call ends with
   a description (species, level, HP, catch-policy verdict, balls) and the exact resume call; the model fights /

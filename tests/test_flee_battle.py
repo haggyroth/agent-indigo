@@ -171,10 +171,19 @@ def test_flee_mode_runs_from_wild_and_does_not_stop_for_low_hp():
     assert c2._handle_travel_battle("Pewter City", mode="autopilot") is not None   # legacy: stop and heal
 
 
-def test_flee_mode_reports_a_failed_escape():
+def test_flee_mode_falls_back_to_fighting_when_the_escape_fails():
     c = _wild_client()
     c._flee_battle = lambda: "Couldn't escape!"
-    msg = c._handle_travel_battle("Pokemon Center", mode="flee")
+    fought = []
+
+    def fight():
+        fought.append(1)
+        c.reader.ctx = GameContext.OVERWORLD
+    c._auto_fight = fight
+    assert c._handle_travel_battle("Pokemon Center", mode="flee") is None and fought == [1]
+    c2 = _wild_client()
+    c2._flee_battle = lambda: "Couldn't escape!"
+    msg = c2._handle_travel_battle("Pokemon Center", mode="flee")          # still in battle after the fight
     assert msg is not None and "escape failed" in msg
 
 

@@ -20,6 +20,9 @@ class Live:
         assert self.m.load_state_file(str(path)), f"could not load {path}"
         self.m.tick(30)
         self.heal_hp()
+        self.c._grind_run = None            # a grind session from an earlier test must not leak its floor/level
+        self.c._training_swapped = False
+        self.c._trip = None
 
     def heal_hp(self) -> None:
         for i in range(len(self.r.read_party())):

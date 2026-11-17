@@ -166,23 +166,27 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "grind",
-        "description": "Level up by fighting wild Pokémon in tall grass (auto-fights every battle, and "
-                       "heals itself at a Pokémon Center when HP or attack PP runs low, then walks "
-                       "back — one call does a lot of work). Two modes: grind(level=13) raises your "
-                       "BEST Pokémon to L13 (e.g. before Brock so Bulbasaur has Vine Whip); grind() with NO "
-                       "level BALANCES the team — nobody more than 7 levels under your highest "
-                       "(top L40 → nobody under L33), because weak backups can't carry a gym, a "
-                       "dungeon or a forced switch. In both modes a lagging Pokémon is "
-                       "sent in first for the XP (it starts the fight, then a teammate finishes it — "
-                       "both share the XP; it is never swapped back in to be hit). "
-                       "Evolutions complete automatically. Use grind() after catching new Pokémon "
-                       "and before gyms/dungeons.",
+        "description": "Level up on wild Pokémon in tall grass. It walks to a route whose wild levels fit "
+                       "the Pokémon being trained, paces until a wild Pokémon appears, then the call ENDS and "
+                       "tells you what appeared — YOU fight it (use_move / use_item / catch / flee), then call "
+                       "grind again to continue (the session — target, starting levels — persists). It heals "
+                       "itself at a Pokémon Center when HP or attack PP runs low. Two modes: grind(level=13) "
+                       "raises your BEST Pokémon to L13 (e.g. before Brock); grind() with NO level BALANCES "
+                       "the team up to a floor fixed at the start (best − 7, capped at the next gym's level): "
+                       "the weakest member leads and earns the XP and the ACE IS BENCHED (don't switch it "
+                       "in). It stops with a diagnosis if the fights are feeding the ace. "
+                       "auto_battles=N plays the next N boring wild fights (foe at most 2 levels above your "
+                       "active Pokémon, nothing worth catching) on autopilot to save turns. "
+                       "Evolutions complete automatically. Use after catching new Pokémon and before gyms.",
         "parameters": {"type": "object", "properties": {
             "level": {"type": "integer",
                       "description": "target level for your BEST Pokémon, e.g. 13. Omit (or 0) to balance the whole team."},
             "catch": {"type": "boolean",
-                      "description": "auto-catch wild Pokémon worth having while grinding (default true; "
-                                     "they get an autopilot nickname). Pass false to only fight."},
+                      "description": "point out wild Pokémon worth a ball (default true) and never autopilot "
+                                     "them. Pass false to only fight."},
+            "auto_battles": {"type": "integer", "minimum": 0, "maximum": 50,
+                             "description": "autopilot this many boring wild fights before handing "
+                                            "encounters to you (default 0 = you play every one)."},
         }, "required": []},
     }},
     {"type": "function", "function": {

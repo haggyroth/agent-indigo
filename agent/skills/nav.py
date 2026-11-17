@@ -585,6 +585,10 @@ class NavMixin:
                 self._auto_fight()
             return None
         flee = self._flee_battle()
+        if "Got away" not in flee and mode == "flee":
+            self._auto_fight()                     # a heal trip: no time to bother the model — win it and carry on
+            if self.reader.detect_context() != GameContext.IN_BATTLE:
+                return None
         if "Got away" not in flee:
             return (f"A wild battle started en route to {target_name} and the escape "
                     f"failed — fight it with use_move, then go_to({target_name!r}) again.")

@@ -328,8 +328,14 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
         finally:
             setter(None)
 
+    _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
+                                 "get_ss_ticket", "get_cut", "pc_deposit", "pc_withdraw", "pc_swap", "pick_up_items",
+                                 "use_hm", "teach_move", "load_state"})
+
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
+        if name in self._ABANDONS_GRIND and getattr(self, "_grind_run", None):
+            self._grind_abandon()              # the model moved on: a stale session must not pin the floor
         match name:
             case "press_button":
                 # Clamp defensively — a model can ignore the schema's maximum.
@@ -409,7 +415,8 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
             case "enter_name":
                 return self._enter_name(str(args["name"]))
             case "grind":
-                return self._grind(int(args.get("level", 0) or 0), bool(args.get("catch", True)))
+                return self._grind(int(args.get("level", 0) or 0), bool(args.get("catch", True)),
+                                   int(args.get("auto_battles", 0) or 0))
             case "train_party":
                 return self._train_party()
             case "read_game_state":
