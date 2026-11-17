@@ -10,7 +10,6 @@ from knowledge.travel_rules import NO_WALK, PC_TOWNS, no_walk_reason
 
 pytest.importorskip("openai")
 from agent.lm_studio_client import AgentClient   # noqa: E402
-from agent.skills import nav as nav_mod           # noqa: E402
 
 
 # ── data ───────────────────────────────────────────────────────────────────────────────────────
