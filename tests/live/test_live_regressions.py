@@ -718,3 +718,14 @@ def test_slot_machine_driver_plays_and_pays(live):
     assert live.r.detect_context() == GameContext.OVERWORLD and live.m.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_SLOT_MACHINE
     net = live.r.read_coins() - start
     assert f"{net:+d} coins" in out, out
+
+
+def test_go_to_route_4_before_brock_stops_with_the_reason_instead_of_looping_at_pewter(live):
+    """Regression: the model ran Viridian Forest → Pewter and then looped on the Gym Guide trying to reach Route 4 badge-less."""
+    live.load("threemon")
+    assert live.r.read_badges()[0] == 0
+    out = live.c._execute("go_to", json.dumps({"destination": "Route 4"}))
+    assert "Can't get to Route 4 yet" in out and "Brock" in out and "Gym Guide" in out, out
+    assert live.c.last_trip_stop["reason"] == "gated"
+    out = live.c._execute("grind", json.dumps({"level": 13}))
+    assert live.r.read_current_map() not in ((3, 21), (3, 22)), out         # grind's relocation must not head for gated grass either

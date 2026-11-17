@@ -25,6 +25,10 @@ def _floors(prefix: str, *floors: str) -> tuple:
 
 
 AREAS: tuple[Area, ...] = (
+    Area("pewter", "Pewter City", ("PewterCity",),
+         "Beat Brock at the gym (north-west of town) for the Boulder Badge: the way east to Route 3 / Mt. Moon / Cerulean stays closed until then.",
+         "The Gym Guide near the east side walks you back to the gym door whenever you head east without the badge — an endless 'Follow me!' loop.",
+         "go_to('gym'), heal(), save_state(), challenge_leader(). Grind on the Viridian Forest / Route 2 side first if Brock's Onix (L14) looks too strong."),
     # ── caves and dungeons ────────────────────────────────────────────────────────────────────────────
     Area("mt_moon", "Mt. Moon", _floors("MtMoon", "1F", "B1F", "B2F"),
          "Cross it to Route 4 (the way to Cerulean): 1F → B1F → B2F, then the east exit.",
