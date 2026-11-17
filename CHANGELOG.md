@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — gym / Elite Four / Champion advice comes from the decomp (#211)
+- **No more hand-typed levels.** `knowledge/gym_advice.py` builds each opponent's brief from the generated parties
+  (`knowledge/gym_teams.py`, now including the Champion's three starter variants): their Pokémon and levels, the types their attacks
+  really are, the types that hit most of the team super effectively (from the type chart) and the moves worth planning around
+  (sleep, Toxic, Self-Destruct, Recover…). `GYM_ACE_LEVEL` is derived from the same data.
+- **Where the model sees it:** the observation inside a gym ("Leader: Koga: Koffing L37, Muk L39, … | hit them with Ground (4/4)…")
+  and `team_report` (next leader, or the whole Elite Four plus Gary once all 8 badges are won).
+- Removed the never-read `key_threat` / `counter` strings (they had drifted: Elite Four levels were 2-6 off). Fixed the Celadon
+  navigation hint (TM26 is Giovanni's; the Game Corner sells Ice Beam / Thunderbolt / Flamethrower / Shadow Ball / Iron Tail).
+- Tests: a navigation-prose check fails if any "Species L<n>" in the hand-written text disagrees with the decomp.
+
 ### Fixed — nav driver review (#216)
 - **Travel rules are data.** `knowledge/travel_rules.py`: `PC_TOWNS` and `NO_WALK` (the Cerulean → west "Route 4 ledges only go one
   way" rule) moved out of the skill code. The no-walk message now says what to do for *this* party: "Pidgeotto knows Fly: fly_to the

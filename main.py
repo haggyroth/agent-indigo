@@ -696,10 +696,12 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 "do NOT challenge them again. LEAVE the gym (walk_to the exit "
                 "door) and head to your NEXT objective in the Navigation section.")
         else:
+            from knowledge.gym_advice import brief as _gym_brief
             obs_parts.append(
                 "GYM: to fight the Leader, call challenge_leader() — it walks up "
                 "to them and starts the battle. (heal() and save_state first.) "
-                "Do NOT use go_to inside a gym.")
+                "Do NOT use go_to inside a gym."
+                + (f"\nLeader: {_gym_brief(gym_leader)}" if gym_leader else ""))
     if state.context == GameContext.OVERWORLD and tilemap.ready:
         if tilemap._width and tilemap._height:
             obs_parts.append(f"Map size: {tilemap._width}×{tilemap._height} "
