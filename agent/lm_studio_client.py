@@ -380,7 +380,7 @@ class AgentClient(PCMixin, PartyMixin, QuestMixin, NavMixin, OverworldMixin, Bat
                 return self._get_cut(bool(args.get("auto_trainers", False)))
             case "teach_move":
                 return self._teach_move(str(args["tm"]), str(args.get("pokemon", "") or ""),
-                                        str(args.get("forget", "") or ""))
+                                        str(args.get("forget", "") or ""), bool(args.get("confirm", False)))
             case "fly_to":
                 return self._fly_to(str(args["town"]))
             case "use_hm":

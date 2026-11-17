@@ -346,6 +346,7 @@ class _RunState:
     battle_is_trainer: bool = False
     prev_key_items: Optional[int] = None
     prev_dex_owned: Optional[int] = None
+    bag_sig: Optional[tuple] = None
     prev_map_key: Optional[tuple[int, int]] = None
     transitioning_steps: int = 0
     pending_map_b64: Optional[str] = None
@@ -540,10 +541,27 @@ def build_observation(*, state: GameState, diff: StateDiff, in_battle: bool,
                 _dex = reader.read_pokedex()
             except Exception:
                 _dex = None
+            try:
+                _tms = reader.read_tmhm_pocket()
+                _items = reader.read_items_pocket()
+            except Exception:
+                _tms, _items = None, []
             _block = _render(_assess(state.party, _balls, _pots, _money, ltm.data.get("gyms_beaten", []),
-                                     dex=_dex))
+                                     dex=_dex, tms=_tms))
             if _block:
                 obs_parts.append(_block)
+            # The bag digest (TMs / HMs / stones / candy): shown when it changes, then every 30 ticks as a reminder —
+            # the model forgot TMs it picked up many turns ago.
+            if _tms is not None:
+                from knowledge.bag import bag_digest, stone_notes
+                sig = (tuple(_tms), tuple((i, q) for i, q in _items if i in (63, 64, 65, 66, 67, 68, 70, 93, 94, 95, 96, 97, 98)),
+                       tuple(tuple(p.move_names) for p in state.party))
+                if sig != run.bag_sig or run.step_count % 30 == 0:
+                    run.bag_sig = sig
+                    _line = bag_digest(state.party, _tms, _items)
+                    if _line:
+                        obs_parts.append(_line)
+                    obs_parts.extend(stone_notes(state.party, _items))
         if trip and not in_battle and state.context == GameContext.OVERWORLD:
             resume = (f"call {trip['call']} to resume." if trip.get("call") else
                       f"call go_to() with no destination — or go_to({trip['dest']!r}) — to resume.")

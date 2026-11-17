@@ -134,8 +134,10 @@ TOOLS = [
                        "'Bag:' line for what you have. OUTSIDE battle it works too: opens "
                        "Start → Bag, uses the item on the Pokémon that needs it (or the "
                        "`target` you name — species or 1-based slot), and also handles "
-                       "Revive and Repel. Free actions out of battle: heal a hurt mon here "
-                       "instead of walking to a Pokémon Center.",
+                       "Revive and Repel, evolution stones (Thunder Stone on Pikachu → evolves it; the evolution "
+                       "scene is played for you), Rare Candy and the vitamins (HP Up, Protein, Iron, Carbos, "
+                       "Calcium, Zinc — you must name the `target`). Free actions out of battle: heal a hurt "
+                       "mon here instead of walking to a Pokémon Center.",
         "parameters": {"type": "object", "properties": {
             "item": {"type": "string",
                      "description": "Item name, e.g. 'Potion', 'Super Potion', 'Antidote', "
@@ -279,14 +281,16 @@ TOOLS = [
                        "Items → TM CASE → the TM → USE → Pokémon). `tm` is 'TM09', 'HM01', or the "
                        "move name ('Cut', 'Giga Drain'). `pokemon` (species or 1-based slot) is "
                        "optional — otherwise each party member is tried in order until one can learn "
-                       "it. If it already knows 4 moves it forgets `forget` (a move name) or, by "
-                       "default, a safe one (a status move / the weakest attack — never an HM move or "
-                       "its last attack). Confirms the move shows up. Teach Cut/Surf/Strength/"
+                       "it. If it already knows 4 moves a single-use TM first returns a PREVIEW of what "
+                       "would be forgotten (a status move / the weakest attack — never an HM move or its "
+                       "last attack); repeat the call with forget='<move>' (yours or the suggested one) or "
+                       "confirm=true to commit. Confirms the move shows up. Teach Cut/Surf/Strength/"
                        "Flash/Fly HMs this way, then use_hm.",
         "parameters": {"type": "object", "properties": {
             "tm": {"type": "string", "description": "e.g. 'HM01', 'TM09', 'Surf'"},
             "pokemon": {"type": "string", "description": "optional species name or 1-based slot"},
             "forget": {"type": "string", "description": "optional move to replace when full"},
+            "confirm": {"type": "boolean", "description": "commit without naming a move to forget (the default pick)"},
         }, "required": ["tm"]},
     }},
     {"type": "function", "function": {

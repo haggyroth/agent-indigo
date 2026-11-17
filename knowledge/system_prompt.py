@@ -75,7 +75,10 @@ section — don't repeat the thing you just finished.
 - **`walk_to(x, y)`** moves to a tile on the CURRENT map (path-finds around walls
   and NPCs). Use it to reach a specific spot, or a door/EXIT tile to enter/leave a
   building.
-- **TMs/HMs:** `teach_move("HM01"|"TM09"|"Cut", pokemon?, forget?)` teaches a TM/HM through the TM Case (it checks compatibility, never forgets an HM move or your last attack). Teach Cut/Surf/Strength, then `use_hm(...)` clears the obstacle.
+- **TMs/HMs:** `teach_move("HM01"|"TM09"|"Cut", pokemon?, forget?)` teaches a TM/HM through the TM Case (it checks compatibility, never forgets an HM move or your last attack). Teach Cut/Surf/Strength, then `use_hm(...)` clears the obstacle. A `BAG —` line in the observation lists your TMs, HMs
+  (and whether anyone knows them) and stones / Rare Candy / vitamins; a "TM upgrade — teach_move(…)" readiness item names a
+  TM that clearly beats one of a Pokémon's moves (TMs are single-use, so a full moveset gets a preview to confirm first).
+  `use_item('Thunder Stone')` evolves a Pokémon that uses it; `use_item('Rare Candy', target=…)` levels the one you name.
 - **Nicknames:** `catch(nickname="…")` names the Pokémon you catch — and the name is YOURS to invent, so
   have fun with it: a pun on the species or its moves, a pop-culture or food reference, a dramatic title,
   an old-timey or grumpy name that suits it. Never just the species name or a number suffix, and keep

@@ -24,6 +24,18 @@ class Live:
         self.c._training_swapped = False
         self.c._trip = None
 
+    def give_item(self, item_id: int, qty: int = 1) -> None:
+        """Put `qty` of `item_id` in the first free Items-pocket slot (quantities are XOR'd with the save key)."""
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        k16 = self.r._encryption_key() & 0xFFFF
+        for i in range(Addr.ITEMS_SLOTS):
+            base = sb1 + Addr.ITEMS_OFFSET + 4 * i
+            if self.m.read16(base) == 0:
+                self.m.write16(base, item_id)
+                self.m.write16(base + 2, qty ^ k16)
+                return
+        raise AssertionError("Items pocket is full")
+
     def heal_hp(self) -> None:
         for i in range(len(self.r.read_party())):
             b = Addr.PARTY_DATA + 100 * i
