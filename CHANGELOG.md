@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — the Pewter "Follow me!" loop (regression seen in a watched run)
+- Heading east out of Pewter City before Brock is beaten makes the Gym Guide walk the player back to the gym door, every time. `go_to('Route 4')`
+  and `grind`'s relocation treated the road as open, spent their hop budget bouncing off him and ended with "trip … ended: budget". The route is
+  now gated on the Boulder Badge (read from the GAME's badge byte, not from memory, so a stale belief can't open it): `go_to` stops up front with
+  the reason and what to do (beat Brock), and grind skips that grass. A Pewter City area note says the same on arrival.
+- Test: a live regression (`go_to('Route 4')` from Viridian Forest with 0 badges) and a gate unit test.
+
 ### Added — the Celadon Game Corner: coins, the Prize Corner and the slot machines (#215)
 - **`quest('coin_case')`** gets the Coin Case from the man in the Celadon Restaurant.
 - **`game_corner(action, amount)`**: `status` (coins, prices), `buy_coins` (the clerk's 50 / 500 lots, ¥20 a coin, checked against money and the

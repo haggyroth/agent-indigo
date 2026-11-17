@@ -81,3 +81,15 @@ def test_closed_elev3_barrier_is_a_wall():
 def test_req_alt_flag_field():
     r = Req("key_item", CARD_KEY, "hint", alt_flag=0x192)
     assert r.alt_flag == 0x192
+
+
+def test_pewter_east_exit_needs_the_boulder_badge_not_a_story_guess():
+    """The Gym Guide loop: heading east from Pewter before Brock is beaten walks you to the gym door forever."""
+    from knowledge.gates import MAP_GATES, unmet_gates
+    from knowledge.map_graph import node_for, route_to
+    route = route_to(node_for(1, 0, 5, 5), (3, 22))                       # Viridian Forest → Route 4 goes through Pewter's east exit
+    assert any(step[2][:2] == (3, 21) for step in route)
+    blocked = unmet_gates(route, lambda req: False)
+    assert blocked and blocked[0][1].kind == "badges" and "Gym Guide" in blocked[0][1].hint
+    assert unmet_gates(route, lambda req: req.kind == "badges") == []      # with the badge the road is open
+    assert MAP_GATES[(3, 21)][0].value == 1

@@ -24,7 +24,12 @@ SS_TICKET = 265
 _SS_HINT = ("Cerulean's exits stay blocked (a Slowbro + Lass south, a policeman east) until you have the "
             "SS Anne ticket — call quest('ss_ticket') (Bill's Sea Cottage, Route 25).")
 
+_PEWTER_HINT = ("Pewter City's east side is closed until Brock is beaten: the Gym Guide grabs you on the way ('Brock's looking for challengers! "
+                "Follow me!') and walks you to the gym door again and again, so heading east just loops. Win the Boulder Badge first: "
+                "go_to('gym'), heal(), save_state(), then challenge_leader().")
+
 MAP_GATES: dict[tuple[int, int], list[Req]] = {
+    (3, 21): [Req("badges", 1, _PEWTER_HINT)],           # Route 3, Pewter's east exit (checked against the GAME's badge byte, not memory)
     (9, 6): [Req("hm", "Cut", "Vermilion Gym's door is blocked by a Cut tree: get HM01 Cut from the captain "
                  "of the S.S. Anne (board at Vermilion's harbor with the SS Ticket), teach it "
                  "(teach_move) to a Pokémon, then use_hm('Cut') on the tree. quest('cut') does the first two steps.")],
