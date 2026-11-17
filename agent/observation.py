@@ -17,6 +17,7 @@ from game.constants import Addr  # noqa: F401  (kept for callers that patch it)
 from game.menu import MenuDriver
 from game.pathfinding import door_centers
 from game.state import GameContext
+from knowledge.area_guide import guide_for as area_guide
 from knowledge.bag import bag_digest, booster_note, stone_notes
 from knowledge.battle import (battle_idle_nudge, battle_summary, overworld_pp_summary, xp_share_hint)
 from knowledge.catch_policy import evaluate as catch_evaluate
@@ -155,6 +156,20 @@ def _shortcuts(t: Tick) -> list[str]:
     if note:
         out.append(note)
     return out
+
+
+def _area(t: Tick) -> list[str]:
+    """What to do on this map (dungeon / puzzle gym / late-game stretch): shown on arrival and as a reminder every 25 ticks."""
+    if t.in_battle or not t.overworld:
+        return []
+    text = area_guide(t.here)
+    if not text:
+        t.run.area_shown = None
+        return []
+    if t.run.area_shown == t.here and t.run.step_count % 25:
+        return []
+    t.run.area_shown = t.here
+    return [text]
 
 
 def _trip(t: Tick) -> list[str]:
@@ -424,7 +439,7 @@ def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool,
     parts.append(f"Pos: ({state.player_x},{state.player_y}) Map: {state.map_bank}/{state.map_id}")
     if not in_battle and state.context in (GameContext.OVERWORLD, GameContext.IN_MENU):
         parts += _supplies(t)
-    parts += _gym(t) + _field(t) + _exits(t) + _loop_signals(t)
+    parts += _gym(t) + _area(t) + _field(t) + _exits(t) + _loop_signals(t)
     # Close every turn with an explicit call to action: some models read a bare state dump as "no question asked".
     parts.append("→ Your turn: decide the best next action and call a tool NOW (do not reply with text only)")
     return " | ".join(parts)

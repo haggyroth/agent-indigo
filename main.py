@@ -340,6 +340,7 @@ class _RunState:
     prev_key_items: Optional[int] = None
     prev_dex_owned: Optional[int] = None
     bag_sig: Optional[tuple] = None
+    area_shown: Optional[tuple] = None    # the map whose area guide was last shown (see agent.observation._area)
     prev_map_key: Optional[tuple[int, int]] = None
     transitioning_steps: int = 0
     pending_map_b64: Optional[str] = None

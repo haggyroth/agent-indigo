@@ -23,6 +23,20 @@ All notable changes to this project are documented here. Format loosely follows
   watchdog.
 - Tests: `tests/test_game_corner.py`; live tests drive the Coin Case quest, coin buying, a TM and a Pokémon prize, and a 12-spin slot session.
 
+### Added — area guidance for every dungeon, puzzle gym and late-game stretch (#240)
+- **`knowledge/area_guide.py`**: a goal / what-to-watch-for / tip for 23 areas — Mt. Moon, Rock Tunnel, Diglett's Cave, the Power Plant, the Pokémon
+  Mansion, Seafoam Islands, Victory Road, Cerulean Cave, the Safari Zone, the Rocket Hideout, Silph Co., the Pokémon Tower, the S.S. Anne, the four
+  puzzle gyms (Sabrina's warp pads, Koga's invisible walls, Blaine's quiz machines, Giovanni's spinner tiles), Routes 12-15, the Cycling Road, Saffron's
+  gates and the Underground Path, the sea route to Cinnabar, Routes 22-23 / the Plateau, and the Elite Four — 98 maps in all. Every dungeon floor
+  the game names has one (a test checks).
+- **Facts come from the decomp** (`tools/gen_area_facts.py` → `knowledge/area_facts.py`): each map's trainer count, item balls (the item read from the
+  script that gives it) and hidden items with coordinates, and — for Sabrina's gym — the warp-pad pairs. The Card Key (Silph Co. 5F) and the Secret Key
+  (Mansion B1F) are named where they lie. Claims the decomp contradicted were fixed on the way (Moltres is on Mt. Ember in this version, the Tea is
+  free from the Condominiums woman, Silph's Lapras comes from a 7F employee).
+- **Shown in the observation** (`AREA — Victory Road: …`) on arrival and as a reminder every 25 ticks while the player stays on a covered map.
+- Not part of this change: automatic solvers for the puzzle gyms (Sabrina's pads, Koga's walls, Blaine's quiz, Giovanni's spinners) and the Seafoam
+  boulder puzzle — the text tells the model what the obstacle is; a solver is a separate piece of work.
+
 ### Added — the Safari Zone: `quest('surf')`, `quest('strength')` and `safari(...)` battles (#215)
 - **Safari battles are playable.** Their menu is BALL / BAIT / GO NEAR / RUN (no moves, party or Bag), so a battle that sets the Safari
   flag gets its own tool list (`safari`, `inspect_pokemon`, `team_report`, `press_button`, `advance_dialog`, `answer_prompt`,
