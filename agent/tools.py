@@ -163,12 +163,14 @@ TOOLS = [
         }, "required": []},
     }},
     {"type": "function", "function": {
-        "name": "get_ss_ticket",
-        "description": "Bill's quest for the SS Anne ticket (Route 25 → Sea Cottage). REQUIRED after Misty: without "
-                       "the ticket Cerulean's south and east exits stay blocked. A wild Pokémon or trainer on the "
-                       "way ENDS the call — play it, then call get_ss_ticket again to resume. auto_trainers=true "
-                       "fights the Nugget Bridge trainers for you.",
+        "name": "quest",
+        "description": "Scripted story quests. quest() lists them and where you stand (✔ done / ▶ available / … blocked); "
+                       "quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty: Cerulean's exits stay blocked "
+                       "without it); quest('cut') = HM01 Cut from the S.S. Anne's Captain (REQUIRED before Vermilion Gym). "
+                       "A wild Pokémon or trainer on the way ENDS the call — play it, then call quest again to resume. "
+                       "auto_trainers=true fights the trainers on the way for you.",
         "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "enum": ["ss_ticket", "cut"], "description": "omit to list the quests"},
             "auto_trainers": {"type": "boolean",
                               "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
         }, "required": []},
@@ -186,74 +188,36 @@ TOOLS = [
         "name": "team_report",
         "description": "Read-only team analysis: the types your KNOWN moves hit super effectively, shared "
                        "weaknesses, who can carry each HM, whether the team answers the NEXT gym and — if not — what "
-                       "to catch and where (or which PC Pokémon to pc_swap in). Use it when planning catches and "
+                       "to catch and where (or which PC Pokémon to swap in with pc). Use it when planning catches and "
                        "before a gym.",
         "parameters": {"type": "object", "properties": {}},
     }},
     {"type": "function", "function": {
-        "name": "pc_boxes",
-        "description": "List the Pokémon stored in the PC boxes (per box: names and levels). Reads memory — no menu "
-                       "needed, works anywhere. detail=true adds each one's box:slot, types, moves and which HMs it "
-                       "could learn — use it to pick who to withdraw (e.g. a Surf or Fly carrier, a type counter). "
-                       "Boxed Pokémon keep no HP.",
+        "name": "pc",
+        "description": "The Pokémon PC (box storage). action='list' shows what is stored (reads memory, works anywhere; "
+                       "detail=true adds box:slot, types, moves, HM ability and a quality grade — use it to pick who to "
+                       "withdraw). 'deposit' stores party `pokemon`; 'withdraw' takes `pokemon` (species, nickname or "
+                       "'box:slot') out into a free party slot; 'swap' deposits `pokemon` and withdraws `box_pokemon` in one "
+                       "go (both checked first). These travel to a Center if needed. A name matching several Pokémon returns "
+                       "the list — use a slot or 'box:slot'. It won't store your last battle-ready Pokémon, or the only HM "
+                       "carrier unless force=true.",
         "parameters": {"type": "object", "properties": {
-            "detail": {"type": "boolean", "description": "include box:slot, types, moves, HM ability"}}},
-    }},
-    {"type": "function", "function": {
-        "name": "pc_deposit",
-        "description": "Store a party Pokémon in the PC (travels to a Center if needed). `pokemon` = slot, species "
-                       "or nickname. Won't store your last battle-ready Pokémon, or the only HM-move carrier unless "
-                       "force=true. Uses the first box with room.",
-        "parameters": {"type": "object", "properties": {
-            "pokemon": {"type": "string", "description": "party slot number or name"},
+            "action": {"type": "string", "enum": ["list", "deposit", "withdraw", "swap"]},
+            "pokemon": {"type": "string", "description": "deposit/swap: party slot or name; withdraw: boxed species, nickname or 'box:slot'"},
+            "box_pokemon": {"type": "string", "description": "swap only: boxed species, nickname or 'box:slot' to bring out"},
+            "detail": {"type": "boolean", "description": "list only: include box:slot, types, moves, HM ability"},
             "force": {"type": "boolean", "description": "deposit even if it is the only HM-move carrier"}},
-            "required": ["pokemon"]},
-    }},
-    {"type": "function", "function": {
-        "name": "pc_withdraw",
-        "description": "Take a Pokémon out of the PC into your party (needs a free slot). `pokemon` = species / "
-                       "nickname or 'box:slot' like '1:0'; several matches return the list.",
-        "parameters": {"type": "object", "properties": {
-            "pokemon": {"type": "string", "description": "species, nickname or 'box:slot'"}}, "required": ["pokemon"]},
-    }},
-    {"type": "function", "function": {
-        "name": "pc_swap",
-        "description": "Deposit `party_pokemon`, then withdraw `box_pokemon` in one go; both are checked first. A "
-                       "name matching several boxed Pokémon returns the list — use 'box:slot'. Use it to rebuild the "
-                       "team (bring in a counter, send a weak one away).",
-        "parameters": {"type": "object", "properties": {
-            "party_pokemon": {"type": "string", "description": "party slot number or name to send to the PC"},
-            "box_pokemon": {"type": "string", "description": "boxed species, nickname or 'box:slot' to bring out"},
-            "force": {"type": "boolean", "description": "deposit even if it is the only HM-move carrier"}},
-            "required": ["party_pokemon", "box_pokemon"]},
+            "required": ["action"]},
     }},
     {"type": "function", "function": {
         "name": "reorder_party",
-        "description": "Swap two party members out of battle, driving Start → POKéMON → SWITCH for you. "
-                       "`first`/`second` are a 1-based slot or a species/nickname. Use it to choose who "
-                       "leads or to line up a switch order. In a battle use switch_pokemon instead.",
+        "description": "Out of battle, swap two party members (Start → POKéMON → SWITCH, driven for you) — or, with "
+                       "`second` omitted, make `first` your LEAD (slot 1, fights first; a fainted one can't lead). "
+                       "`first`/`second` are a 1-based slot or a species/nickname. In a battle use switch_pokemon.",
         "parameters": {"type": "object", "properties": {
             "first": {"type": "string", "description": "slot number or name"},
-            "second": {"type": "string", "description": "slot number or name"},
-        }, "required": ["first", "second"]},
-    }},
-    {"type": "function", "function": {
-        "name": "set_lead",
-        "description": "Make a party member your lead (slot 1 — the one that fights first) out of battle. "
-                       "`pokemon` is a 1-based slot or a species/nickname. A fainted Pokémon can't lead.",
-        "parameters": {"type": "object", "properties": {
-            "pokemon": {"type": "string", "description": "slot number or name"},
-        }, "required": ["pokemon"]},
-    }},
-    {"type": "function", "function": {
-        "name": "get_cut",
-        "description": "Get HM01 Cut from the S.S. Anne's Captain and teach it (needs the SS Ticket first). REQUIRED "
-                       "before Vermilion Gym — a Cut tree blocks its door. Encounters on the way end the call; call "
-                       "get_cut again to resume. auto_trainers=true fights the ship's trainers for you.",
-        "parameters": {"type": "object", "properties": {
-            "auto_trainers": {"type": "boolean",
-                              "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
-        }, "required": []},
+            "second": {"type": "string", "description": "slot number or name; omit to make `first` the lead"},
+        }, "required": ["first"]},
     }},
     {"type": "function", "function": {
         "name": "teach_move",

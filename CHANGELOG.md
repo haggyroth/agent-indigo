@@ -5,6 +5,19 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — tool surface, part 2 (#213): 8 tools become 3, one rule for "which Pokémon?"
+- **`pc(action, pokemon?, box_pokemon?, detail?, force?)`** replaces `pc_boxes` / `pc_deposit` / `pc_withdraw` / `pc_swap`
+  (`action` = list | deposit | withdraw | swap). Missing arguments are reported before anything touches the emulator.
+- **`quest(name?)`** replaces `get_ss_ticket` / `get_cut`. `quest()` lists every story quest with ✔ done / ▶ available / … blocked
+  (`knowledge/quests.py`, a registry: the next beat — Silph Scope, Poké Flute, Safari Zone — is an entry plus a driver, not another
+  top-level tool). Resume hints now read `quest('ss_ticket')` / `quest('cut')`.
+- **`reorder_party(first, second?)`** absorbs `set_lead`: with `second` omitted, `first` becomes the lead.
+- **One resolver** (`knowledge/targets.py`, `resolve_mon`): slot number, else exact species / nickname, else a unique partial match.
+  Two Pidgeys, or "rat" matching Rattata and Raticate, is reported as ambiguous ("slots 2, 4 — name one by its slot number") instead
+  of silently taking the first. Used by switch_pokemon, use_item, give_item, teach_move, use_hm, reorder_party and pc.
+- 38 → 33 tools in total (33 → 28 offered on the overworld); every hint, the system prompt, budgets and the scripted policy use the new calls.
+- Tests: `tests/test_targets.py`, `tests/test_tool_merge.py`; the live tests drive the new tools on the real ROM.
+
 ### Added — held items, battle boosters, Repel strategy (#215)
 - **`give_item(item, pokemon)`**: Bag → Items pocket → GIVE → the Pokémon, confirmed by the Pokémon's held item changing; an item
   already held is swapped back into the Bag (the game's own prompt is answered). `PokemonStatus.held_item` is decoded from the Growth

@@ -480,7 +480,7 @@ class NavMixin:
     def _yield_encounter(self, target_name: str, trainer: bool, resume: str | None, call: str | None = None) -> str:
         """The go_to message for an encounter handed to the model: what appeared, whether it is worth a ball,
         the tools to answer it with, and the exact call that resumes the trip (`call` overrides go_to — a quest
-        tool such as get_ss_ticket() resumes itself)."""
+        tool such as quest('ss_ticket') resumes itself)."""
         try:
             here = MAP_NAMES.get(self.reader.read_current_map()) or "this map"
         except Exception:

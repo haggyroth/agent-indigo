@@ -85,7 +85,7 @@ class HMMixin:
         party = self.reader.read_party()
         slots = [i for i, p in enumerate(party) if move_id in (p.move_ids or [])]
         if who:
-            t = self._resolve_party_target(who, party)
+            t = self._pick_party(who, party)[0]
             slots = [t] if t is not None and t in slots else []
         if not slots:
             return f"No Pokémon in your party knows {MOVE_LABEL.get(move_id, move_id)}."

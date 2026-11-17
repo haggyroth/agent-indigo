@@ -39,10 +39,12 @@ class PartyMixin:
         if self.reader.detect_context() != GameContext.OVERWORLD:
             return "Reorder the party from the overworld (in a battle use switch_pokemon)."
         party = self.reader.read_party()
-        a = self._resolve_party_target(str(first), party)
-        b = self._resolve_party_target(str(second), party)
-        if a is None or b is None:
-            return f"Couldn't find {first!r} / {second!r} in your party: {', '.join(p.species_name for p in party)}."
+        a, err = self._pick_party(str(first), party)
+        if a is None:
+            return err
+        b, err = self._pick_party(str(second), party)
+        if b is None:
+            return err
         if a == b:
             return "That's the same Pokémon — nothing to swap."
         before = self._party_sig()

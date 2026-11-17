@@ -166,7 +166,7 @@ class Gap:
 
 def gaps(party, boxes=None, gyms_beaten=()) -> list[Gap]:
     """What the team is missing right now, most urgent first: the next gym, then the HMs the story is about to
-    demand. `boxes` (PC contents) lets a hint say 'you already own one — pc_swap it in'."""
+    demand. `boxes` (PC contents) lets a hint say 'you already own one — pc('swap') it in'."""
     out: list[Gap] = []
     owned = {p.species_id for p in party}
     boxed = {m["species_id"]: m for m in (boxes or [])}
@@ -181,7 +181,7 @@ def gaps(party, boxes=None, gyms_beaten=()) -> list[Gap]:
             bits.append(f"just {fit.safe_members}/{len(party)} of you can take his types")
         if in_box:
             m = boxed[in_box[0]]
-            bits.append(f"you already own a {m['species_name']} in the PC ({m['box'] + 1}:{m['slot']}) — pc_swap it in")
+            bits.append(f"you already own a {m['species_name']} in the PC ({m['box'] + 1}:{m['slot']}) — pc('swap') it in")
             out.append(Gap("gym", "; ".join(bits), in_box))
         elif wanted:
             pick = wanted[:2]
@@ -200,7 +200,7 @@ def gaps(party, boxes=None, gyms_beaten=()) -> list[Gap]:
         if have_boxed:
             m = have_boxed[0]
             out.append(Gap("hm", f"nobody on the team can learn {hm} ({why}) — your {m['species_name']} in the PC "
-                                 f"({m['box'] + 1}:{m['slot']}) can: pc_swap it in", [m["species_id"]]))
+                                 f"({m['box'] + 1}:{m['slot']}) can: pc('swap') it in", [m["species_id"]]))
         elif cands:
             names = "; ".join(f"{SPECIES_NAMES[s]} — {where_to_find(s, 1)}" for s in cands[:2] if where_to_find(s, 1))
             out.append(Gap("hm", f"nobody on the team can learn {hm} ({why}); catch one that can: {names}", cands[:2]))

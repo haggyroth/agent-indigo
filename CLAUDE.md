@@ -215,16 +215,11 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `pick_up_items` | overworld | — | Collect the item balls on this map (see 'Items on the ground:' in the observation). |
 | `use_move` | battle | move | Use one of your active Pokémon's moves by name (the 'Your moves' list). |
 | `grind` | overworld | level?, catch?, auto_battles? | Level up on wild Pokémon in tall grass.  It walks to a route whose wild levels fit the Pokémon being trained; each wild encounter then ENDS the call — you fight it, then call grind again (the session persists). |
-| `get_ss_ticket` | overworld | auto_trainers? | Bill's quest for the SS Anne ticket (Route 25 → Sea Cottage). |
+| `quest` | overworld | name?, auto_trainers? | Scripted story quests.  quest() lists them and where you stand (✔ done / ▶ available / … blocked); quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty: Cerulean's exits stay blocked without it); quest('cut') = HM01 Cut from the S.S. |
 | `inspect_pokemon` | battle + overworld | pokemon | Look closely at ONE Pokémon: real stats, IVs, EVs, nature, Hidden Power and a quality grade for what its species is used for, compared with your team. |
-| `team_report` | battle + overworld | — | Read-only team analysis: the types your KNOWN moves hit super effectively, shared weaknesses, who can carry each HM, whether the team answers the NEXT gym and — if not — what to catch and where (or which PC Pokémon to pc_swap in). |
-| `pc_boxes` | overworld | detail? | List the Pokémon stored in the PC boxes (per box: names and levels). |
-| `pc_deposit` | overworld | pokemon, force? | Store a party Pokémon in the PC (travels to a Center if needed). |
-| `pc_withdraw` | overworld | pokemon | Take a Pokémon out of the PC into your party (needs a free slot). |
-| `pc_swap` | overworld | party_pokemon, box_pokemon, force? | Deposit `party_pokemon`, then withdraw `box_pokemon` in one go; both are checked first. |
-| `reorder_party` | overworld | first, second | Swap two party members out of battle, driving Start → POKéMON → SWITCH for you. |
-| `set_lead` | overworld | pokemon | Make a party member your lead (slot 1 — the one that fights first) out of battle. |
-| `get_cut` | overworld | auto_trainers? | Get HM01 Cut from the S.S.  Anne's Captain and teach it (needs the SS Ticket first). |
+| `team_report` | battle + overworld | — | Read-only team analysis: the types your KNOWN moves hit super effectively, shared weaknesses, who can carry each HM, whether the team answers the NEXT gym and — if not — what to catch and where (or which PC Pokémon to swap in with pc). |
+| `pc` | overworld | action, pokemon?, box_pokemon?, detail?, force? | The Pokémon PC (box storage).  action='list' shows what is stored (reads memory, works anywhere; detail=true adds box:slot, types, moves, HM ability and a quality grade — use it to pick who to withdraw). |
+| `reorder_party` | overworld | first, second? | Out of battle, swap two party members (Start → POKéMON → SWITCH, driven for you) — or, with `second` omitted, make `first` your LEAD (slot 1, fights first; a fainted one can't lead). |
 | `teach_move` | overworld | tm, pokemon?, forget?, confirm? | Teach a TM/HM to a party Pokémon via the TM Case. |
 | `fly_to` | overworld | town | Fly to a visited town (needs a Pokémon that knows Fly + the Thunder Badge, outdoors): Pallet, Viridian, Pewter, Cerulean, Lavender, Vermilion, Celadon, Fuchsia, Cinnabar, Saffron, Indigo Plateau. |
 | `use_hm` | overworld | move | Use a field move: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut (nearest tree), Rock Smash, Strength (then walk into the boulder), Flash (lights a cave). |
@@ -241,7 +236,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 38 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 33 tools in total.
 <!-- TOOLS:END -->
 
 The opponent is identified from memory (`gEnemyParty`), so there is no

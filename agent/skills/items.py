@@ -55,7 +55,7 @@ class FieldItemMixin:
     def _pick_field_target(self, iid: int, party, target: str) -> int | None:
         """0-based party slot to use the item on: the named one, else whoever needs it."""
         if target:
-            return self._resolve_party_target(target, party)
+            return self._pick_party(target, party)[0]
         if iid in _HEAL_HP:
             hurt = [(p.current_hp / max(p.max_hp, 1), i) for i, p in enumerate(party)
                     if 0 < p.current_hp < p.max_hp]
@@ -105,6 +105,10 @@ class FieldItemMixin:
             return (f"More than one Pokémon can use the {ITEM_NAMES[iid]} — name one: "
                     f"use_item('{ITEM_NAMES[iid]}', target='<species or slot>').")
         if iid not in _NO_TARGET:
+            if target:
+                _slot, why = self._pick_party(target, party)
+                if _slot is None:
+                    return why
             slot = self._pick_field_target(iid, party, target)
             if slot is None:
                 return (f"Nobody needs {ITEM_NAMES[iid]} right now"
@@ -213,7 +217,9 @@ class FieldItemMixin:
         if iid not in order:
             return (f"{holder.nickname or holder.species_name} is already holding the {HELD_ITEMS[iid][0]}." if holder
                     else f"No {HELD_ITEMS[iid][0]} in your Items pocket.")
-        slot = self._resolve_party_target(pokemon, party) if pokemon else None
+        slot, err = self._pick_party(pokemon, party) if pokemon else (None, "")
+        if slot is None and err:
+            return err
         if slot is None:
             from knowledge.held_items import holder_for
             who = holder_for(iid, party)

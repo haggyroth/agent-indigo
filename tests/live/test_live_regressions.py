@@ -158,7 +158,7 @@ def test_get_ss_ticket_then_cross_cerulean_to_vermilion(live):
     """Bill's quest end to end (post-Misty fixture), then the Underground Path to Vermilion — covers the
     Saffron-shell routing fix and the directional stairs probe."""
     live.load("post_misty")
-    out = _quest(live, "get_ss_ticket", rounds=30)
+    out = _quest(live, "quest", rounds=30, name="ss_ticket")
     assert "Got the SS Ticket" in out or "already have" in out, out
     assert live.c._has_ss_ticket()
     for _ in range(6):
@@ -175,7 +175,7 @@ def test_get_cut_then_enter_the_vermilion_gym_and_open_the_locks(live):
     memory open the electric locks."""
     live.load("vermilion")
     live.c.ltm.data["gyms_beaten"] = ["Brock", "Misty"]
-    out = _quest(live, "get_cut", auto_trainers=True)
+    out = _quest(live, "quest", name="cut", auto_trainers=True)
     assert "Got HM01" in out or "already knows Cut" in out, out
     assert live.c._knows_cut()
     for _ in range(6):
@@ -198,7 +198,7 @@ def test_reorder_party_and_set_lead_drive_the_party_menu(live):
     out = live.c._execute("reorder_party", json.dumps({"first": "1", "second": "3"}))
     assert out.startswith("Swapped"), out
     assert [p.species_name for p in live.r.read_party()][0] == "Caterpie"
-    out = live.c._execute("set_lead", json.dumps({"pokemon": "Pikachu"}))
+    out = live.c._execute("reorder_party", json.dumps({"first": "Pikachu"}))
     assert out.startswith("Swapped") and live.r.read_party()[0].species_name == "Pikachu", out
     assert live.r.detect_context() == GameContext.OVERWORLD
 
@@ -267,6 +267,9 @@ def test_balance_training_keeps_the_ace_from_stealing_xp(live, monkeypatch):
 def _pc(live, tool, **args):
     """Call a pc_* tool; if go_to handed us a wild encounter on the way to the Center (#202), flee and resume."""
     out = ""
+    if tool.startswith("pc_"):                                       # pc_deposit(pokemon=…) → pc(action="deposit", pokemon=…)
+        args = {"action": tool[3:], **({"pokemon": args.pop("party_pokemon")} if "party_pokemon" in args else {}), **args}
+        tool = "pc"
     for _ in range(12):
         out = live.c._execute(tool, json.dumps(args))
         if "appeared at" not in out or live.r.detect_context() != GameContext.IN_BATTLE:
@@ -280,8 +283,8 @@ def test_pc_deposit_list_and_withdraw_through_the_real_menus(live):
     out = _pc(live, "pc_deposit", pokemon="Pikachu")
     assert out.startswith("Deposited") and len(live.r.read_party()) == 2, out
     assert live.r.detect_context() == GameContext.OVERWORLD
-    assert "Pikachu" in live.c._execute("pc_boxes", "{}")
-    out = live.c._execute("pc_withdraw", json.dumps({"pokemon": "pikachu"}))
+    assert "Pikachu" in live.c._execute("pc", json.dumps({"action": "list"}))
+    out = live.c._execute("pc", json.dumps({"action": "withdraw", "pokemon": "pikachu"}))
     assert out.startswith("Withdrew") and len(live.r.read_party()) == 3, out
     assert live.r.read_boxes() == []
 
@@ -294,7 +297,7 @@ def test_pc_withdraw_from_another_box_and_grid_slot(live):
     for i in range(80):
         live.m.write8(dst + i, live.m.read8(src + i))
         live.m.write8(src + i, 0)
-    out = live.c._execute("pc_withdraw", json.dumps({"pokemon": "2:14"}))
+    out = live.c._execute("pc", json.dumps({"action": "withdraw", "pokemon": "2:14"}))
     assert out.startswith("Withdrew") and live.r.read_current_box() == 1, out
     assert [p.species_name for p in live.r.read_party()][-1] == "Caterpie"
 
@@ -417,7 +420,7 @@ def test_inspect_pokemon_and_the_catch_report_use_the_real_ivs(live):
         if "Gotcha" in got:
             break
     assert "Gotcha" in got and "Quality: " in got, got
-    assert live.c._execute("pc_boxes", json.dumps({"detail": True})) is not None
+    assert live.c._execute("pc", json.dumps({"action": "list", "detail": True})) is not None
 
 
 def test_escape_rope_leaves_the_forest_the_threemon_fixture_stands_in(live):
@@ -466,3 +469,10 @@ def test_give_item_equips_swaps_and_x_items_work_in_battle(live):
     out = live.c._execute("use_item", json.dumps({"item": "X Attack"}))
     assert out.startswith("Used X Attack — +1 Attack stage"), out
     assert dict(live.r.read_items_pocket()).get(75) == 1
+
+
+def test_quest_lists_progress_and_refuses_what_is_blocked(live):
+    live.load("threemon")
+    out = live.c._execute("quest", "{}")
+    assert out.startswith("Story quests:") and "ss_ticket" in out and "cut" in out, out
+    assert "needs quest('ss_ticket') first" in live.c._execute("quest", json.dumps({"name": "cut"})) or "already" in out

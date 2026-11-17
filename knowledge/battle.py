@@ -285,5 +285,5 @@ def xp_share_hint(party, active_species: int, foe_level: int = 0) -> str:
                 f"and is not hit. Do NOT switch it back in.")
     low = lag[0][1]
     return (f"XP SHARE: {low.species_name} L{low.level} trails the team (top L{top}). Next fight lead with it "
-            f"(set_lead('{low.species_name}') before walking) and switch to a strong teammate on turn 1 — "
+            f"(reorder_party('{low.species_name}') before walking) and switch to a strong teammate on turn 1 — "
             "both gain XP. Trainer battles pay 1.5×.")

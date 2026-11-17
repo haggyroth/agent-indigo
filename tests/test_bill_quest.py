@@ -22,7 +22,7 @@ def test_route_23_badge_gate_is_on_route_23_not_22():
 def test_cerulean_exits_are_gated_on_the_ss_ticket():
     route = [("connection", "South", (3, 23))]
     unmet = unmet_gates(route, lambda req: False)
-    assert unmet and "get_ss_ticket" in unmet[0][1].hint
+    assert unmet and "quest('ss_ticket')" in unmet[0][1].hint
     assert unmet_gates(route, lambda req: True) == []
 
 

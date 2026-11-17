@@ -59,7 +59,7 @@ def test_full_party_catches_an_upgrade_into_the_box_with_a_pc_swap_hint():
     full = party((IVYSAUR, "Ivysaur", 30), (CATERPIE, "Caterpie", 12), (PIDGEY, "Pidgey", 12),
                  (CATERPIE + 1, "Metapod", 12), (CATERPIE + 2, "Butterfree", 12), (13, "Weedle", 12))
     v = evaluate(full, GROWLITHE, 18)
-    assert v.catch and "pc_swap" in v.reason
+    assert v.catch and "pc('swap')" in v.reason
 
 
 def test_a_weak_line_only_adding_a_type_still_needs_a_small_gap():

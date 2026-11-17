@@ -70,7 +70,7 @@ def test_next_gym_advances_after_a_badge():
 
 def test_after_misty_it_fetches_the_ss_ticket_first():
     p = policy(GameContext.OVERWORLD, [mon(30)], gyms_beaten=["Brock", "Misty"], ticket=False)
-    assert p.decide() == ("get_ss_ticket", {})
+    assert p.decide() == ("quest", {"name": "ss_ticket"})
     hurt = policy(GameContext.OVERWORLD, [mon(30, hp=20)], gyms_beaten=["Brock", "Misty"], ticket=False)
     assert hurt.decide() == ("heal", {})            # the rival fight is on the way: go in healthy
     p = policy(GameContext.OVERWORLD, [mon(30)], gyms_beaten=["Brock", "Misty"], ticket=True)
@@ -79,4 +79,4 @@ def test_after_misty_it_fetches_the_ss_ticket_first():
 
 def test_with_the_ticket_but_no_cut_it_gets_cut_before_the_gym():
     p = policy(GameContext.OVERWORLD, [mon(30)], gyms_beaten=["Brock", "Misty"], ticket=True, knows_cut=False)
-    assert p.decide() == ("get_cut", {})
+    assert p.decide() == ("quest", {"name": "cut"})

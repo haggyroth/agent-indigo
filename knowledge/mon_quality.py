@@ -165,7 +165,7 @@ def upgrade_swaps(party, boxes, margin: float = UPGRADE_MARGIN, limit: int = 2) 
             note = f"; it is {cost} levels lower, so expect to retrain it" if cost > LEVEL_COST_NOTE else ""
             out.append(f"{b['nickname'] or b['species_name']} in the PC ({b['box'] + 1}:{b['slot']}) is a {qb.grade} "
                        f"{p.species_name} ({qb.score:.0%}) vs your {qp.grade} one ({qp.score:.0%}) — "
-                       f"pc_swap('{p.nickname or p.species_name}', '{b['box'] + 1}:{b['slot']}'){note}")
+                       f"pc(action='swap', pokemon='{p.nickname or p.species_name}', box_pokemon='{b['box'] + 1}:{b['slot']}'){note}")
     return out[:limit]
 
 
