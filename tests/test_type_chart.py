@@ -1,5 +1,6 @@
 """Gen III type effectiveness."""
-from knowledge.type_chart import get_effectiveness, best_move_type
+from knowledge.battle import effectiveness_vs
+from knowledge.type_chart import get_effectiveness
 
 
 def test_super_effective_and_resist():
@@ -22,16 +23,4 @@ def test_key_immunities():
 
 def test_dual_type_multiplier_stacks():
     # Water vs Ground/Rock (e.g. Onix): 2 * 2 = 4x
-    typ, mult = best_move_type(["WAT"], ["GRD", "ROC"])
-    assert typ == "WAT" and mult == 4.0
-
-
-def test_best_move_picks_highest():
-    # Against a pure Rock target, Water(2x) beats Normal(0.5x).
-    typ, mult = best_move_type(["NOR", "WAT"], ["ROC"])
-    assert typ == "WAT" and mult == 2.0
-
-
-def test_best_move_defaults_to_normal_when_nothing_helps():
-    typ, mult = best_move_type(["NOR"], ["NOR"])
-    assert typ == "NOR" and mult == 1.0
+    assert effectiveness_vs("WAT", ("GRD", "ROC")) == 4.0

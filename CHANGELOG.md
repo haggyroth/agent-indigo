@@ -5,6 +5,25 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Removed — dead code from the pre-Nov-13 audit (#214)
+- **Deleted, no remaining use:** `tools/diagnostic.py` and `tools/diagnostic_tilemap.py` (≈650 lines, HTTP-backend-only, built on
+  addresses the code no longer trusts); dead methods in the move-learn, PC, overworld and quest skills (`_accept_forget_slot0`,
+  `_storage_base`, `_party_full_hp`, `VERMILION_GYM`); `read_bag_count`, `read_box_mon` (public single-slot reader; `read_boxes` /
+  `_decode_box_mon` remain), both `tap_many`s, `active_party_member`, `type_chart.best_move_type`, `reconcile_badges_from_ram` (the
+  monotonic reconciler nothing called — only `reconcile_badges_authoritative` at startup), `STARTER_RECOMMENDATION/REASON`, the
+  autopilot nickname generator (`auto_name`, its pun/pool tables, `GUIDANCE`), unused `Addr` constants (`BADGES`, `OVERWORLD_FLAG`,
+  `BATTLE_FLAGS`, `PARTY_MENU_SLOT`, `FLAG_SYS_USE_STRENGTH`), unused config (`DECISION_INTERVAL`, `HP_HEAL_THRESHOLD`, the
+  `LM_STUDIO_BASE` alias — the env var is still honoured as a fallback for `LLM_BASE_URL`), `_RunState.battle_start_lead` /
+  `battle_active_slot` (superseded by the event-stream battle tracker) and `ShortTermMemory`'s never-read `current_state`,
+  `last_state`, `last_diff`, `battle_turn`, `consecutive_same_action`.
+- **Tidied:** LTM's corrupt-file warning uses the logger instead of `print`; tests for deleted code removed or pointed at the
+  surviving API; more `ShortTermMemory` loop-detection tests (history cap, new-map and new-battle resets, moving while repeating).
+- **Guard:** `tests/test_dead_code.py` fails CI when a function / method / class in `agent game knowledge memory evals` is referenced
+  nowhere else (tests don't count; generated tables exempt; a short allow-list for deliberate APIs). 
+- Not done here (still on #214): the `hasattr(self.mgba, "wait_until_idle")` capability checks (~20 sites; needs the test fakes
+  updated), the narrow-exception pass, extracting the observation builder from `main.py`, and replacing the AgentClient mixins'
+  hidden shared state with an explicit context.
+
 ### Added — IV / EV / nature awareness and a per-Pokémon quality score (#208)
 - **Decoded.** `PokemonStatus` and the boxed-Pokémon dicts now carry IVs, EVs, friendship, ability slot and the game's own
   computed stats (IVs/EVs from the already-decrypted E / M substructures; layout per the decomp). Pokémon are identified by

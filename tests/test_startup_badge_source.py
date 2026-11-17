@@ -13,7 +13,7 @@ MAIN = Path(__file__).resolve().parent.parent / "main.py"
 
 # Either startup reconciler is acceptable — both must be fed from the relocation-safe
 # reader, never the fixed Addr.BADGES.
-_RECONCILE_METHODS = {"reconcile_badges_from_ram", "reconcile_badges_authoritative"}
+_RECONCILE_METHODS = {"reconcile_badges_authoritative"}
 
 
 def _reconcile_call() -> ast.Call:
@@ -28,7 +28,7 @@ def _reconcile_call() -> ast.Call:
 
 def test_reconcile_is_fed_from_reader_read_badges():
     call = _reconcile_call()
-    assert call.args, "reconcile_badges_from_ram called with no argument"
+    assert call.args, "reconcile_badges_authoritative called with no argument"
     arg_src = ast.dump(call.args[0])
     # The argument must be reader.read_badges()[...] — an attribute call on `reader`.
     assert "read_badges" in arg_src, (

@@ -39,7 +39,6 @@ class Addr:
     # target slot before selecting.
     # (UNRELIABLE with 3+ mons — it read 0/1/0 while the real cursor went 0/1/2; use PARTY_FIELD_SLOT
     # 0x0203B0A9, gPartyMenu.slotId, which is also what the in-battle party screen uses.)
-    PARTY_MENU_SLOT     = 0x020207FE
     # gBattlePartyCurrentOrder — packed nibbles mapping each in-battle party-menu
     # DISPLAY slot to a field party id (slot even → high nibble, odd → low nibble of
     # byte slot//2). Identity [01 23 45] at battle start; a switch permutes it, so the
@@ -99,7 +98,6 @@ class Addr:
     # 0x41C was wrong — it landed in the bag-items region, so read_badges returned
     # bag data and NO run ever registered a badge. Cross-checked: key items at
     # +0x3B8 matches this same struct base, confirming the offset frame.)
-    BADGES       = 0x02026530   # canonical base(0x202554c)+0xFE4; reference only (do not read live)
     BADGES_OFFSET = 0xFE4       # + [SAVEBLOCK1_PTR] → badge bitmask (relocation-safe)
     # Bit order: bit 0=Brock, 1=Misty, 2=Surge, 3=Erika,
     #            4=Koga, 5=Sabrina, 6=Blaine, 7=Giovanni
@@ -275,7 +273,6 @@ class Addr:
     DEX_OWNED_OFFSET   = 0x28           # SaveBlock2 + 0x18 + 0x10 : u8 owned[52]
     DEX_SEEN_OFFSET    = 0x5C           # SaveBlock2 + 0x18 + 0x44 : u8 seen[52]
     FLAGS_OFFSET       = 0xEE0          # + [SAVEBLOCK1_PTR]; flag n = byte n>>3, bit n&7
-    FLAG_SYS_USE_STRENGTH = 0x805
     FLAG_SYS_FLASH_ACTIVE = 0x806
     # gBackupMapLayout (IWRAM): the LIVE, EWRAM copy of the map that the game edits when a door opens or
     # a switch flips (Silph card-key doors, Pokémon Mansion). {s32 width+15, s32 height+14, u16* map};
@@ -295,12 +292,6 @@ class Addr:
     SUMMARY_MOVE_CURSOR = 0x0203B16D
     BAG_POCKET_KEYITEMS = 1
 
-    # DEPRECATED — empirically WRONG for context detection; kept only for the
-    # legacy diagnostic tool. OVERWORLD_FLAG reads 0 during free-roam overworld
-    # (its logic was inverted); BATTLE_FLAGS is transient during a battle and
-    # stale afterward. Do not use these in detect_context.
-    OVERWORLD_FLAG = 0x0202287C
-    BATTLE_FLAGS   = 0x02022880
 
     # Map header — DataCrystal: "Current Map Header 0x02036DFC"
     # The struct MapHeader sits directly at this address (not a pointer to it).

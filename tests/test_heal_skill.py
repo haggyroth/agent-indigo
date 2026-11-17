@@ -56,18 +56,6 @@ def _ctrl_client(reader, mgba):
     return c
 
 
-def test_party_full_hp_true_when_all_full():
-    assert _client([_mon(27, 27), _mon(20, 20)])._party_full_hp() is True
-
-
-def test_party_full_hp_false_when_any_hurt():
-    assert _client([_mon(27, 27), _mon(5, 20)])._party_full_hp() is False
-
-
-def test_party_full_hp_false_when_empty():
-    assert _client([])._party_full_hp() is False
-
-
 def test_heal_noops_when_already_full():
     # Full party → heal() returns immediately without any navigation.
     msg = _client([_mon(27, 27)])._heal()

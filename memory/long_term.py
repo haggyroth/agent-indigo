@@ -1,9 +1,12 @@
 import copy
 import json
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
 from config import PROGRESS_PATH
+
+logger = logging.getLogger(__name__)
 
 DEFAULTS = {
     "session_count": 0,   "badges_earned": 0,
@@ -37,11 +40,9 @@ class LongTermMemory:
                     f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.bak")
                 try:
                     os.replace(self.path, bak)
-                    print(f"[long_term] WARNING: {self.path.name} was corrupt ({e}); "
-                          f"moved to {bak.name}, starting fresh.")
+                    logger.warning("%s was corrupt (%s); moved to %s, starting fresh.", self.path.name, e, bak.name)
                 except OSError:
-                    print(f"[long_term] WARNING: {self.path.name} was corrupt ({e}) "
-                          f"and could not be renamed; starting fresh.")
+                    logger.warning("%s was corrupt (%s) and could not be renamed; starting fresh.", self.path.name, e)
                 return copy.deepcopy(DEFAULTS)
             # deepcopy so absent keys don't alias DEFAULTS' mutable lists
             data = {**copy.deepcopy(DEFAULTS), **saved}
@@ -76,32 +77,6 @@ class LongTermMemory:
             self.data["badges_earned"] = len(self.data["gyms_beaten"])
             self.save()
 
-    def reconcile_badges_from_ram(self, badge_bits: int) -> list[str]:
-        """Fold the game's badge bitmask (the authoritative save state) into LTM.
-
-        LTM is a *monotonic* mirror for reward/milestone tracking: we adopt any
-        badge RAM shows that LTM is missing, but never remove one — game RAM can
-        legitimately regress when the agent load_state()s to retry a gym, and we
-        must not un-earn milestones. This never writes game RAM.
-
-        Returns the milestone names newly adopted (for logging).
-        """
-        from knowledge.leafgreen_data import badges_in_bitmask
-        adopted: list[str] = []
-        changed = False
-        for _bit, leader, milestone in badges_in_bitmask(badge_bits):
-            if leader and leader not in self.data["gyms_beaten"]:
-                self.data["gyms_beaten"].append(leader)
-                self.data["badges_earned"] = len(self.data["gyms_beaten"])
-                changed = True
-            if milestone and milestone not in self.data["milestones"]:
-                self.data["milestones"].append(milestone)
-                adopted.append(milestone)
-                changed = True
-        if changed:
-            self.save()
-        return adopted
-
     def reconcile_badges_authoritative(self, badge_bits: int) -> dict:
         """Sync LTM's badge state to EXACTLY match the live save's bitmask — adopting
         badges the save has that LTM is missing AND dropping any LTM claims that the
@@ -111,7 +86,7 @@ class LongTermMemory:
         blocks it and marches it back to the un-beaten gym). Non-gym milestones
         (starter_chosen, …) are untouched. Returns {'adopted': [...], 'dropped': [...]}.
 
-        Mid-session, keep using the monotonic reconcile_badges_from_ram so a
+        Mid-session the badge milestones are adopted one at a time by the main loop so a
         load_state() retry (RAM regresses) never un-earns a real badge.
         """
         from knowledge.leafgreen_data import badges_in_bitmask, BADGE_BIT_MILESTONE

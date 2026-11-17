@@ -34,3 +34,30 @@ def test_unknown_position_does_not_touch_movement():
     # A position-less record (e.g. reasoning-only) must not change movement state.
     stm.record_action("thinking...")
     assert stm.steps_without_movement == 2
+
+
+def test_same_action_at_a_new_position_is_not_stuck_and_history_is_capped():
+    stm = ShortTermMemory()
+    for i in range(40):
+        stm.record_action("press:Right", i, 0)
+    assert stm.steps_without_movement == 0 and not stm.stuck
+    assert len(stm.action_history) == 30 and stm.action_history[-1] == "press:Right"
+    assert stm.visit_count(39, 0) == 1 and stm.visit_count(99, 99) == 0
+
+
+def test_new_map_clears_visits_and_the_stuck_counter_but_keeps_history():
+    stm = ShortTermMemory()
+    for _ in range(5):
+        stm.record_action("press:Up", 2, 2)
+    assert stm.stuck and stm.visit_count(2, 2) == 5
+    stm.reset_for_new_map()
+    assert not stm.stuck and stm.visit_count(2, 2) == 0 and len(stm.action_history) == 5
+
+
+def test_new_battle_clears_the_stuck_counter():
+    stm = ShortTermMemory()
+    for _ in range(5):
+        stm.record_action("press:A", 1, 1)
+    assert stm.stuck
+    stm.reset_for_new_battle()
+    assert stm.steps_without_movement == 0

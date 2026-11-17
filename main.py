@@ -341,9 +341,7 @@ class _RunState:
     """
     prev_state: Optional[GameState] = None
     battle_was_active: bool = False
-    battle_start_lead: str = ""
     current_enemy: str = ""
-    battle_active_slot: int = 0
     battle_is_trainer: bool = False
     prev_key_items: Optional[int] = None
     prev_dex_owned: Optional[int] = None
@@ -924,9 +922,6 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 client._finish_evolution()
             state = reader.read_state()
             diff  = reader.diff(run.prev_state, state)
-            stm.current_state = state
-            stm.last_state    = run.prev_state
-            stm.last_diff     = diff
 
             # Goal reached? (eval harness only; no-op for the open-ended real run.)
             if goal is not None and goal(state, ltm):
@@ -938,8 +933,6 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             in_battle = state.context == GameContext.IN_BATTLE
             if in_battle and not run.battle_was_active:
                 stm.reset_for_new_battle()
-                run.battle_start_lead = state.party[0].species_name if state.party else ""
-                run.battle_active_slot = 0
                 # Classify the battle from gBattleTypeFlags (set at battle init).
                 run.battle_is_trainer = bool(mgba.read32(Addr.BATTLE_TYPE_FLAGS)
                                              & Addr.BATTLE_TYPE_TRAINER)
@@ -957,13 +950,6 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 enemy = reader.read_enemy_lead()
                 if enemy and enemy.species_name:
                     run.current_enemy = enemy.species_name.upper().strip()
-
-            # Track which of our Pokémon is actually fighting. In single battles
-            # only the active mon's HP changes, so the last slot to take damage
-            # is the one that's out — remembered so battle-end logging records the
-            # fighting mon, not always the lead (#2).
-            if in_battle and diff.hp_changed:
-                run.battle_active_slot = diff.hp_changed[-1]
 
             # ── Battle end detection ────────────────────────────────────────
             if run.battle_was_active and not in_battle:
