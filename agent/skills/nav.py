@@ -3,11 +3,23 @@ warp crossing, the travel-battle handler, and the gym-leader challenge.
 Deterministic code driving the emulator; the LLM only picks the intent.
 See agent.lm_studio_client.AgentClient (which inherits NavMixin)."""
 
+import logging
+
 from rich.console import Console
 
 from knowledge.navigation import MAP_NAMES
+from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
 console = Console()
+logger = logging.getLogger(__name__)
+_LOGGED: set = set()
+
+
+def _log_once(key: str, msg: str, *args) -> None:
+    """Log a failure the code deliberately tolerates, once per kind — silent `except: pass` hid them completely."""
+    if key not in _LOGGED:
+        _LOGGED.add(key)
+        logger.warning(msg, *args, exc_info=True)
 
 
 class NavMixin:
@@ -190,6 +202,15 @@ class NavMixin:
             self._auto_fight()
         self._advance_to_control(tries=30)
         return True
+
+    def _walk_to_tool(self, tx: int, ty: int) -> str:
+        """The model-facing walk_to: reject a tile outside the current map with the real size instead of handing a
+        nonsense goal to A* (internal callers use _walk_to directly — they may aim at edge/warp tiles)."""
+        w, h = getattr(self.tilemap, "_width", None), getattr(self.tilemap, "_height", None)
+        if w and h and not (0 <= tx < w and 0 <= ty < h):
+            return (f"({tx},{ty}) is outside this map — valid tiles are x 0-{w - 1}, y 0-{h - 1}. "
+                    "Use go_to / go_to_map to leave the map.")
+        return self._walk_to(tx, ty)
 
     def _walk_to(self, tx: int, ty: int) -> str:
         """Deterministically walk the player to tile (tx, ty) on the current map
@@ -574,7 +595,7 @@ class NavMixin:
                     if sender():               # forced replacement after a faint: B can't cancel it
                         continue
                 except Exception:
-                    pass
+                    _log_once("advance.send_next_mon", "nav: _send_next_mon failed while advancing to control (ignored)")
             # A stray full-screen menu (Bag / party / summary / TM Case / map): A would USE or
             # SELECT things in it (that is how a left-open Bag drank potions in a loop) — back out.
             from game.constants import Addr
@@ -641,6 +662,7 @@ class NavMixin:
                 move_id, bit = HM_BADGE[req.value]
                 return self._party_knows(move_id) and bool(self.reader.read_badges()[1] >> bit & 1)
         except Exception:
+            _log_once(f"gate.{req.kind}", "nav: could not check the %s requirement — treating it as met (ignored)", req.kind)
             return True                       # never block travel on a read hiccup
         return True
 
@@ -672,7 +694,7 @@ class NavMixin:
 
     # Towns with their own Pokémon Center (Pallet has none). Healing at a town's Center the first time we
     # arrive also makes it the blackout respawn point, so a loss never sends us back across the map.
-    _PC_TOWNS = frozenset({(3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 10)})
+    _PC_TOWNS = PC_TOWNS            # knowledge.travel_rules
 
     def _maybe_visit_new_town(self, town, destination: str) -> None:
         """First arrival in a town with a Center: walk in and talk to Nurse Joy (heals HP+PP and sets the
@@ -690,6 +712,9 @@ class NavMixin:
             return
         self._in_town_visit = True
         try:
+            from agent import events
+            events.emit("trip", f"first visit to {MAP_NAMES.get(town, town)}: healing at its Center to set the respawn point",
+                        major=False)
             res = self._heal(force=True)
             if res.startswith(("Healed", "Party is already")):
                 seen.append(key)             # only count it once we actually reached the nurse
@@ -699,9 +724,6 @@ class NavMixin:
                     pass
         finally:
             self._in_town_visit = False
-
-    # Maps you can't walk to from Cerulean (see the guard in _go_to): the whole west side of Kanto start.
-    _WEST_OF_ROUTE4 = frozenset({(3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21), (1, 0), (1, 1), (1, 2), (1, 3)})
 
     def _has_must_need(self) -> bool:
         return any(n.level == "must" for n in self._readiness())
@@ -762,8 +784,54 @@ class NavMixin:
         city_name = next((g["city"] for g in GYMS if g["leader"] == leader), None)
         return next((k for k, v in MAP_NAMES.items() if v == city_name and k[0] == 3), None)
 
+    _HOP_BUDGET = 40              # hops one go_to call may take before it reports "budget"
+    MAX_TRIP_DEPTH = 4            # go_to -> gym city -> first-visit heal -> go_to(Pokemon Center) is 3 deep; more is a loop
+
+    @staticmethod
+    def _battle_stop_reason(msg: str) -> str:
+        """Why _handle_travel_battle ended a trip, from its message (pinned by tests so the wording can't drift)."""
+        if "escape failed" in msg or msg.startswith("A tough trainer"):
+            return "battle_unresolved"
+        if msg.startswith(("Lost a trainer", "Lost to a trainer")):
+            return "lost"
+        if "HP is low" in msg:
+            return "low_hp"
+        return "battle"                       # a wild Pokémon / trainer handed to the model
+
+    def _stop(self, reason: str, msg: str) -> str:
+        """Record WHY the current trip ended (arrived / battle / lost / low_hp / no_route / gated / no_walk / stall /
+        blocked / budget / nested / unknown_destination) and return the message unchanged."""
+        self._stop_reason = reason
+        return msg
+
     def _go_to(self, destination: str, mode: str = "yield", auto_trainers: bool = False,
                resume_call: str | None = None) -> str:
+        """Travel (see _go_to_inner) with a depth guard and a recorded, structured stop reason: `last_trip_stop`
+        = {reason, target, map} and one `trip` event per outermost trip — so "Stopped at X en route…" from a spent
+        hop budget no longer looks the same as an interrupted trip."""
+        depth = getattr(self, "_go_depth", 0)
+        if depth >= self.MAX_TRIP_DEPTH:
+            return self._stop("nested", f"Travel to {destination!r} is nested {depth} deep (a heal or a first-visit "
+                                        "stop led back into travel) — stopping so it can't loop. Call it again from here.")
+        self._go_depth = depth + 1
+        self._stop_reason = None
+        try:
+            out = self._go_to_inner(destination, mode, auto_trainers, resume_call)
+        finally:
+            self._go_depth = depth
+        reason = self._stop_reason or ("arrived" if str(out).startswith("Arrived") else "stopped")
+        try:
+            here = self.reader.read_current_map()
+        except Exception:
+            here = None
+        self.last_trip_stop = {"reason": reason, "target": destination, "map": here}
+        if depth == 0 and reason != "arrived":
+            from agent import events
+            events.emit("trip", f"trip to {destination} ended: {reason}", major=False, reason=reason, target=destination)
+        return out
+
+    def _go_to_inner(self, destination: str, mode: str = "yield", auto_trainers: bool = False,
+                     resume_call: str | None = None) -> str:
         """Travel to a named map ("Pewter City", "Route 1") or waypoint ("Pokemon
         Center", "Mart", "Gym"), auto-routing across map connections AND building/
         cave warps. Re-routes from the current map after each hop.
@@ -777,17 +845,13 @@ class NavMixin:
         from knowledge.map_graph import route_to, node_for
         target_map, target_name = self._resolve_destination(destination)
         if target_map is None:
-            return target_name   # error message
+            return self._stop("unknown_destination", target_name)   # error message
 
-        # Cerulean → the west (Pewter / Viridian / Pallet / Routes 1-3 / Mt. Moon) has NO walking route:
-        # Route 4's east end is a pocket of one-way ledges, so you can come OUT of Mt. Moon into it but
-        # never climb back (live-verified: no walkable path from Route 4's Cerulean side to Mt. Moon). The
-        # planner's region-blind fallback used to invent a "South edge" link here and loop on
-        # "Reached the South edge but could not cross".
-        if self.reader.read_current_map() in ((3, 3), (3, 22)) and tuple(target_map[:2]) in self._WEST_OF_ROUTE4:
-            return (f"There is no walking route from Cerulean back to {target_name}: Route 4's ledges only "
-                    "go one way (out of Mt. Moon). Fly there (needs HM Fly) or load an earlier save — and "
-                    "plan trips so you don't need to go back west on foot.")
+        # Some trips have NO walking route (knowledge.travel_rules.NO_WALK, e.g. Cerulean back west of Route 4).
+        why_not = no_walk_reason(self.reader.read_current_map(), target_map)
+        if why_not:
+            return self._stop("no_walk", f"There is no walking route to {target_name} from here: {why_not}. "
+                                         f"{self._no_walk_advice(target_name)}")
 
         # A gym interior is often sealed from the planner's static view (Cut-tree doors: Vermilion,
         # Celadon, ...), which made it fall back to a region-blind route that marched into walls. Get to
@@ -798,9 +862,9 @@ class NavMixin:
         if gym_city and here not in (gym_city, target_map):
             out = self._go_to(MAP_NAMES[gym_city], mode=mode, auto_trainers=auto_trainers, resume_call=resume_call)
             if not out.startswith("Arrived"):
-                return out
+                return out                       # the nested trip already recorded its reason
 
-        for _hop in range(40):   # higher budget: auto-fled battles each cost a hop
+        for _hop in range(self._HOP_BUDGET):   # higher budget: auto-fled battles each cost a hop
             # A trainer spotting us, post-battle text, or a stray menu leaves the
             # game non-walkable (often misreads as IN_MENU). Advance it to overworld
             # or a battle before trying to route — otherwise we're pinned in a maze.
@@ -810,7 +874,7 @@ class NavMixin:
             if ctx == GameContext.IN_BATTLE:
                 stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination, resume_call)
                 if stop:
-                    return stop
+                    return self._stop(self._battle_stop_reason(stop), stop)
                 continue   # fled; resume travelling
 
             cur = self.reader.read_current_map()
@@ -820,7 +884,7 @@ class NavMixin:
                 self._trip = None
                 from agent import events
                 events.emit("trip", f"arrived at {target_name}", major=False)
-                return f"Arrived at {target_name}."
+                return self._stop("arrived", f"Arrived at {target_name}.")
             # Region-qualify the current node (Route 2's north/south halves route
             # differently) so a split map is crossed via its gate, not a sealed edge.
             px, py = self.reader.read_player_pos()
@@ -832,11 +896,11 @@ class NavMixin:
                 fails.clear()          # every known path is blocked — forget and retry fresh
                 route = route_to(cur_node, target_map)
             if not route:
-                return (f"No route to {target_name} from {MAP_NAMES.get(cur, cur)} "
-                        f"(it may be behind a locked/blocked area).")
+                return self._stop("no_route", f"No route to {target_name} from {MAP_NAMES.get(cur, cur)} "
+                                              f"(it may be behind a locked/blocked area).")
             route, why = self._respect_gates(cur_node, target_map, route, avoid)
             if why:
-                return f"Can't get to {target_name} yet: {why}"
+                return self._stop("gated", f"Can't get to {target_name} yet: {why}")
             kind_step, arg, next_map = route[0]
             before = cur
             before_pos = (px, py)
@@ -849,7 +913,7 @@ class NavMixin:
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination, resume_call)
                 if stop:
-                    return stop
+                    return self._stop(self._battle_stop_reason(stop), stop)
                 continue   # escaped; resume travelling
 
             after = self.reader.read_current_map()
@@ -871,6 +935,8 @@ class NavMixin:
                 # Try each approach direction once before declaring the edge dead.
                 if kind_step == "warp" and self._probe_warp(self._warp_exit_tile(arg)):
                     continue
+                if self.reader.detect_context() == GameContext.IN_BATTLE:
+                    continue                  # a battle interrupted the probe: not a dead edge — the loop top handles it
                 # Learn the dead edge: after two failures of the SAME hop (a puzzle door, an
                 # HM obstacle, a switch we haven't hit) route_to avoids it and picks another
                 # ladder/exit — so one new puzzle doesn't need a hand-made routing fix.
@@ -878,22 +944,46 @@ class NavMixin:
                 fails[edge] = fails.get(edge, 0) + 1
                 guidance = self._register_go_to_stall(target_name, before)
                 if guidance:
-                    return guidance
+                    return self._stop("stall", guidance)
                 here = MAP_NAMES.get(before, before)
-                return (f"Heading to {target_name}: stuck at {here} ({res}). "
-                        f"It may need something first (a cave/HM), or try again.")
+                return self._stop("blocked", f"Heading to {target_name}: stuck at {here} ({res}). "
+                                             f"It may need something first (a cave/HM), or try again.")
         end_map = self.reader.read_current_map()
         guidance = self._register_go_to_stall(target_name, end_map)
         if guidance:
-            return guidance
+            return self._stop("stall", guidance)
         here = MAP_NAMES.get(end_map, "?")
-        return f"Stopped at {here} en route to {target_name} (still travelling — call go_to again)."
+        return self._stop("budget", f"Stopped at {here} en route to {target_name} after the {self._HOP_BUDGET}-hop "
+                                    "budget (still travelling — call go_to again).")
 
     def _can_use_cut(self) -> bool:
         try:
             return self._knows_cut() and bool(self.reader.read_badges()[1] >> 1 & 1)
         except Exception:
             return False
+
+    def _in_battle_now(self) -> bool:
+        from game.state import GameContext
+        return self.reader.detect_context() == GameContext.IN_BATTLE
+
+    def _no_walk_advice(self, target_name: str) -> str:
+        """What to do instead of walking: Fly if someone can, else the honest options."""
+        try:
+            from knowledge.team import hm_status
+            party = self.reader.read_party()
+            knower, capable = hm_status(party, "Fly")
+            have_badge = bool(self.reader.read_badges()[1] >> 2 & 1)         # Thunder Badge
+        except Exception:
+            return "Fly there if you can, or load an earlier save."
+        if knower and have_badge:
+            return f"{knower} knows Fly: fly_to the nearest visited town instead."
+        if knower:
+            return f"{knower} knows Fly but you need the Thunder Badge to use it outside battle."
+        if capable:
+            return (f"Nobody knows Fly yet ({', '.join(capable)} could learn it) — teach it, or load an earlier save. "
+                    "Plan trips so you don't need to go back west on foot.")
+        return ("Nobody on the team can learn Fly — load an earlier save, or catch a Fly-capable bird "
+                "(Pidgey / Spearow lines) before you head east again.")
 
     def _probe_warp(self, warp: tuple[int, int]) -> bool:
         """Step onto `warp` from each side (Up/Left/Right/Down into it) until the map changes. True if
@@ -913,6 +1003,8 @@ class NavMixin:
         for dx, dy, btn in ((0, 1, "Up"), (1, 0, "Left"), (-1, 0, "Right"), (0, -1, "Down")):
             stand = (wx + dx, wy + dy)
             self._walk_to(*stand)
+            if self._in_battle_now():
+                return False                             # a wild/trainer battle started while probing: let go_to handle it
             if self.reader.read_player_pos() != stand:
                 continue
             self.mgba.hold(btn, 20)
