@@ -3,7 +3,7 @@ from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACK
                     USE_VISION, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
                     LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
 from game.memory_reader import LeafGreenReader
-from game.state import GameContext, GameState, StateDiff, active_party_member, newly_fainted_slots
+from game.state import GameContext, GameState, StateDiff, newly_fainted_slots
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
 from agent.reward import RewardTracker
@@ -345,6 +345,7 @@ class _RunState:
     battle_active_slot: int = 0
     battle_is_trainer: bool = False
     prev_key_items: Optional[int] = None
+    prev_dex_owned: Optional[int] = None
     prev_map_key: Optional[tuple[int, int]] = None
     transitioning_steps: int = 0
     pending_map_b64: Optional[str] = None
@@ -356,46 +357,66 @@ class _RunState:
     consecutive_errors: int = 0
 
 
-def _handle_battle_end(run: _RunState, state: GameState, reward: RewardTracker,
-                       ltm: LongTermMemory, journal: BattleJournal) -> None:
-    """Classify the just-ended battle, reward it, and journal it once.
+# gBattleOutcome label (agent.events.battle_outcome_label) -> the LTM counter it bumps. A fled, caught or drawn
+# battle is NOT a win (the old rule said "win unless the whole party fainted", so every Run and every Poké Ball
+# padded battles_won).
+_OUTCOME_COUNTER = {"won": "battles_won", "lost": "battles_lost", "caught": "battles_caught", "fled": "battles_fled",
+                    "foe fled": "battles_fled", "teleported": "battles_fled", "foe teleported": "battles_fled"}
+_JOURNAL_OUTCOME = {"won": "win", "lost": "loss", "drew": "draw"}
+_last_ltm_save = 0.0
 
-    Runs on the tick where `in_battle` flips False. Reads the fighting mon's final
-    HP/identity from `state.party` + `run.battle_active_slot`, then resets
-    `run.current_enemy` for the next encounter."""
-    active_mon = active_party_member(state.party, run.battle_active_slot)
-    lead_hp_pct = active_mon.hp_percent if active_mon else 0.0
-    active_species = active_mon.species_name if active_mon else run.battle_start_lead
-    all_fainted = bool(state.party) and all(p.current_hp == 0 for p in state.party)
-    outcome = "loss" if all_fainted else "win"
-    # Pass enemy name for journal + system prompt loss-lessons
-    current_enemy_snap = run.current_enemy
-    run.current_enemy = ""
-    if outcome == "win":
-        ltm.data["battles_won"] += 1
-        # Reward trainer wins (wild wins aren't in the schedule). Gym leaders are
-        # trainers too and additionally fire gym_leader_win on the subsequent badge
-        # — a negligible +1 overlap.
-        if run.battle_is_trainer:
-            reward.reward("trainer_win")
-    else:
-        ltm.data["battles_lost"] += 1
-    location = MAP_NAMES.get((state.map_bank, state.map_id),
-                             f"bank={state.map_bank},id={state.map_id}")
+
+def _record_battle(s: dict, run: "_RunState", reader: LeafGreenReader, reward: RewardTracker,
+                   ltm: LongTermMemory, journal: BattleJournal) -> None:
+    """Book one finished battle — called by the event stream exactly once per battle wherever it was fought (a
+    skill, a tool call or the main loop): counters by real outcome, the reward, and a journal row with the foe,
+    turns and moves actually used."""
+    global _last_ltm_save
+    ltm.data["total_battles"] = ltm.data.get("total_battles", 0) + 1
+    key = _OUTCOME_COUNTER.get(s["outcome"])
+    if key:
+        ltm.data[key] = ltm.data.get(key, 0) + 1
+    earned = 0.0
+    if s["outcome"] == "won" and s["trainer"]:
+        # Gym leaders are trainers too and additionally fire gym_leader_win on the subsequent badge.
+        earned = reward.reward("trainer_win")
+    if s["outcome"] == "caught":
+        ltm.data["pokemon_caught"] = ltm.data.get("pokemon_caught", 0) + 1
+        try:
+            owned = reader.read_pokedex()[0]
+        except Exception:
+            owned = None
+        if owned is not None and run.prev_dex_owned is not None and owned > run.prev_dex_owned:
+            earned += reward.reward("caught_new")             # a species the Pokédex had not registered yet
+        if owned is not None:
+            run.prev_dex_owned = owned
+    foe = (s.get("foe_name") or "").upper().strip()
+    bits = [f"{'trainer' if s['trainer'] else 'wild'} {s.get('foe_name') or '?'}", s["outcome"]]
+    if s.get("wiped"):
+        bits.append("whole party fainted")
     journal.log(BattleRecord(
         timestamp=datetime.now().isoformat(timespec="seconds"),
-        location=location,
-        enemy_name=current_enemy_snap or "unknown",
-        enemy_level=0,
-        player_lead=active_species,
-        outcome=outcome,
-        turns=0,
-        moves_used=[],
-        hp_remaining_pct=round(lead_hp_pct, 2),
-        reward=0.0,
-        notes="",
+        location=s.get("where") or "unknown",
+        enemy_name=foe or "unknown",
+        enemy_level=int(s.get("foe_level") or 0),
+        player_lead=s.get("active") or s.get("lead") or "",
+        outcome=_JOURNAL_OUTCOME.get(s["outcome"], s["outcome"]),
+        turns=int(s.get("turns") or 0),
+        moves_used=list(s.get("moves") or []),
+        hp_remaining_pct=round(float(s.get("hp_pct") or 0.0), 2),
+        reward=round(earned, 2),
+        notes=", ".join(bits),
     ))
-    ltm.save()
+    now = time.time()
+    if now - _last_ltm_save > 5 or s["outcome"] in ("lost", "caught"):     # many battles per second inside a skill
+        _last_ltm_save = now
+        ltm.save()
+
+
+def _handle_battle_end(run: _RunState) -> None:
+    """The tick where `in_battle` flips False: the battle itself was booked by _record_battle (event stream);
+    here only the loop's per-battle scratch is reset."""
+    run.current_enemy = ""
 
 
 def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
@@ -442,10 +463,12 @@ def _apply_rewards(run: _RunState, state: GameState, diff: StateDiff,
         reward.reward("key_item")
         events.emit("key_item", f"key item obtained (bag now holds {key_items})")
     run.prev_key_items = key_items
+    try:
+        run.prev_dex_owned = reader.read_pokedex()[0]       # absorbs dex gains from evolutions; catches book theirs in _record_battle
+    except Exception:
+        pass
 
     if run.prev_state is not None and state.party_count > run.prev_state.party_count:
-        reward.reward("caught_new")
-        ltm.data["pokemon_caught"] = ltm.data.get("pokemon_caught", 0) + 1
         # first-party addition → starter chosen
         if run.prev_state.party_count == 0 and state.party_count == 1:
             starter = state.party[0].species_name or "Unknown"
@@ -830,6 +853,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
     rlog = run_log or NullRunLog()
     client.run_log = rlog
     events.configure(console if verbose else None, rlog, LOG_LEVEL)
+    events.on_battle_end(lambda s: _record_battle(s, run, reader, reward, ltm, journal))
     ckpt = None
     if getattr(rlog, "dir", None) and CHECKPOINT_EVERY > 0 and hasattr(mgba, "save_state_file"):
         from memory.checkpoints import CheckpointManager
@@ -883,7 +907,6 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             in_battle = state.context == GameContext.IN_BATTLE
             if in_battle and not run.battle_was_active:
                 stm.reset_for_new_battle()
-                ltm.data["total_battles"] += 1
                 run.battle_start_lead = state.party[0].species_name if state.party else ""
                 run.battle_active_slot = 0
                 # Classify the battle from gBattleTypeFlags (set at battle init).
@@ -913,7 +936,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
 
             # ── Battle end detection ────────────────────────────────────────
             if run.battle_was_active and not in_battle:
-                _handle_battle_end(run, state, reward, ltm, journal)
+                _handle_battle_end(run)
             # Save the pre-update value so the auto-tap guard below can see
             # whether we were in battle on the PREVIOUS tick (battle_was_active
             # is about to be overwritten with the current tick's value).
@@ -970,8 +993,8 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 run.prev_map_key = map_key
 
             # ── Auto-reward + auto-milestone from state diff ────────────────
+            events.observe(reader)                    # books any battle that just ended (see _record_battle)
             _apply_rewards(run, state, diff, reader, reward, ltm)
-            events.observe(reader)
 
             # ── Build observation string ─────────────────────────────────────
             obs = build_observation(state=state, diff=diff, in_battle=in_battle,

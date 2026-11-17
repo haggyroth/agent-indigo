@@ -1,6 +1,7 @@
 """Battle skills: use_move, flee, catch, switch, use_item, and the
 best-move auto-fight driver. See agent.lm_studio_client.AgentClient
 (which inherits BattleMixin)."""
+import re
 
 
 class BattleMixin:
@@ -46,9 +47,14 @@ class BattleMixin:
         a faint, the battle ending) — grind/go_to play hundreds of these inside one tool call."""
         from agent import events
         events.observe(getattr(self, "reader", None))       # sees the battle START even if this move ends it
+        out = ""
         try:
-            return self._use_move_inner(name)
+            out = self._use_move_inner(name)
+            return out
         finally:
+            m = re.match(r"Used ([^.\[(,]+)", str(out))
+            if m:
+                events.note_move(m.group(1).strip())
             events.observe(getattr(self, "reader", None))
 
     def _use_move_inner(self, name: str) -> str:

@@ -624,8 +624,17 @@ class LeafGreenReader:
         # when it is the same species, else the first unclaimed earlier mon of that species.
         claimed: set[int] = set()
         pairs: list[tuple[int, int]] = []
+        by_pid = {bq.personality: k for k, bq in enumerate(before.party) if bq.personality}
         for i, a in enumerate(after.party):
             j = None
+            if a.personality and by_pid:
+                j = by_pid.get(a.personality)      # the same Pokémon (survives reorders AND evolution); new mons stay unpaired
+                if j is not None and j in claimed:
+                    j = None
+                if j is not None:
+                    claimed.add(j)
+                    pairs.append((j, i))
+                continue
             if i < len(before.party) and before.party[i].species_id == a.species_id and i not in claimed:
                 j = i
             else:

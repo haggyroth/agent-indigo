@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — battle outcome and progress accounting (#210)
+- **Real outcomes.** Battles are booked from `gBattleOutcome` (via the event stream's end-of-battle hook, which fires exactly
+  once per battle wherever it was fought — including the hundreds inside `grind()` that the old main-loop edge detector never
+  saw). `battles_won` counts only wins; new `battles_fled`, `battles_caught` counters; losses and `total_battles` are exact.
+  Added the missing `B_OUTCOME_*` constants (ran / teleported / foe fled / foe teleported).
+- **The journal has data.** Rows now carry the foe and its level, the turns and distinct moves actually used, the Pokémon that
+  fought, its HP at the end and notes (`trainer Geodude, lost, whole party fainted`); outcomes are `win` / `loss` / `fled` /
+  `caught` / `draw`. `get_loss_lessons` finally has turns and moves to show instead of "Turn 0 … unknown".
+- **Catches.** `pokemon_caught` counts real catches (the starter and PC withdrawals no longer inflate it); `caught_new` fires
+  only when the Pokédex gains an entry.
+- **Identity, not slot index.** `StateDiff` (level-ups, HP, new moves) and `newly_fainted_slots` pair Pokémon by personality value, so
+  `set_lead`, switches and party-screen reorders no longer read as a faint + a miss or two level-ups, and an evolution is the
+  same Pokémon. A genuinely new party member stays unpaired.
+- LTM saves are debounced (≤ once per 5 s, immediately on a loss or catch) now that fights inside skills are booked too.
+
 ### Added — a live game-event stream in the terminal (#209)
 - `agent/events.py`: one compact line per event (and an `ev` record in `run.jsonl`): every **tool call** with its arguments,
   a one-line result and timing (was: name + 80 chars); **battle start / end** classified from `gBattleOutcome`
