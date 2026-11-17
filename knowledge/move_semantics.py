@@ -118,9 +118,14 @@ def kind_of(name: str) -> str:
 
 
 def role_tag(name: str, *, wild: bool | None = None, foe_asleep: bool = False, user_level: int = 0,
-             foe_level: int = 0) -> str:
+             foe_level: int = 0, hidden_power: tuple | None = None) -> str:
     """One terse sentence about what `name` does / when it fails ('' for a plain damaging move)."""
     kind = kind_of(name)
+    if kind == "hidden_power":
+        if hidden_power:
+            from knowledge.team import TYPE_WORD
+            return f"Hidden Power is {TYPE_WORD.get(hidden_power[0], hidden_power[0])} {hidden_power[1]} for this Pokémon (from its IVs)"
+        return "type and power come from the Pokémon's IVs"
     t = _TAG.get(kind)
     if t is None:
         acc = accuracy_of(name)
@@ -149,7 +154,8 @@ def _flail_power(hp_frac: float) -> int:
 
 
 def move_score(name: str, attacker_types=(), defender_types=(), *, user_level: int = 0, foe_level: int = 0,
-               foe_asleep: bool = False, friendship: int = 70, user_hp_frac: float = 1.0, foe_hp: int = 0) -> float:
+               foe_asleep: bool = False, friendship: int = 70, user_hp_frac: float = 1.0, foe_hp: int = 0,
+               hidden_power: tuple | None = None) -> float:
     """Expected damage per turn in base-power units (0 = this move does nothing useful as an attack right now).
 
     power × accuracy × STAB × type effectiveness, with the exceptions that matter: one-hit KOs and reactive moves
@@ -175,8 +181,10 @@ def move_score(name: str, attacker_types=(), defender_types=(), *, user_level: i
     if power <= 0:
         return 0.0
     mtype = MOVE_TYPE.get(name)
+    if kind == "hidden_power" and hidden_power:                  # its real type and power come from the IVs
+        mtype, power = hidden_power[0], float(hidden_power[1])
     eff = 1.0
-    if kind != "hidden_power" and mtype and defender_types:      # Hidden Power's real type comes from IVs
+    if (kind != "hidden_power" or hidden_power) and mtype and defender_types:
         eff = effectiveness_vs(mtype, tuple(defender_types))
     if eff == 0:
         return 0.0
@@ -194,7 +202,7 @@ def move_score(name: str, attacker_types=(), defender_types=(), *, user_level: i
         else:
             return power * acc                                     # level / HP unknown: the table's estimate
         return _power_equivalent(dmg, user_level) * acc
-    stab = 1.5 if (mtype in attacker_types and kind != "hidden_power") else 1.0
+    stab = 1.5 if (mtype in attacker_types and (kind != "hidden_power" or hidden_power)) else 1.0
     score = power * acc * stab * eff
     if kind in ("charge", "semi_inv", "recharge"):
         score *= 0.5

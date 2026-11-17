@@ -206,6 +206,16 @@ TOOLS = [
         }, "required": []},
     }},
     {"type": "function", "function": {
+        "name": "inspect_pokemon",
+        "description": "Look closely at ONE Pokémon: its real stats, individual values (IVs), effort values (EVs), nature, "
+                       "Hidden Power type and a quality grade (excellent / good / average / below average) weighted for what "
+                       "the species is used for, plus how it compares with your team. `pokemon` is a party slot or name, or a "
+                       "boxed one as 'box:slot' (see pc_boxes(detail=true)). Use it right after a catch and when choosing who "
+                       "to keep, withdraw or swap — two of the same species can differ a lot.",
+        "parameters": {"type": "object", "properties": {
+            "pokemon": {"type": "string", "description": "party slot number, name, or 'box:slot'"}}, "required": ["pokemon"]},
+    }},
+    {"type": "function", "function": {
         "name": "team_report",
         "description": "Read-only analysis of your team: which types your KNOWN moves hit super effectively (and which "
                        "they don't), shared weaknesses, who can carry each HM (Cut / Fly / Surf / Strength) against what the "

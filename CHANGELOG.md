@@ -5,6 +5,27 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — IV / EV / nature awareness and a per-Pokémon quality score (#208)
+- **Decoded.** `PokemonStatus` and the boxed-Pokémon dicts now carry IVs, EVs, friendship, ability slot and the game's own
+  computed stats (IVs/EVs from the already-decrypted E / M substructures; layout per the decomp). Pokémon are identified by
+  personality value, nature = PID % 25. `tools/gen_base_stats.py` → `knowledge/base_stats.py` (base stats + EV yields).
+- **`knowledge/mon_quality.py`** (pure): the Gen III stat formula, Hidden Power (type and power from the IVs), and `assess` — a
+  score in [0, 1] = 0.8 × role-weighted IV share + 0.2 × nature fit, graded excellent / good / average / below average. The role
+  (physical / special / mixed) comes from base stats and the damaging moves known, so a special attacker's Attack IV and an
+  Attack-lowering nature are not held against it. **Golden-checked live:** base stats + decoded IVs / EVs / nature + the formula
+  reproduce the stored stats of every party Pokémon exactly.
+- **Where it shows up.** The catch result reports the new Pokémon's `Quality:` (found by personality value, in the party or the PC)
+  with a comparison to the same species you already have or to the team average — *after* the catch, like a human would see it;
+  new `inspect_pokemon` tool (stats, IVs, EVs, nature, Hidden Power, grade, team comparison); `pc_boxes(detail=true)` grades boxed
+  Pokémon; a readiness item "better specimen in the PC — pc_swap('Pidgey', '1:4')" appears in Pokémon Centers when a boxed
+  specimen of a species you field beats yours by 12+ points (levels lost are mentioned); the `catch` event line shows the grade.
+- **Hidden Power** is finally real in battle: the ranker scores it with its true type and power, the move list shows
+  "Hidden Power is Water 56 for this Pokémon (from its IVs)" (closes the loose end from #204).
+- **Opt-in pre-catch peek:** `IV_PEEK_BEFORE_CATCH=true` adds a "Foe IVs (peek enabled)" line for wild Pokémon. Default off — a human
+  has no IV readout in Gen III — and runs with it on are not comparable to runs without.
+- Not done: EV training plans (which route/foe trains the wanted EV), vitamins as EV tools, replacing a party member by a *different*
+  species on quality alone (catch_policy still decides by line strength).
+
 ### Added — team composition awareness (#207)
 - **`knowledge/team.py`** (pure): coverage from the moves a team actually knows, shared weaknesses (≥ 3 members), who can carry
   each HM (Cut / Fly / Surf / Strength) against the badge count at which the story needs it, and a **fit check against the next

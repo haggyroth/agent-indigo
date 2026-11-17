@@ -256,6 +256,12 @@ gap never closes); use Potions and `use_move` with the trainee. The target is fi
 (best − 7, capped at the next gym's level), so it finishes. (`grind(13)` raises your best one to L13, still rotating
 lagging teammates in.) Catch worthwhile wild Pokémon yourself with `catch()` when `grind` hands you one.
 
+**Judge your specimens.** Two of the same species can differ a lot (the individual values, nature and EVs). Right after a
+catch the result includes a `Quality:` report — a grade (excellent / good / average / below average), the IV percentage, the nature
+and how it compares with your same-species Pokémon or the team. `inspect_pokemon(<slot|name|box:slot>)` shows the real stats, IVs, EVs
+and Hidden Power; `pc_boxes(detail=true)` grades the boxed ones; a "better specimen in the PC" readiness item names the exact `pc_swap`.
+Keep the better individual of a species (weigh the levels you would lose), and don't judge by species alone.
+
 **Team gaps.** The readiness block names what the TEAM is missing — "team gap — Lt. Surge's gym (Electric): your team hits
 only 0/3 of his Pokémon … catch a counter: Diglett — Diglett's Cave B1F …" or "nobody on the team can learn Surf … catch one
 that can: …" (with the exact LeafGreen locations, or the box:slot of one you already own in the PC). A catch that fills such a gap

@@ -32,6 +32,18 @@ def parse_species(sub: dict) -> int:
     return int.from_bytes(sub["G"][0:2], "little")
 
 
+def parse_evs(sub: dict) -> tuple:
+    """(HP, Atk, Def, Spe, SpA, SpD) effort values from the E substructure (pokefirered PokemonSubstruct2)."""
+    return tuple(sub["E"][0:6])
+
+
+def parse_ivs(sub: dict) -> tuple[tuple, int]:
+    """((HP, Atk, Def, Spe, SpA, SpD) individual values, ability slot) from the M substructure: a u32 at +4 packed as
+    hp:5 atk:5 def:5 spe:5 spa:5 spd:5 isEgg:1 abilityNum:1 (pokefirered PokemonSubstruct3)."""
+    v = int.from_bytes(sub["M"][4:8], "little")
+    return tuple((v >> (5 * i)) & 31 for i in range(6)), (v >> 31) & 1
+
+
 def parse_moves(sub: dict) -> tuple[list[int], list[int]]:
     a = sub["A"]
     return [int.from_bytes(a[i*2:(i+1)*2], "little") for i in range(4)], [a[8+i] for i in range(4)]
@@ -140,6 +152,7 @@ class LeafGreenReader:
         move_ids   = [0] * 4
         move_names = [""] * 4
         pp         = [0] * 4
+        ivs, evs, ability_slot, friendship = (), (), 0, 0
 
         if self.decrypt:
             try:
@@ -148,6 +161,9 @@ class LeafGreenReader:
                 species_name = SPECIES_NAMES.get(species_id, f"#{species_id}")
                 move_ids, pp = parse_moves(sub)
                 move_names   = [MOVE_NAMES.get(m, f"move_{m}") if m else "" for m in move_ids]
+                ivs, ability_slot = parse_ivs(sub)
+                evs          = parse_evs(sub)
+                friendship   = sub["G"][9]
             except Exception:
                 # decryption failed — Tier 1 data still valid
                 logger.warning("party mon decrypt failed for slot %d", slot, exc_info=True)
@@ -163,6 +179,8 @@ class LeafGreenReader:
             species_name=species_name, move_ids=move_ids, move_names=move_names, pp=pp,
             nickname="".join(nick).strip(),
             personality=int.from_bytes(raw[0:4], "little"),
+            ivs=ivs, evs=evs, friendship=friendship, ability_slot=ability_slot,
+            stats=tuple(int.from_bytes(raw[o:o + 2], "little") for o in (0x58, 0x5A, 0x5C, 0x5E, 0x60, 0x62)),
         )
 
     # Gen III internal species indices run 1..411 (Bulbasaur..Chimecho-era slots);
@@ -457,6 +475,8 @@ class LeafGreenReader:
                 return None
             ids, _pp = parse_moves(sub)
             exp = int.from_bytes(sub["G"][4:8], "little")
+            ivs, ability_slot = parse_ivs(sub)
+            evs = parse_evs(sub)
         except Exception:
             return None
         from knowledge.growth import level_from_exp
@@ -467,7 +487,9 @@ class LeafGreenReader:
             nick.append(GEN3_CHARSET.get(b) or "")
         return {"box": box, "slot": slot, "species_id": sid, "species_name": SPECIES_NAMES.get(sid, f"#{sid}"),
                 "nickname": "".join(nick).strip(), "level": level_from_exp(sid, exp),
-                "move_names": [MOVE_NAMES.get(m, "") for m in ids if m]}
+                "move_names": [MOVE_NAMES.get(m, "") for m in ids if m],
+                "personality": int.from_bytes(raw[0:4], "little"), "ivs": ivs, "evs": evs,
+                "friendship": sub["G"][9], "ability_slot": ability_slot}
 
     def read_boxes(self) -> list[dict]:
         """Every occupied PC slot, box by box (one memory read per box)."""
