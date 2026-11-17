@@ -454,7 +454,13 @@ class OverworldMixin:
         losses = self._trainer_losses
         avoid: set = {m for m, n in losses.items() if n >= 2}
         for _attempt in range(3):
-            found = best_grass((bank, mid), level, exclude_current=exclude_current, avoid=avoid)
+            found = None
+            for _probe in range(16):                       # skip grass behind a gate (Brock, a ticket…) without spending an attempt
+                found = best_grass((bank, mid), level, exclude_current=exclude_current, avoid=avoid)
+                if found is None or not self._grass_route_gated((bank, mid), found[0]):
+                    break
+                avoid.add(found[0])
+                found = None
             if found is None:
                 return False
             goal_map = found[0]
@@ -488,6 +494,18 @@ class OverworldMixin:
                 return True
             avoid.add(goal_map)
         return False
+
+    def _grass_route_gated(self, here, goal) -> bool:
+        """Is the way to the grass map `goal` closed by a story gate the player does not meet (the Pewter guard, a ticket, an HM)?"""
+        from knowledge.gates import unmet_gates
+        from knowledge.map_graph import node_for, route_to
+        try:
+            px, py = self.reader.read_player_pos()
+            route = route_to(node_for(here[0], here[1], px, py), goal)
+            return bool(route and unmet_gates(route, self._gate_ok))
+        except Exception:
+            log_once("overworld._grass_route_gated", "overworld._grass_route_gated: tolerated failure (continuing with a default)")
+            return False
 
     def _grass_step(self, st: dict, again: str) -> str | None:
         """One overworld step of a grass-grinding loop: pace on a patch to trigger encounters, or
@@ -737,11 +755,18 @@ class OverworldMixin:
     def _grind_yield(self, run, again: str, trainer: bool, party) -> str:
         """End the grind call on an encounter so the MODEL plays it (moves, items, catch, switches)."""
         from knowledge.party import ace_index
+        from game.state import GameContext
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            try:
+                self._battle_settle(40)                   # the foe slot still holds the LAST foe until the first menu is up
+            except Exception:
+                log_once("overworld._grind_yield.settle", "overworld._grind_yield: could not settle the battle intro (continuing)")
         try:
             where = MAP_NAMES.get(self.reader.read_current_map(), "here")
         except Exception:
             log_once("overworld._grind_yield", "overworld._grind_yield: tolerated failure (continuing with a default)")
             where = "here"
+        run["yielded"] = True                             # until the battle ends, a second grind() call is a mistake (see _grind_inner)
         what, verdict = "Pokémon", ""
         try:
             foe = self.reader.read_enemy_lead()
@@ -759,7 +784,13 @@ class OverworldMixin:
             log_once("overworld._grind_yield", "overworld._grind_yield: tolerated failure (continuing with a default)")
             pass
         lead = party[0] if party else None
+        try:
+            active_id = self.reader.read_active_battle_species()
+            lead = next((p for p in party if p.species_id == active_id), lead)
+        except Exception:
+            log_once("overworld._grind_yield.active", "overworld._grind_yield: tolerated failure (continuing with a default)")
         lead_name = (lead.nickname or lead.species_name) if lead else "your lead"
+        moves = ", ".join(m for m in (lead.move_names if lead else []) if m)
         ace = ace_index(party)
         ace_name = (party[ace].nickname or party[ace].species_name) if ace is not None else "the ace"
         if run["balance"]:
@@ -772,7 +803,8 @@ class OverworldMixin:
                    + (f"; teammates under L{run['floor']} lead first" if lead and lead.level < run["floor"] else "")
                    + ". Fight with use_move / use_item.")
         head = "A TRAINER battle" if trainer else f"A wild {what}"
-        return (f"{head} started at {where} while grinding.{verdict} {who} Battle {run['battles']}; "
+        knows = f" {lead_name} knows: {moves}." if moves else ""
+        return (f"{head} started at {where} while grinding.{verdict}{knows} {who} Battle {run['battles']}; "
                 f"when it is over call {again} to continue.")
 
     def _grind_inner(self, target_level: int = 0, catch: bool = True, auto_battles: int = 0) -> str:
@@ -797,6 +829,13 @@ class OverworldMixin:
         party = self.reader.read_party()
         if not party:
             return "No Pokémon to grind with."
+        live = self._grind_run
+        if live is not None:
+            if self.reader.detect_context() == GameContext.IN_BATTLE and live.get("yielded"):
+                return ("That battle is still going — fight it with use_move / catch / switch_pokemon / flee_battle first. Calling grind "
+                        "again mid-battle only miscounts it. When it is over, call grind again; the session continues.")
+            if self.reader.detect_context() != GameContext.IN_BATTLE:
+                live["yielded"] = False                        # the encounter we handed over is finished
         balance = int(target_level or 0) <= 0
         target_level = 0 if balance else max(1, min(int(target_level), 100))
         key = (balance, target_level)

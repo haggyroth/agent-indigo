@@ -5,6 +5,20 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — four things a watched grind run showed (run 20261117-133255)
+- **grind no longer plans around closed roads.** Relocation picked Route 4, 24 and 25 (all behind Brock's gate), stopped "gated" 18 times,
+  spent its three attempts and then claimed there was no grass anywhere. Gated candidates are now skipped up front without using an attempt
+  (`_grass_route_gated`), so it goes to grass it can actually reach.
+- **A nearly-fainted Pokémon is told to switch.** The fresh L3 catches that "lead first" fainted four times in 17 ticks because the model kept
+  attacking. After every move, an active Pokémon at or below 35% HP with a fit teammate gets `⚠ X is at 3/16 HP … switch_pokemon('Y') now, or use
+  a Potion` (`knowledge.party.low_hp_switch_hint`, works in every battle).
+- **grind's battle message lists the active Pokémon's moves** ("BananaBiff knows: Scratch, Leer.") — eight calls went on `use_move('Tackle')` after
+  the lead changed to a Pokémon that doesn't know it.
+- **grind() mid-battle is refused** ("That battle is still going…") instead of starting and counting a second battle, and the battle-start message
+  now lets the intro settle before reading the foe (it used to report the previous foe at 0 HP).
+- Tests: gate-aware relocation, the yield text, the switch hint, the mid-battle refusal and its resume. Two live tests were updated to the new
+  realities (a badge-less fixture can no longer relocate to Brock-gated grass; the grind helper plays on after a refusal).
+
 ### Fixed — the Pewter "Follow me!" loop (regression seen in a watched run)
 - Heading east out of Pewter City before Brock is beaten makes the Gym Guide walk the player back to the gym door, every time. `go_to('Route 4')`
   and `grind`'s relocation treated the road as open, spent their hop budget bouncing off him and ended with "trip … ended: budget". The route is

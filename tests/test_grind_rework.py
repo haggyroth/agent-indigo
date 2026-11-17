@@ -101,8 +101,12 @@ def test_wild_encounter_ends_the_call_and_the_session_persists():
     out = c._grind(0, True, 0)
     assert "wild RATTATA L6" in out and "Keep Ace2 OUT" in out and "grind()" in out
     assert fought == [] and c._grind_run["battles"] == 1 and c._grind_run["floor"] == 23
-    again = c._grind(0, True, 0)                       # still in the battle: yields again, same session
-    assert "Battle 2" in again and fought == [] and c._grind_run["floor"] == 23
+    again = c._grind(0, True, 0)                       # calling grind AGAIN while that battle is still going: refused, not recounted
+    assert "still going" in again and c._grind_run["battles"] == 1 and fought == [] and c._grind_run["floor"] == 23
+    w.ctx = GameContext.OVERWORLD
+    seen = []
+    c._restock = lambda why: seen.append(c._grind_run["yielded"]) or "stop here"            # the battle is over: the session resumes
+    assert c._grind(0, True, 0) == "stop here" and seen == [False]
 
 
 def test_the_floor_does_not_follow_the_ace_up():
@@ -181,3 +185,35 @@ def test_abandoning_a_session_drops_it_and_restores_the_ace_in_the_overworld():
     c._restore_ace_lead = lambda: restored.append(1)
     c._grind_abandon()
     assert c._grind_run is None and restored == [1] and c._training_swapped is False
+
+
+# ── findings from a watched run: gated grass, the lead's moves, a fragile lead, grind() mid-battle ──
+def test_grass_behind_the_pewter_gate_is_never_chosen_without_the_badge():
+    pytest.importorskip("openai")
+    from agent.lm_studio_client import AgentClient
+    c = AgentClient.__new__(AgentClient)
+    badges = {"n": 0}
+    c.reader = NS(read_player_pos=lambda: (5, 5), read_badges=lambda: (badges["n"], (1 << badges["n"]) - 1),
+                  read_key_items=lambda: [], read_flag=lambda f: False)
+    assert c._grass_route_gated((3, 1), (3, 22)) and c._grass_route_gated((3, 1), (3, 21))     # Viridian → Route 3 / 4: Brock first
+    assert not c._grass_route_gated((3, 1), (3, 20))                                           # Route 2 is open
+    badges["n"] = 1
+    assert not c._grass_route_gated((3, 1), (3, 22))
+
+
+def test_the_yield_text_lists_the_active_pokemons_moves():
+    w = FakeWorld([mon(8, 1, name="Rat"), mon(30, 2, name="Ace")], ctx=GameContext.IN_BATTLE)
+    w.party[0].move_names = ["Scratch", "Leer", "", ""]
+    c = grind_client(w)
+    out = c._grind(0, True, 0)
+    assert "Rat1 knows: Scratch, Leer." in out
+
+
+def test_a_nearly_fainted_lead_is_told_to_switch_to_a_fit_teammate():
+    from knowledge.party import low_hp_switch_hint
+    party = [mon(3, 1, hp=3, name="Mankey"), mon(9, 2, hp=30, name="Bulba")]
+    hint = low_hp_switch_hint(party, 0, cur=3, mx=16, foe_level=4)
+    assert "Mankey1 is at 3/16" in hint and "switch_pokemon('Bulba2')" in hint
+    assert low_hp_switch_hint(party, 0, cur=12, mx=16, foe_level=4) == ""                      # healthy enough: no nag
+    assert low_hp_switch_hint([mon(3, 1, hp=3)], 0, cur=3, mx=16) == ""                        # nobody to switch to
+    assert low_hp_switch_hint(party, 0, cur=0, mx=16) == ""                                    # already fainted
