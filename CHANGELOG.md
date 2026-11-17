@@ -15,7 +15,7 @@ All notable changes to this project are documented here. Format loosely follows
 - **One resolver** (`knowledge/targets.py`, `resolve_mon`): slot number, else exact species / nickname, else a unique partial match.
   Two Pidgeys, or "rat" matching Rattata and Raticate, is reported as ambiguous ("slots 2, 4 — name one by its slot number") instead
   of silently taking the first. Used by switch_pokemon, use_item, give_item, teach_move, use_hm, reorder_party and pc.
-- 33 → 28 tools in the overworld list; every hint, the system prompt, budgets and the scripted policy use the new calls.
+- 38 → 33 tools in total (33 → 28 offered on the overworld); every hint, the system prompt, budgets and the scripted policy use the new calls.
 - Tests: `tests/test_targets.py`, `tests/test_tool_merge.py`; the live tests drive the new tools on the real ROM.
 
 ### Added — held items, battle boosters, Repel strategy (#215)
