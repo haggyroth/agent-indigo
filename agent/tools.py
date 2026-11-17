@@ -177,7 +177,7 @@ TOOLS = [
                        "A wild Pokémon or trainer on the way ENDS the call — play it, then call quest again to resume. "
                        "auto_trainers=true fights the trainers on the way for you.",
         "parameters": {"type": "object", "properties": {
-            "name": {"type": "string", "enum": ["ss_ticket", "cut", "surf", "strength"], "description": "omit to list the quests"},
+            "name": {"type": "string", "enum": ["ss_ticket", "cut", "surf", "strength", "coin_case"], "description": "omit to list the quests"},
             "auto_trainers": {"type": "boolean",
                               "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
         }, "required": []},
@@ -333,6 +333,16 @@ TOOLS = [
         "name": "read_game_state",
         "description": "Read current game state: party HP, battle status, badges, location.",
         "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "game_corner",
+        "description": "The Celadon Game Corner (needs the Coin Case: quest('coin_case')). action='status' shows coins and prices; "
+                       "'buy_coins' (amount = coins, ¥20 each) buys them from the clerk; 'slots' (amount = spins, a full 3-coin "
+                       "bet each) plays a machine and stops on a streak of losses. Spend coins on prizes with shop(item='TM24' | "
+                       "'Abra' | 'Smoke Ball'…).",
+        "parameters": {"type": "object", "properties": {
+            "action": {"type": "string", "enum": ["status", "buy_coins", "slots"]},
+            "amount": {"type": "integer", "description": "coins to buy, or number of spins"}}},
     }},
     {"type": "function", "function": {
         "name": "save_game",

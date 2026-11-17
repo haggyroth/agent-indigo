@@ -341,6 +341,14 @@ class LeafGreenReader:
         val = self.client.read32(sb1 + Addr.MONEY_OFFSET) ^ self._encryption_key()
         return val if 0 <= val <= 999_999 else 0
 
+    def read_coins(self) -> int:
+        """Game Corner coins (the Coin Case). A u16 at SaveBlock1 + 0x294, XOR'd with the low half of the encryption key."""
+        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
+        if not self._valid_ewram_ptr(sb1):
+            return 0
+        val = self.client.read16(sb1 + Addr.COINS_OFFSET) ^ (self._encryption_key() & 0xFFFF)
+        return val if 0 <= val <= 9999 else 0
+
     def read_bag(self) -> dict[int, int]:
         """Return {item_id: quantity} across the Items and Poké Balls pockets.
         Item IDs are cleartext; quantities are XOR'd with the low 16 bits of the

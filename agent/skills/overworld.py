@@ -307,8 +307,15 @@ class OverworldMixin:
         from knowledge.tmhm import TMHM
         iid, close = resolve_item(item)
         if iid is None:
+            from knowledge.game_corner import resolve_prize
+            prize, near = resolve_prize(item)
+            if prize is not None:
+                return self._buy_prize(prize)                  # paid in Game Corner coins, not yen
+            close = close or near
+        if iid is None:
             return (f"No clerk sells {item!r}." + (f" Did you mean: {', '.join(close)}?" if close else "")
-                    + " (Poké Marts sell balls, potions and cures; the Celadon Dept. Store also sells TMs, stones, vitamins and X-items.)")
+                    + " (Poké Marts sell balls, potions and cures; the Celadon Dept. Store also sells TMs, stones, vitamins and X-items; the "
+                    "Celadon Prize Corner sells TMs, items and Pokémon for Game Corner coins.)")
         label, price = item_label(iid), PRICES.get(iid, 0)
         if iid in FREE_SOURCES and not self.reader.count_item(iid):
             events.emit("note", FREE_SOURCES[iid] + " — buying anyway", log=False)

@@ -23,6 +23,8 @@ from knowledge.battle import (battle_idle_nudge, battle_summary, overworld_pp_su
 from knowledge.catch_policy import evaluate as catch_evaluate
 from knowledge.escape import hint as escape_hint
 from knowledge.gym_advice import brief as gym_brief
+from knowledge.game_corner import PRIZES
+from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
@@ -313,6 +315,11 @@ def _supplies(t: Tick) -> list[str]:
         rec = shopping_summary(bag, t.ltm.data["badges_earned"], money)
         if rec:
             out.append("MART — " + rec + ". Call shop() to buy the recommended restock automatically.")
+    if t.here in (GAME_CORNER, PRIZE_ROOM) and r.read_flag(COIN_CASE[1]):
+        coins = r.read_coins()
+        buys = [f"{p.name} ({p.coins})" for p in PRIZES if p.coins <= coins]
+        out.append(f"GAME CORNER: {coins} coins. " + (f"Affordable now with shop(item=…): {', '.join(buys[:6])}. " if buys else "")
+                   + "game_corner('slots', N) wins coins (a full bet is 3); game_corner('buy_coins', N) buys them at ¥20 each.")
     if MAP_KIND.get(t.here) == "pokecenter":                    # the PC is right here: remind the model it exists
         stored = _safe("pc_count", lambda: len(r.read_boxes()), 0)
         if stored:

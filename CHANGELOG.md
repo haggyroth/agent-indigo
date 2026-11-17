@@ -5,6 +5,24 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the Celadon Game Corner: coins, the Prize Corner and the slot machines (#215)
+- **`quest('coin_case')`** gets the Coin Case from the man in the Celadon Restaurant.
+- **`game_corner(action, amount)`**: `status` (coins, prices), `buy_coins` (the clerk's 50 / 500 lots, ¥20 a coin, checked against money and the
+  9999-coin cap) and `slots` (N full-bet spins).
+- **Prizes via `shop(item=…)`**: TMs (13, 23, 24, 30, 35), battle items and the Pokémon (Abra, Clefairy, Pinsir, Dratini, Porygon) are paid for in
+  coins at the right clerk, from the decomp (`tools/gen_game_corner.py` → `knowledge/game_corner_data.py`, LeafGreen side of every `.ifdef`).
+  Not enough coins gets the arithmetic ("2800 more = ¥56000, or win them"). A prize Pokémon's nickname box is declined; the result says
+  whether it landed in the party or the PC.
+- **The slot driver is a port, not luck** (`knowledge/slots.py`, from `slot_machine.c`): each spin the machine rolls a hidden *bias* (7 about 6% of
+  the time, and a Rocket / 7 bias sticks until it pays) and a reel press slides the reel up to four positions to serve it if it can. The driver
+  finds the machine's state block in memory (reel positions, sub-pixel, bias), replays `StopReel1/2/3` for each future frame and presses A in
+  the middle of a window of good frames, then waits for exactly the coins the stopped reels pay. Measured on the real ROM: +2,400 to +3,900
+  coins per 150 spins (8–13 jackpots of 300), against the −3 coins a blind spin costs. A stop-loss (300 coins) ends a bad session.
+- Menu handling lessons recorded in code: the clerks' list ignores input while it fades in (probe before pressing A again), closing text is
+  dismissed with B only (A on the field talks to the clerk again — and buys again), and the coin counter now counts as "progress" for the
+  watchdog.
+- Tests: `tests/test_game_corner.py`; live tests drive the Coin Case quest, coin buying, a TM and a Pokémon prize, and a 12-spin slot session.
+
 ### Added — area guidance for every dungeon, puzzle gym and late-game stretch (#240)
 - **`knowledge/area_guide.py`**: a goal / what-to-watch-for / tip for 23 areas — Mt. Moon, Rock Tunnel, Diglett's Cave, the Power Plant, the Pokémon
   Mansion, Seafoam Islands, Victory Road, Cerulean Cave, the Safari Zone, the Rocket Hideout, Silph Co., the Pokémon Tower, the S.S. Anne, the four
