@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — shopping in Celadon City
+- `shop()` from Celadon routed to Saffron's Mart ("gate guards want Tea") and a run sat at 0 Poké Balls with ¥3044: the Celadon Dept.
+  Store was not a mart waypoint. Its 2F items clerk is now one (`MAP_KIND[(10, 1)] = "mart"`), `shop()` walks to the clerk that sells
+  the most of the plan (from the map, not a standard Mart's fixed tile; `_clerk_approach` is shared with `shop(item=…)`), and since
+  the store sells no Poké Ball / Potion it buys the next grade up with the same budget (Great Balls, Super / Hyper Potions).
+
 ### Fixed — what a second unwatched Gemma run turned up
 - **A blackout reset the whole game.** `_handle_blackout` reloaded `saves/slot_0.ss1` — a file from July that survives between
   runs — which put the run back on the new-game naming screen (party gone, 75 steps wasted typing names). Only a slot saved by

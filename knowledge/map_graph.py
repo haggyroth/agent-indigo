@@ -492,6 +492,7 @@ MAP_KIND: dict[tuple[int, int], str] = {
     (9, 1): "pokecenter",
     (9, 5): "mart",
     (9, 6): "gym",
+    (10, 1): "mart",        # Celadon Dept. Store 2F: the items clerk (Great Balls, Super Potions, cures) — see tools/gen_map_graph.py
     (10, 12): "pokecenter",
     (10, 16): "gym",
     (11, 1): "mart",
