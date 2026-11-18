@@ -1295,3 +1295,76 @@ def test_league_prep_sells_treasure_at_the_plateau_clerk_and_buys_revives_and_fu
     assert "Sold" in note and "Revive" in note and "Full Restore" in note, note
     bag = live.r.read_bag()
     assert 110 not in bag and bag.get(24, 0) >= 4 and bag.get(19, 0) >= 1, bag
+
+
+def test_a_league_loss_resets_the_rooms_and_quest_elite_four_starts_over(live):
+    """The loss path on the real ROM (#259): losing in Agatha's room heals the party, takes money, clears every FLAG_DEFEATED_* and respawns at the
+    Plateau's Pokémon Center (the decomp's DoWhiteOut → EventScript_ResetEliteFourEnd) — and quest('elite_four') then goes back in from Lorelei."""
+    from game.constants import Addr
+    live.load("league_agatha")
+    c = live.c
+    assert live.r.read_flag(0x4B8) and live.r.read_flag(0x4B9) and not live.r.read_flag(0x4BA)
+    money = live.r.read_money()
+    for _ in range(6):                                           # talk to Agatha without the autopilot: a battle starts
+        c._execute("quest", json.dumps({"name": "elite_four", "auto_trainers": False}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            break
+    assert live.r.detect_context().name == "IN_BATTLE"
+    for slot in range(len(live.r.read_party())):                 # every Pokémon at 0 HP: the next turn is the loss
+        live.m.write16(Addr.PARTY_DATA + 100 * slot + 0x56, 0)
+    live.m.write16(Addr.BATTLE_MON0_SPECIES + 0x28, 0)
+    for _ in range(80):
+        live.m.tap("A")
+        live.m.tick(30)
+        if tuple(live.r.read_current_map()) == (13, 0):
+            break
+    live.m.tick(120)
+    assert tuple(live.r.read_current_map()) == (13, 0)                                   # the Plateau's Pokémon Center
+    assert not any(live.r.read_flag(f) for f in (0x4B8, 0x4B9, 0x4BA, 0x4BB, 0x4BC))      # the whole League is reset
+    assert live.r.read_money() < money and all(p.current_hp > 0 for p in live.r.read_party())
+    for _ in range(6):
+        c._execute("quest", json.dumps({"name": "elite_four", "auto_trainers": False}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            break
+    assert tuple(live.r.read_current_map()) == (1, 75)                                   # back in Lorelei's room
+
+
+def test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town(live):
+    """What happens after the Champion (#259), on the native backend: the Hall of Fame sets FLAG_SYS_GAME_CLEAR, the game returns to Indigo Plateau and rolls
+    the credits (~14,000 frames), then SOFT-RESETS to the title screen (RAM empty for a moment, then the attract-mode loop); the battery save holds the cleared
+    game, and Continue (main.drive_into_gameplay) puts you in Pallet Town with the badges and the flag. main()'s run therefore ends at the milestone, before this."""
+    import main
+    from game.constants import Addr
+    live.load("league_champion")
+    c = live.c
+    foe = Addr.BATTLE_MON0_SPECIES + 0x58
+    use_move = c._use_move
+
+    def weak_foe(name):
+        if live.m.read16(foe) and live.m.read16(foe + 0x28) > 1:
+            live.m.write16(foe + 0x28, 1)
+        return use_move(name)
+    c._use_move = weak_foe
+    live.boost_party()
+    for _ in range(40):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        c._execute("quest", json.dumps({"name": "elite_four", "auto_trainers": True}))
+        if live.r.read_flag(0x82C):
+            break
+    assert live.r.read_flag(0x82C) and tuple(live.r.read_current_map()) == (1, 80)
+    saw_plateau = reset = False
+    for i in range(120):                                         # up to ~29,000 frames: the credits, then the reset
+        live.m.tick(240)
+        if i % 6 == 0 and i < 60:
+            live.m.tap("A")                                      # Oak's speech
+        here = tuple(live.r.read_current_map())
+        saw_plateau = saw_plateau or here == (3, 9)
+        if here == (0, 0) and not live.r.read_party():
+            reset = True
+            break
+    assert saw_plateau and reset, (saw_plateau, reset)
+    assert main.drive_into_gameplay(live.m, live.r)
+    assert tuple(live.r.read_current_map()) == (3, 0)                                    # Pallet Town
+    assert live.r.read_flag(0x82C) and live.r.read_badges()[0] == 8 and len(live.r.read_party()) == 6

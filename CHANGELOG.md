@@ -18,6 +18,17 @@ All notable changes to this project are documented here. Format loosely follows
   first; and the Poké Mart "Potion → substitute" table listed item 24 (a **Revive**) as a Hyper Potion (it is 21).
 - Not yet: Game Corner coins / repeatable trainers as scripted income (#270's remaining idea), Dept. Store TM planning (#277).
 
+
+### Verified — the League's loss path and the credits, live (#259 follow-up)
+- **Loss** (`test_a_league_loss_resets_the_rooms_...`): losing in Agatha's room heals the party, takes money (¥14,044 → ¥5,524 in the staged run), clears all five
+  `FLAG_DEFEATED_*` and respawns at the Plateau's Pokémon Center; `quest('elite_four')` then goes back in from Lorelei. No reload is needed (main's blackout handler
+  would reload the pre-door save, slot 3, first).
+- **Credits** (`test_the_credits_end_in_a_soft_reset_...`): after the Hall of Fame the game returns to Indigo Plateau and rolls the credits for ~14,000 frames, then
+  SOFT-RESETS to the title screen (RAM empty for a moment — party 0, map 0/0 — then the attract-mode loop forever). The battery save holds the cleared game and
+  `drive_into_gameplay` (Continue) lands in **Pallet Town** with 8 badges and `FLAG_SYS_GAME_CLEAR` — a valid post-game start for the post-game issues.
+- **Fixed**: `main()`'s end condition fired at step 0 for any run that started after the game was cleared (a post-credits save, or a `logs/progress.json` kept
+  from an earlier run). The goal is now "the Hall of Fame milestone was recorded during THIS run".
+
 ### Added — `quest('elite_four')`: the Pokémon League, start to Hall of Fame (#259)
 - New `elite_four` beat after `victory_road` and `agent/skills/league.py` (`LeagueMixin`). From Indigo Plateau it PREPS before the first door (heal, `shop`, a save to
   slot 3), walks in through the Center's north door and then, room by room (Lorelei, Bruno, Agatha, Lance, the Champion; maps/positions/flags from the decomp's
