@@ -208,6 +208,9 @@ def plan(beat: Beat, status: dict) -> str:
     if beat.driver:
         out.append(f"quest('{beat.driver}') runs it.")
     out += [f"{i}. {s}" for i, s in enumerate(beat.steps, 1)]
+    from knowledge.beat_readiness import recommendation
+    if rec := recommendation(beat.key):
+        out.append(rec)
     if beat.tip:
         out.append(beat.tip)
     return "\n".join(out)

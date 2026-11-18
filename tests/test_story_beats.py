@@ -108,7 +108,7 @@ class FakeReader:
     def read_key_items(self): return list(self.items)
     def read_badges(self): return bin(self.mask).count("1"), self.mask
     def read_current_map(self): return self.map
-    def read_party(self): return [SimpleNamespace(move_ids=self.moves, species_name="X", level=30)]
+    def read_party(self): return [SimpleNamespace(move_ids=self.moves, species_name="X", level=30) for _ in range(4)]       # deep enough to pass the readiness gate
     def detect_context(self): return SimpleNamespace(name="OVERWORLD")
 
 
