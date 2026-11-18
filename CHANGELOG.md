@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — Cut trees in the region graph; Route 16's Fly house is reachable; the Poké Flute gate is narrower; Route 4's Magikarp house says why not (#293)
+- **Cut-tree links** (`tools/gen_regions.py` → `BLOCKER_LINKS` in `knowledge/map_regions.py`): the generator still treats Cut trees / rocks as walls, but now also records the
+  two regions each one separates. `route_to` tries a second strict search with those links (a `("cut", far-side tile, node)` step; `go_to` walks to the tile and `walk_to`
+  cuts the tree) BEFORE the region-blind fallback, which used to plan Route 16's direct door (10,5) and skip the gatehouse.
+- **Route 16**: Celadon → east strip → tree (41,11) → upper gatehouse (27,6)→(20,6) → house door (10,5) is planned and walked (and the way back). The Poké Flute gate on Route 16
+  now applies only to routes that leave it by the SOUTH connection (the lower road the Snorlax guards): `Req.only_exits`.
+- **`quest('fly')` is corrected** (it was wrong in the previous entry): no flute or Snorlax is needed, only Cut; verified live from Celadon, HM02 collected, and back.
+- **Route 4**: the Magikarp house (and its 2F) joins the "ledges only go one way" `NO_WALK` rule, so from Cerulean's end `go_to` says there is no walking route (and what to do) instead
+  of stalling; the errand helper reports that message. `quest('flash')`'s plan said CAUGHT where the game counts SEEN.
+
 ### Added — `quest('dig')`, `quest('hitmon')`, `quest('magikarp')` (#278)
 - **`quest('dig')`**: the Rocket grunt behind the robbed house in Cerulean City (33,6) — beat him (hand-off or autopilot) and he returns **TM28 Dig** (flag 0x23F).
 - **`quest('hitmon')`**: Saffron's Fighting Dojo — beat Master Koichi (trainer flag 0x63D), then take **Hitmonchan** from the ball at (7,3) (a one-time choice: Hitmonlee goes;

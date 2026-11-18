@@ -18,6 +18,7 @@ class Req:
     value: object        # item id | HM name | badge count | world-map flag | the party's best level
     hint: str
     alt_flag: int | None = None   # satisfied if this system flag is set (e.g. already visited)
+    only_exits: tuple = ()        # when set, the gate only matters if the route leaves the map outdoors by a seamless connection in one of these directions
 
 
 SS_TICKET = 265
@@ -54,7 +55,8 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
                   "Tower: quest('pokemon_tower') then quest('poke_flute')), then face the Snorlax, press A and answer YES.",
                   alt_flag=0x253)],           # FLAG_WOKE_UP_ROUTE_12_SNORLAX
     (3, 34): [Req("key_item", POKE_FLUTE,
-                  "A Snorlax blocks Route 16 — you need the Poké Flute (Mr. Fuji, Lavender Town: quest('poke_flute')).")],
+                  "A Snorlax blocks Route 16 — you need the Poké Flute (Mr. Fuji, Lavender Town: quest('poke_flute')).",
+                  only_exits=("South",))],    # it blocks the lower road to Route 17; Celadon (East) and the Fly house (west end, past the Cut tree) are fine
     (3, 8): [Req("hm", "Surf", "Cinnabar Island is across the sea: teach Surf (HM03 from the Safari "
                  "Zone — quest('surf')) to a Pokémon, then use_hm('Surf') / go_to.",
                  alt_flag=0x898)],           # FLAG_VISITED_CINNABAR: once you have been there (Fly lands you on it) the island is reachable
@@ -72,9 +74,22 @@ def unmet_gates(route, satisfied) -> list[tuple[int, Req]]:
     """[(step index, Req)] for every step of `route` that enters a gated map whose requirement
     `satisfied(req)` rejects. `route` is route_to()'s step list (dest node = step[2])."""
     out = []
-    for i, step in enumerate(route or []):
+    steps = list(route or [])
+    for i, step in enumerate(steps):
         dest = tuple(step[2][:2])
         for req in MAP_GATES.get(dest, []):
+            if req.only_exits and _exit_direction(steps, i) not in req.only_exits:
+                continue
             if not satisfied(req):
                 out.append((i, req))
     return out
+
+
+def _exit_direction(steps, i):
+    """The direction of the seamless connection the route leaves the map by after entering it at step i (Cut-tree steps inside the map are skipped), or None when
+    it goes into a building next or the route ends there."""
+    for step in steps[i + 1:]:
+        if step[0] == "cut":
+            continue
+        return step[1] if step[0] == "connection" else None
+    return None

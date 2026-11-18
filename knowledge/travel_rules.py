@@ -22,7 +22,7 @@ class NoWalk:
     ok_regions: tuple = ()    # (map, region tag) pairs where the rule does NOT apply: the Mt. Moon-side pocket of Route 4 opens straight onto Route 3
 
 
-_WEST_OF_ROUTE4 = frozenset({(3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21), (1, 0), (1, 1), (1, 2), (1, 3)})
+_WEST_OF_ROUTE4 = frozenset({(3, 0), (3, 1), (3, 2), (3, 19), (3, 20), (3, 21), (1, 0), (1, 1), (1, 2), (1, 3), (16, 0), (16, 1)})      # (16, x): Route 4's Pokémon Center is in the Mt. Moon-side pocket
 
 NO_WALK: tuple[NoWalk, ...] = (
     NoWalk(frozenset({(3, 3), (3, 22)}), _WEST_OF_ROUTE4, "Route 4's ledges only go one way (out of Mt. Moon)",
