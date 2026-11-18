@@ -170,14 +170,13 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "quest",
-        "description": "Scripted story quests. quest() lists them and where you stand (✔ done / ▶ available / … blocked); "
-                       "quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty); quest('cut') = HM01 Cut (REQUIRED before "
-                       "Vermilion Gym); quest('surf') / quest('strength') = HM03 / HM04 via the Safari Zone (¥500 entry); "
-                       "quest('rocket_hideout') = the Silph Scope from Giovanni under the Celadon Game Corner (for the Pokémon Tower). "
-                       "A wild Pokémon or trainer on the way ENDS the call — play it, then call quest again to resume. "
+        "description": "The story, start to Elite Four. quest() lists every beat: ✔ done / ▶ next / … blocked. quest('<name>') runs "
+                       "its script when it has one (ss_ticket, cut, coin_case, rocket_hideout = the Silph Scope, tea, surf, strength) "
+                       "or prints the plan (pokemon_tower, poke_flute, snorlax, silph_co, pokemon_mansion, the gyms…). A wild "
+                       "Pokémon or trainer on the way ENDS the call — play it, then call quest again to resume. "
                        "auto_trainers=true fights the trainers on the way for you.",
         "parameters": {"type": "object", "properties": {
-            "name": {"type": "string", "enum": ["ss_ticket", "cut", "surf", "strength", "coin_case", "rocket_hideout"], "description": "omit to list the quests"},
+            "name": {"type": "string", "description": "a beat from the list (e.g. rocket_hideout, pokemon_tower, silph_co); omit to list them"},
             "auto_trainers": {"type": "boolean",
                               "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
         }, "required": []},

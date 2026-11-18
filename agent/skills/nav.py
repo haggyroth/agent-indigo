@@ -1065,7 +1065,7 @@ class NavMixin:
         return ("Nobody on the team can learn Fly — load an earlier save, or catch a Fly-capable bird "
                 "(Pidgey / Spearow lines) before you head east again.")
 
-    def _probe_warp(self, warp: tuple[int, int]) -> bool:
+    def _probe_warp(self, warp: tuple[int, int], _seen=None) -> bool:
         """Step onto `warp` from each side (Up/Left/Right/Down into it) until the map changes. True if
         it did. Verified live: the Underground Path (Route 5) stairs at (7,4) only fire from one side."""
         before = self.reader.read_current_map()
@@ -1093,6 +1093,17 @@ class NavMixin:
             self.mgba.hold(btn, 20)
             self.mgba.tick(72)                       # let the warp fade finish
             if self.reader.read_current_map() != before:
+                return True
+        # A doormat is often 2+ warp tiles of which only ONE fires (Route 7's gate house: (11,5) fires, (11,6) does not — the graph lists
+        # both): try the neighbouring warp tiles of the same mat the same way.
+        seen = set(_seen or ()) | {(wx, wy)}
+        try:
+            mates = [w for w in self.tilemap.read_warps() if w not in seen and max(abs(w[0] - wx), abs(w[1] - wy)) <= 1]
+        except Exception:
+            mates = []
+        for w in mates:
+            seen.add(w)
+            if self._probe_warp(w, seen):
                 return True
         return False
 

@@ -28,6 +28,7 @@ from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
+from knowledge.story_beats import story_line
 from knowledge.matchup import Foe, better_matchup, low_hp_advice, roster
 from knowledge.mon_quality import assess as assess_iv, hidden_power
 from knowledge.move_semantics import catch_setup_hint
@@ -112,6 +113,16 @@ def _lead_line(t: Tick) -> list[str]:
     return out
 
 
+def _story_status_for(t: Tick) -> dict:
+    """The story chain's state from the live game (flags / key items / badges / milestones). Cut / Surf count as done only once TAUGHT."""
+    from agent.story import story_status
+    r, party = t.reader, t.state.party
+    moves = {m for p in party for m in (p.move_ids or [])}
+    flag = r.read_flag
+    overrides = {"cut": 15 in moves, "surf": 57 in moves or bool(flag(0x239)), "strength": 70 in moves or bool(flag(0x23A))}
+    return story_status(r, t.ltm, overrides)
+
+
 def _readiness_and_bag(t: Tick) -> list[str]:
     """The fundamentals a good player sorts out BEFORE walking on (heal, restock, team, levels, TMs…) plus the bag digest."""
     r, party, out = t.reader, t.state.party, []
@@ -137,6 +148,9 @@ def _readiness_and_bag(t: Tick) -> list[str]:
                                               dex=dex, tms=tms, boxes=boxes, save_due=due))
     if block:
         out.append(block)
+    story = _safe("story", lambda: story_line(_story_status_for(t)), "")        # what the main story wants next (after Brock)
+    if story and d.get("badges_earned", 0) >= 1:
+        out.append(story)
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
         sig = (tuple(tms), tuple((i, q) for i, q in items if i in BAG_SIG_ITEMS),
                tuple(tuple(p.move_names) for p in party), tuple(p.held_item for p in party))

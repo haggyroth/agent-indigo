@@ -66,6 +66,7 @@ MAP_NAMES: dict[tuple[int, int], str] = {
     (1, 63): "Safari Zone (Center)",
     (1, 71): "Safari Zone Secret House",
     (11, 0): "Safari Zone Entrance",
+    (10, 7): "Celadon Mansion 1F",
     (10, 14): "Celadon Game Corner",
     (10, 15): "Celadon Prize Corner",
     (10, 17): "Celadon Restaurant",

@@ -479,7 +479,7 @@ def test_give_item_equips_swaps_and_x_items_work_in_battle(live):
 def test_quest_lists_progress_and_refuses_what_is_blocked(live):
     live.load("threemon")
     out = live.c._execute("quest", "{}")
-    assert out.startswith("Story quests:") and "ss_ticket" in out and "cut" in out, out
+    assert out.startswith("Story, start to Elite Four") and "ss_ticket" in out and "cut" in out, out
     assert "needs quest('ss_ticket') first" in live.c._execute("quest", json.dumps({"name": "cut"})) or "already" in out
 
 
@@ -899,3 +899,39 @@ def test_rocket_hideout_quest_ends_with_the_silph_scope_and_back_in_celadon(live
     assert 356 in live.r.read_key_items()                            # the Lift Key on the way
     assert "Got the Silph Scope" in out and live.r.read_current_map() == (3, 6), out
     assert "already done" in c._execute("quest", json.dumps({"name": "rocket_hideout"}))
+
+
+def test_tea_quest_then_the_saffron_gate_guard_lets_you_in(live):
+    """quest('tea'): the old woman in Celadon Mansion 1F gives the Tea; go_to Saffron City walks into the Route 7 gate house, the guard drinks
+    it (the key item is consumed, FLAG_GOT_TEA stays) and — with only ONE of the doormat's two warp tiles firing — _probe_warp finds the
+    one that does. The Saffron gate then counts as met by the flag, not by the (gone) item."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    live.set_badges(0b1111)                       # the fixture predates Erika: with the Rainbow Badge the Hideout and the Tea are open
+    listing = c._execute("quest", "{}")
+    assert "▶ tea" in listing and "▶ rocket_hideout" in listing and "… pokemon_tower" in listing, listing
+    assert "No script for this one yet" in c._execute("quest", json.dumps({"name": "pokemon_tower"}))
+    out = ""
+    for _ in range(6):
+        live.heal_hp()
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "tea"}))
+        if live.r.read_flag(0x2A6):
+            break
+    assert live.r.read_flag(0x2A6) and 369 in live.r.read_key_items() and out.startswith("Got the Tea"), out
+    assert "already done" in c._execute("quest", json.dumps({"name": "tea"})).lower() or "already have" in c._execute("quest", json.dumps({"name": "tea"}))
+    for _ in range(8):
+        live.heal_hp()
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        c._execute("go_to", json.dumps({"destination": "Saffron City", "force": True}))
+        if tuple(live.r.read_current_map()) == (3, 10):
+            break
+    assert tuple(live.r.read_current_map()) == (3, 10), "never got into Saffron City"
+    assert 369 not in live.r.read_key_items() and live.r.read_flag(0x2A6)           # the guard drank it; the flag stays

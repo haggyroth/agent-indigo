@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the whole main story as a guided chain, start to Elite Four
+- **`knowledge/story_beats.py`**: ~30 ordered beats (Oak's Parcel → … → Victory Road) each with where / what must come first / how it is DONE
+  (flags, key items, badges and milestones, verified against the pokefirered decomp) / numbered steps. `quest()` lists the chain
+  (✔ done / ▶ next / … blocked, scripted ones marked); `quest('pokemon_tower' | 'poke_flute' | 'snorlax' | 'silph_co' | 'pokemon_mansion' |
+  'koga' | 'sabrina' | 'blaine' | 'giovanni' | 'victory_road' | …)` prints a state-aware plan ("not yet: first X") when there is no script yet.
+  The observation shows `STORY NEXT: …` (after the first badge). Replaces the six-entry `knowledge/quests.py`; `quest`'s name is a free string.
+- **`quest('tea')`** (new script): the old woman in Celadon Mansion 1F gives the Tea; the Saffron gate guard then lets you in. The gate hint
+  used to send the model to "the Celadon Mansion roof / Game Corner"; the gates now point at the right quests and Saffron's gate is met by
+  `FLAG_GOT_TEA` (the guard consumes the item).
+- Fixed `_probe_warp` on doormats with two warp tiles where only one fires (Route 7's gate house: (11,5) works, (11,6) does not — go_to stalled
+  there forever); it now tries the neighbouring warp tiles of the mat.
+
 ### Added — `quest('rocket_hideout')`: the Silph Scope (verified end to end on the real ROM)
 - The whole story beat after Erika, scripted and resumable: the Game Corner Grunt + poster switch → Rocket Hideout B1F → B2F → B3F →
   B4F; the west half's Grunt and the Lift Key; the elevator (panel list driven by hand, door (2,5)); the two door Grunts that open the
