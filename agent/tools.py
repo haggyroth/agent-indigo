@@ -93,9 +93,11 @@ TOOLS = [
                        "Potions and cures with the money you have. The MART line in the observation shows the plan. With "
                        "`item`, buy that specific thing instead from the nearest clerk who sells it — a TM ('TM28' or 'Dig'), "
                        "a stone, a vitamin (Protein…), an X-item, Super Repel… (the Celadon Dept. Store sells TMs, stones, "
-                       "vitamins and X-items).",
+                       "vitamins and X-items). With `sell`: sell instead — every spare treasure in the bag (Nugget ¥5000, Star Piece, "
+                       "Big Pearl…) or the named `item`; healing items, stones, vitamins and balls are never sold.",
         "parameters": {"type": "object", "properties": {
-            "item": {"type": "string", "description": "optional: one item to buy, e.g. 'TM28', 'Fire Stone', 'X Attack'"},
+            "sell": {"type": "boolean", "description": "true = SELL (treasure, or the item named) instead of buying"},
+            "item": {"type": "string", "description": "optional: one item to buy (or sell), e.g. 'TM28', 'Fire Stone', 'X Attack', 'Nugget'"},
             "quantity": {"type": "integer", "description": "how many (default 1; limited by your money)"}}},
     }},
     {"type": "function", "function": {

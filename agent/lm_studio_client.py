@@ -18,6 +18,7 @@ from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKE
 from agent import events
 from agent.skills.base import SkillBase
 from agent.skills.gamecorner import GameCornerMixin
+from agent.skills.selling import SellMixin
 from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.errands import ErrandsMixin
@@ -41,7 +42,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, SkillState, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SellMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -430,6 +431,8 @@ class AgentClient(SkillBase, SkillState, GameCornerMixin, PCMixin, PartyMixin, Q
             case "heal":
                 return self._heal()
             case "shop":
+                if args.get("sell"):
+                    return self._sell(str(args.get("item", "") or ""), int(args.get("quantity", 1) or 1))
                 return self._shop(str(args.get("item", "") or ""), int(args.get("quantity", 1) or 1))
             case "pick_up_items":
                 return self._pick_up_items()
