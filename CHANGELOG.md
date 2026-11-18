@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('pokemon_mansion')`: the Secret Key (verified end to end on the real ROM)
+- The Mansion's barriers hang on ONE global statue switch (`FLAG_POKEMON_MANSION_SWITCH_STATE` 0x26C): `tools/gen_mansion.py` turns the decomp's
+  `PressSwitch_<floor>` scripts, map collision and warps into `knowledge/mansion_data.py`; `knowledge/mansion_route.py` solves floors × switch state
+  by search; the driver executes the plan's first action, re-reads the real state and re-plans (a trainer or a dropped input costs one re-plan).
+- Things the live ROM taught: statues are pressed from the tile SOUTH of the statue facing up (`BG_EVENT_PLAYER_FACING_NORTH`); only warp tiles
+  with a door / stairs / arrow / fall behaviour fire (the other warp events are LANDING spots — stepping on 2F (27,17) does nothing); stairs are
+  directional (stand on the tile and hold its button — `walk_to` would "nudge" off it); 3F's holes drop you to 1F.
+- `go_to` to Cinnabar after flying there no longer demands Surf (`FLAG_VISITED_CINNABAR` meets the gate).
+
 ### Added — scripts for the Lavender story: `quest('pokemon_tower')`, `quest('poke_flute')`, `quest('snorlax')` (verified end to end on the real ROM)
 - **Pokémon Tower**: the climb to 7F (ghost wilds and Channelers are handed to the model like any quest battle; the rival's 2F trigger and the
   6F Marowak ghost play out), the three Grunts' sight-line fights, then Mr. Fuji at (11,4) — he sets `FLAG_RESCUED_MR_FUJI` and warps you to his

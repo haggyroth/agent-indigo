@@ -968,3 +968,27 @@ def test_lavender_story_tower_flute_snorlax_end_to_end(live):
     out = run("snorlax", lambda: live.r.read_flag(0x253))
     assert live.r.read_flag(0x253), out                                                  # FLAG_WOKE_UP_ROUTE_12_SNORLAX
     assert "already awake" in c._execute("quest", json.dumps({"name": "snorlax"})) or "already done" in c._execute("quest", json.dumps({"name": "snorlax"}))
+
+
+def test_pokemon_mansion_quest_gets_the_secret_key(live):
+    """quest('pokemon_mansion') on the real ROM, staged by flying to Cinnabar: the global statue switch (pressed from the tile SOUTH of a statue,
+    facing up), the directional stairs (stand on the tile, hold their button), the 3F hole down to 1F, the stairs to B1F and two more presses —
+    all planned by knowledge.mansion_route from decomp data (tools/gen_mansion.py) — then the Secret Key at B1F (5,7)."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("cinnabar island")
+    out = ""
+    for _ in range(40):
+        live.heal_hp()
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "pokemon_mansion", "auto_trainers": True}))
+        if 351 in live.r.read_key_items():
+            break
+    assert 351 in live.r.read_key_items(), out                                  # ITEM_SECRET_KEY
+    assert out.startswith("Got the Secret Key")

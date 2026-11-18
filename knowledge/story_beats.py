@@ -102,7 +102,7 @@ BEATS: tuple[Beat, ...] = (
     Beat("sabrina", "Marsh Badge — Sabrina (Psychic)", "Saffron City Gym", needs=("silph_co",), done=(("badge", 5),),
          steps=("The Gym opens once Silph Co. is cleared. The gym is a teleport-pad maze: challenge_leader() uses the pads.",
                 "Bug / Ghost / Dark beat Psychic; her Alakazam is fast — Dark types or strong Ghost moves are best.")),
-    Beat("pokemon_mansion", "Pokémon Mansion: the Secret Key", "Cinnabar Island, the burnt mansion (1F-3F, B1F)", needs=("surf",),
+    Beat("pokemon_mansion", "Pokémon Mansion: the Secret Key", "Cinnabar Island, the burnt mansion (1F-3F, B1F)", needs=("surf",), driver="pokemon_mansion",
          done=(("item", SECRET_KEY),),
          steps=("Surf south from Fuchsia (Routes 19-20) to Cinnabar Island; the Mansion is the large building in the north-west.",
                 "The Secret Key is an item ball on B1F at (5,7). The Mansion is full of statue switches (press A facing a statue: it flips every barrier) — "

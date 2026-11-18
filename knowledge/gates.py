@@ -49,7 +49,8 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 34): [Req("key_item", POKE_FLUTE,
                   "A Snorlax blocks Route 16 — you need the Poké Flute (Mr. Fuji, Lavender Town: quest('poke_flute')).")],
     (3, 8): [Req("hm", "Surf", "Cinnabar Island is across the sea: teach Surf (HM03 from the Safari "
-                 "Zone — quest('surf')) to a Pokémon, then use_hm('Surf') / go_to.")],
+                 "Zone — quest('surf')) to a Pokémon, then use_hm('Surf') / go_to.",
+                 alt_flag=0x898)],           # FLAG_VISITED_CINNABAR: once you have been there (Fly lands you on it) the island is reachable
     (3, 37): [Req("hm", "Surf", "Route 19 is open water — you need Surf.")],
     (3, 38): [Req("hm", "Surf", "Route 20 is open water — you need Surf.")],
     (1, 83): [Req("hm", "Surf", "Seafoam Islands needs Surf (and Strength for its boulders).")],
