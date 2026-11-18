@@ -4,6 +4,7 @@ battles, and pick up item balls. See agent.lm_studio_client.AgentClient
 
 from agent.skills.base import log_once
 from knowledge.navigation import MAP_NAMES
+from knowledge.travel_rules import no_walk_reason
 
 
 def _safe_call(fn, default=None):
@@ -487,9 +488,15 @@ class OverworldMixin:
         seen, todo = {start}, [start]
         while todo:
             x, y = todo.pop()
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            for name, dx, dy in (("Right", 1, 0), ("Left", -1, 0), ("Down", 0, 1), ("Up", 0, -1)):
                 n = (x + dx, y + dy)
-                if n in seen or not (0 <= n[0] < w and 0 <= n[1] < h) or n in shut:
+                if not (0 <= n[0] < w and 0 <= n[1] < h):
+                    continue
+                if not grid[n[1]][n[0]] and n not in trees and self.tilemap.ledge_dir(*n) == name:
+                    n = (x + 2 * dx, y + 2 * dy)               # a one-way ledge: the hop lands two tiles on (walk_to does the same)
+                    if not (0 <= n[0] < w and 0 <= n[1] < h) or not grid[n[1]][n[0]]:
+                        continue
+                if n in seen or n in shut:
                     continue
                 if grid[n[1]][n[0]] or n in trees:
                     seen.add(n)
@@ -525,16 +532,20 @@ class OverworldMixin:
         if level is None:
             level = (self._grind_run or {}).get("lvl") or 0
         bank, mid = self.reader.read_current_map()
+        self._gate_why = ""                                 # only the reasons from THIS search may be told to the model
         # Routes whose way in already beat us twice are off the list for the whole session.
         losses = self._trainer_losses
         best = max((p.level for p in self.reader.read_party()), default=0)
         beaten_goals = {m for m, lvl in self._lost_goals.items() if best < lvl + 3}        # a trainer on the way beat us at that level: not before we are stronger
-        avoid: set = {m for m, n in losses.items() if n >= 2} | set(self._sealed_grass) | beaten_goals   # + grass walled off behind Cut trees
+        avoid: set = {m for m, n in losses.items() if n >= 2} | set(self._sealed_grass) | beaten_goals | {m for m, n in self._failed_grass.items() if n >= 2}   # + grass walled off behind Cut trees
         for _attempt in range(3):
             found = None
             for _probe in range(16):                       # skip grass behind a gate (Brock, a ticket…) without spending an attempt
                 found = best_grass((bank, mid), level, exclude_current=exclude_current, avoid=avoid)
-                if found is None or not self._grass_route_gated((bank, mid), found[0]):
+                if found is None:
+                    break
+                walkable = not no_walk_reason((bank, mid), found[0], self.reader.read_player_pos())      # e.g. back west across Route 4's ledges
+                if walkable and not self._grass_route_gated((bank, mid), found[0]):
                     break
                 avoid.add(found[0])
                 found = None
@@ -562,8 +573,8 @@ class OverworldMixin:
                     # it: heal once, then try a different grass route.
                     lost = True
                     self._lost_goals[goal_map] = best               # remembered across grind() calls, until the team is 3 levels stronger
-                    self._gate_why = (f"a trainer on the way to {MAP_NAMES.get(goal_map, goal_map)} beat you at L{best} — "
-                                      "that road stays off the list until your best Pokémon is 3 levels higher")
+                    self._add_gate_why(f"a trainer on the way to {MAP_NAMES.get(goal_map, goal_map)} beat you at L{best} — "
+                                       "that road stays off the list until your best Pokémon is 3 levels higher")
                     self._heal()
                     break
             if lost:
@@ -572,13 +583,21 @@ class OverworldMixin:
                 continue
             if self.reader.read_current_map() == goal_map and self._nearest_grass() is not None:
                 return True
+            self._failed_grass[goal_map] = self._failed_grass.get(goal_map, 0) + 1     # a watched run spent 100 min x 14 grind() calls walking toward Route 21 (open water)
             avoid.add(goal_map)
         return False
+
+    def _add_gate_why(self, why: str) -> None:
+        """Remember one more reason a grass route was skipped (up to three, each once) for _why_no_grass."""
+        parts = [p for p in self._gate_why.split(" | ") if p]
+        if why not in parts and len(parts) < 3:
+            parts.append(why)
+        self._gate_why = " | ".join(parts)
 
     def _why_no_grass(self) -> str:
         """' Why: …' when grind skipped the nearest grass because of a story gate or a trainer that beat us (else '')."""
         why, self._gate_why = self._gate_why, ""
-        return f" Why the closest grass was skipped: {why}" if why else ""
+        return f" Grass routes skipped on the way: {why}" if why else ""
 
     def _grass_route_gated(self, here, goal) -> bool:
         """Is the way to the grass map `goal` closed by a story gate the player does not meet (the Pewter guard, a ticket, an HM)?"""
@@ -589,7 +608,7 @@ class OverworldMixin:
             route = route_to(node_for(here[0], here[1], px, py), goal)
             unmet = unmet_gates(route, self._gate_ok) if route else []
             if unmet:
-                self._gate_why = unmet[0][1].hint            # so a failed grind can say WHY the nearest grass was skipped
+                self._add_gate_why(f"{MAP_NAMES.get(tuple(goal[:2]), goal)}: {unmet[0][1].hint}")      # so a failed grind can say WHY the nearest grass was skipped
             return bool(unmet)
         except Exception:
             log_once("overworld._grass_route_gated", "overworld._grass_route_gated: tolerated failure (continuing with a default)")

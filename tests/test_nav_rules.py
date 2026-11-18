@@ -115,12 +115,12 @@ def test_advance_to_control_logs_a_failing_forced_switch_once(caplog):
 # ── walk_to bounds and warp probing ────────────────────────────────────────────────────────────────────
 def test_walk_to_rejects_tiles_outside_the_map_with_the_real_size():
     c = client()
-    c.tilemap = NS(_width=20, _height=15)
+    c.tilemap = NS(_width=20, _height=15, refresh=lambda: True)
     seen = []
     c._walk_to = lambda x, y: seen.append((x, y)) or "ok"
     assert "outside this map" in c._walk_to_tool(-1, 5) and "x 0-19, y 0-14" in c._walk_to_tool(3, 15)
     assert c._walk_to_tool(19, 14) == "ok" and seen == [(19, 14)]
-    c.tilemap = NS(_width=None, _height=None)                                  # map size unknown: don't block
+    c.tilemap = NS(_width=None, _height=None, refresh=lambda: True)             # map size unknown: don't block
     assert c._walk_to_tool(99, 99) == "ok"
 
 
@@ -133,3 +133,31 @@ def test_probing_a_warp_stops_when_a_battle_starts():
     walks = []
     c._walk_to = lambda x, y: walks.append((x, y))
     assert c._probe_warp((7, 4)) is False and len(walks) == 1               # gave up after the first approach
+
+
+def test_route_4_mt_moon_pocket_walks_straight_back_to_route_3():
+    """Regression: healing at Route 4's Pokémon Center drops you in the west pocket, one step from Route 3 — NO_WALK (meant for the
+    Cerulean-side ledges) said Route 3 / Route 2 / Viridian Forest were unreachable, so grind went all the way round to Route 22."""
+    assert no_walk_reason((3, 22), (3, 21), (12, 5)) is None                    # the pocket: region 2
+    assert no_walk_reason((3, 22), (1, 1), (12, 6)) is None
+    assert no_walk_reason((3, 22), (3, 21), (40, 6))                            # the Cerulean-side ledge pocket still can't climb back
+    assert no_walk_reason((3, 22), (3, 21))                                     # position unknown: keep the old, cautious answer
+
+
+def test_grass_skip_reasons_name_the_route_and_do_not_pile_up():
+    c = client()
+    c._gate_why = ""
+    for why in ("Route 24: a", "Route 24: a", "Route 25: b", "Route 9: c", "Route 5: d"):
+        c._add_gate_why(why)
+    assert c._gate_why == "Route 24: a | Route 25: b | Route 9: c"
+    assert "Route 25: b" in c._why_no_grass() and c._gate_why == ""
+
+
+def test_walk_to_checks_the_size_of_the_map_you_are_on_not_the_one_you_just_left():
+    """Regression (two watched runs): walk_to right after a tool that changed maps was checked against the OLD map's size —
+    (10,10) 'outside' a 15x10 Center while standing in Vermilion, (11,35) 'outside' Route 4's 108x20 while in Mt. Moon 1F."""
+    c = client()
+    c.tilemap = NS(_width=15, _height=10)
+    c.tilemap.refresh = lambda: (setattr(c.tilemap, "_width", 108), setattr(c.tilemap, "_height", 40), True)[-1]
+    c._walk_to = lambda x, y: "ok"
+    assert c._walk_to_tool(11, 35) == "ok"

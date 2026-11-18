@@ -1140,3 +1140,14 @@ def test_under_levelled_party_is_kept_away_from_cerulean_rival(live):
     live.patch_mon(0, level=21)
     out = c._execute("go_to", json.dumps({"destination": "Route 24", "force": True}))
     assert "rival" not in out or "ambush" not in out
+
+
+def test_grind_from_route_4_pocket_goes_back_to_route_3_not_round_to_route_22(live):
+    """Regression (watched run): the Mt. Moon-side Pokémon Center exits into Route 4's west pocket, where no grass is reachable; NO_WALK
+    wrongly blocked Route 3 one step south, so grind walked the party to Route 22 (wild L2-5) and the misleading SS-ticket gate hint was shown."""
+    live.load("route3_weak_team")
+    live.c._execute("go_to", json.dumps({"destination": "Pokemon Center"}))
+    live.c._execute("walk_to", json.dumps({"x": 7, "y": 8}))
+    assert tuple(live.r.read_current_map()) == (3, 22)
+    out = live.c._execute("grind", json.dumps({"level": 20}))
+    assert tuple(live.r.read_current_map()) == (3, 21), out
