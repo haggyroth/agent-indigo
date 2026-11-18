@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('dig')`, `quest('hitmon')`, `quest('magikarp')` (#278)
+- **`quest('dig')`**: the Rocket grunt behind the robbed house in Cerulean City (33,6) — beat him (hand-off or autopilot) and he returns **TM28 Dig** (flag 0x23F).
+- **`quest('hitmon')`**: Saffron's Fighting Dojo — beat Master Koichi (trainer flag 0x63D), then take **Hitmonchan** from the ball at (7,3) (a one-time choice: Hitmonlee goes;
+  flag 0x278); needs the Tea. The "nickname?" box is declined; a full party sends it to the PC box (the message says so).
+- **`quest('magikarp')`**: the Route 4 Pokémon Center salesman sells a L5 Magikarp for ¥500 (flag 0x249; nickname declined). Verified from Pewter; from Cerulean's side
+  `go_to` stalls at the east end of Route 4, so the beat text says to do it on the way to Mt. Moon. The map is named `Route 4 Magikarp House` because `go_to` reads any
+  destination containing "pokemon center" as "the nearest Center".
+- `_gift_errand` gained `answers` (the Yes/No answers in order) and hands a trainer fight back; new optional beats `dig`, `magikarp`, `hitmon` in the chain.
+- Not done: Copycat's house — in FRLG she needs a Poké Doll and teaches the Mimic *tutor* (not a TM), which belongs with the move tutors (#274).
+
 ### Added — `quest('flash')` and `quest('fly')` (#268)
 - **`quest('flash')`** (verified live): travels to the Route 2 east building, talks to Prof. Oak's Aide and takes HM05 once 10 species are SEEN (it says how many you have
   seen when short). New map names `Route 2 East Building` / `Route 16 House` for `go_to`. A shared `_gift_errand` does travel + talk + advance until the flag is set.
