@@ -969,6 +969,7 @@ class BattleMixin:
         from game.constants import Addr
         from game.state import GameContext
         from knowledge.shopping import ITEM_NAMES
+        HEAL_ONLY_ITEMS = (13, 19, 20, 21, 22)          # Potion, Full Restore, Max / Hyper / Super Potion (Full Restore also cures: handled by status)
         if self.reader.detect_context() != GameContext.IN_BATTLE:
             return "use_item is for battles. (In the overworld, items apply automatically where needed.)"
         key = item.lower().strip().replace("é", "e")
@@ -986,9 +987,18 @@ class BattleMixin:
             return f"No {ITEM_NAMES.get(iid, item)} in your Items pocket (you have: {have})."
         target_index = order.index(iid)
         before_qty = dict(pocket).get(iid, 0)
-        lead0 = self.reader.read_party()
-        before_hp = lead0[0].current_hp if lead0 else 0
-        before_status = lead0[0].status if lead0 else "healthy"
+        # The item goes to the ACTIVE battler (the party menu's default row), which after a switch or a forced replacement is NOT
+        # party[0]: judging success by the lead's HP reported "couldn't use it" — while the heal had landed — and kept pressing A.
+        active_species = self.reader.read_active_battle_species()
+
+        def active_mon():
+            pk = self.reader.read_party()
+            return next((q for q in pk if q.species_id == active_species), pk[0] if pk else None)
+        mon0 = active_mon()
+        before_hp = self.reader.read_active_battle_hp()
+        before_status = mon0.status if mon0 else "healthy"
+        if mon0 and mon0.max_hp and before_hp >= mon0.max_hp and before_status == "healthy" and iid in HEAL_ONLY_ITEMS:
+            return f"{mon0.species_name or 'Your active Pokémon'} is already at full HP ({before_hp}/{mon0.max_hp}) — the {ITEM_NAMES.get(iid, item)} would do nothing."
         if not self._open_battle_bag():
             return "Couldn't open the Bag in battle — try use_item again."
         self._wait_idle()
@@ -1015,12 +1025,10 @@ class BattleMixin:
             return f"Couldn't select {ITEM_NAMES.get(iid, item)} in the bag — try again."
 
         def used() -> bool:
-            pk = self.reader.read_party()
-            p = pk[0] if pk else None
+            p = active_mon()
             qty = dict(self.reader.read_items_pocket()).get(iid, 0)
-            return (qty < before_qty) or (p is not None and (
-                p.current_hp > before_hp
-                or (before_status != "healthy" and p.status == "healthy")))
+            return (qty < before_qty) or self.reader.read_active_battle_hp() > before_hp or (
+                p is not None and before_status != "healthy" and p.status == "healthy")
 
         # Select → USE (default) → party menu (lead is the default slot) → confirm text.
         # Self-verifying A presses: a dropped input in the chain just costs another press
@@ -1034,10 +1042,11 @@ class BattleMixin:
         self._exit_battle_menus()
         if not used():
             return f"Couldn't use the {ITEM_NAMES.get(iid, item)} — you're back in the battle; try again."
-        p = self.reader.read_party()[0]
-        gained = p.current_hp - before_hp
+        p = active_mon()
+        now_hp = self.reader.read_active_battle_hp()
+        gained = now_hp - before_hp
         if gained > 0:
-            return f"Used {ITEM_NAMES.get(iid, item)} — {p.species_name or 'lead'} healed +{gained} HP ({p.current_hp}/{p.max_hp})."
+            return f"Used {ITEM_NAMES.get(iid, item)} — {p.species_name or 'lead'} healed +{gained} HP ({now_hp}/{p.max_hp})."
         if before_status != "healthy" and p.status == "healthy":
             return f"Used {ITEM_NAMES.get(iid, item)} — cured {p.species_name or 'lead'}'s {before_status}."
         from knowledge.bag import BATTLE_BOOSTERS
