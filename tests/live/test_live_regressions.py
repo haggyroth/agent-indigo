@@ -874,3 +874,28 @@ def test_shop_with_too_little_money_says_so_and_stops_the_readiness_nag(live):
     assert "you have ¥300" in out and "Earn more first" in out, out
     assert c.ltm.data.get("shop_broke_at") == 300
     c.ltm.data.pop("shop_broke_at", None)
+
+
+def test_rocket_hideout_quest_ends_with_the_silph_scope_and_back_in_celadon(live):
+    """quest('rocket_hideout') end to end on the real ROM (~5 min): Game Corner Grunt + poster → B1F → B2F → the B3F spinner maze (arrow
+    tiles slide the player across plain floor to a stop tile — planned by find_path_spin) → B4F west Grunt + Lift Key → the elevator
+    (B2F door; the panel list driven by hand; door (2,5)) → B4F south corridor → the two door Grunts open the barrier → Giovanni →
+    Silph Scope → the elevator to B1F → the south-wing Grunt opens the barrier → out to Celadon City."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    out = ""
+    for _ in range(12):
+        live.heal_hp()
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "rocket_hideout", "auto_trainers": True}))
+        if 359 in live.r.read_key_items() and "Got the Silph Scope" in out:
+            break
+    assert 359 in live.r.read_key_items(), out                       # ITEM_SILPH_SCOPE
+    assert 356 in live.r.read_key_items()                            # the Lift Key on the way
+    assert "Got the Silph Scope" in out and live.r.read_current_map() == (3, 6), out
+    assert "already done" in c._execute("quest", json.dumps({"name": "rocket_hideout"}))

@@ -67,6 +67,10 @@ class QuestMixin:
             done.add("cut")
         if self.reader.read_flag(FLAG_GOT_COIN_CASE):
             done.add("coin_case")
+        if self._has_silph_scope():
+            from agent.skills.hideout import HIDEOUT_MAPS
+            if tuple(self.reader.read_current_map()) not in HIDEOUT_MAPS:      # still inside: quest('rocket_hideout') walks you out
+                done.add("rocket_hideout")
         if self._knows_move(SURF_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM03):
             done.add("surf")
         if self._knows_move(STRENGTH_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM04):
@@ -82,7 +86,8 @@ class QuestMixin:
         if missing:
             return f"quest('{q.key}') needs quest('{missing[0]}') first."
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
-                "strength": self._get_strength, "coin_case": self._get_coin_case}[q.key](auto_trainers)
+                "strength": self._get_strength, "coin_case": self._get_coin_case,
+                "rocket_hideout": self._get_silph_scope}[q.key](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:

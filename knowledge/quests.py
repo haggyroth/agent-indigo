@@ -21,6 +21,8 @@ QUESTS: tuple[Quest, ...] = (
           "a Cut tree blocks Vermilion Gym's door", needs=("ss_ticket",)),
     Quest("coin_case", "the Coin Case from the man in the Celadon Restaurant",
           "the Game Corner (slots, coins, the Prize Corner's TMs) refuses you without it"),
+    Quest("rocket_hideout", "the Silph Scope from Giovanni in the Rocket Hideout (under the Celadon Game Corner)",
+          "the Pokémon Tower's ghosts can't be fought without it — and the tower holds the Poké Flute"),
     Quest("surf", "HM03 Surf from the Safari Zone Secret House (¥500 entry, ~200 of the 600 steps)",
           "Cinnabar Island and every water route need it"),
     Quest("strength", "HM04 Strength: the Safari Zone's Gold Teeth, returned to the Warden in Fuchsia",

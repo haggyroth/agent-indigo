@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('rocket_hideout')`: the Silph Scope (verified end to end on the real ROM)
+- The whole story beat after Erika, scripted and resumable: the Game Corner Grunt + poster switch → Rocket Hideout B1F → B2F → B3F →
+  B4F; the west half's Grunt and the Lift Key; the elevator (panel list driven by hand, door (2,5)); the two door Grunts that open the
+  barrier; Giovanni and the Silph Scope; the elevator back to B1F, the south-wing Grunt that opens that barrier, and out to Celadon.
+  Records `got_silph_scope`; `auto_trainers=true` fights the trainers on the way.
+- **Spinner mazes** (`game/pathfinding.find_path_spin`, `tilemap.spin_map/spin_stops`): an arrow tile carries the player in its direction
+  across PLAIN floor too (turning on further arrows) until a stop tile or a wall — verified live (B3F's maze is the only way to B4F). `walk_to`
+  avoids arrow tiles while a way round exists, plans the slides when there is none, waits out each slide and replans if one ends elsewhere.
+  Reusable for Silph Co. and Viridian Gym.
+- Fixed `_probe_warp` walking the NEW map to the old map's stand tiles when the first walk already stepped through the warp (it put the
+  hideout run on the wrong side of B2F).
+
 ### Fixed — third unwatched run (200 steps: Erika beaten, team L32 vs the ace's L38 — the ace gap is closed)
 - **Futile level-target grinds.** After Erika the model called `grind(42)` at L38 and spent ~700 s on Route 7/8 (wild L17–22): the ace
   gained nothing. `grind(level)` now refuses up front when the best OPEN (un-gated) grass tops out 12+ levels below the Pokémon, and

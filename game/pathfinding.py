@@ -79,6 +79,74 @@ def find_path(start, goal, passable, width, height, max_nodes=8000, ledge=None, 
     return None
 
 
+_DELTA = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
+
+
+def spin_slide(tile, passable, spin, stops=frozenset()):
+    """Where a player who just stepped onto the ARROW tile `tile` ends up. `spin` = {(x, y): direction} for every arrow tile and
+    `stops` = the STOP tiles (MB_STOP_SPINNING). Verified live on Rocket Hideout B2F/B3F: the player keeps moving in the direction of
+    the last arrow they touched — PLAIN floor does not stop them — turning on each further arrow, until they enter a stop tile (they
+    stop on it) or the next tile is blocked (they stop where they are). None = loops forever."""
+    cur, d, seen = tile, spin[tile], set()
+    while True:
+        if (cur, d) in seen:
+            return None
+        seen.add((cur, d))
+        dx, dy = _DELTA[d]
+        nxt = (cur[0] + dx, cur[1] + dy)
+        if not passable(*nxt):
+            return cur
+        cur = nxt
+        if cur in stops:
+            return cur
+        if cur in spin:
+            d = spin[cur]
+
+
+def find_path_spin(start, goal, passable, width, height, spin, stops=frozenset(), max_nodes=20000):
+    """Shortest path where stepping onto an arrow tile slides the player (see spin_slide). Search nodes are the places the player can
+    STAND (a slide's end); each edge is one D-pad press. Returns (moves, stops) — the presses and where each one leaves the player —
+    [] / [] when already at the goal, or None when it is unreachable. Replaces find_path on Silph Co. / Rocket Hideout / Viridian Gym."""
+    if start == goal:
+        return [], []
+    gx, gy = goal
+    if not (0 <= gx < width and 0 <= gy < height):
+        return None
+    dist = {start: 0}
+    came = {start: None}
+    heap = [(0, start)]
+    expanded = 0
+    while heap:
+        d, cur = heapq.heappop(heap)
+        if d > dist.get(cur, 1 << 30):
+            continue
+        if cur == goal:
+            moves, ends = [], []
+            node = cur
+            while came[node] is not None:
+                prev, mv = came[node]
+                moves.append(mv)
+                ends.append(node)
+                node = prev
+            return moves[::-1], ends[::-1]
+        expanded += 1
+        if expanded > max_nodes:
+            return None
+        for name, dx, dy in _MOVES:
+            nx, ny = cur[0] + dx, cur[1] + dy
+            if not (0 <= nx < width and 0 <= ny < height) or not (passable(nx, ny) or (nx, ny) == goal):
+                continue
+            end = spin_slide((nx, ny), passable, spin, stops) if (nx, ny) in spin else (nx, ny)
+            if end is None:
+                continue
+            cost = d + abs(end[0] - cur[0]) + abs(end[1] - cur[1])
+            if cost < dist.get(end, 1 << 30):
+                dist[end] = cost
+                came[end] = (cur, name)
+                heapq.heappush(heap, (cost, end))
+    return None
+
+
 def door_centers(warps):
     """Collapse contiguous warp tiles (a multi-tile doormat) to the middle tile of
     each cluster — usually the only one that actually warps (side tiles just

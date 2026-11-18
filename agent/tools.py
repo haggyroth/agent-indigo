@@ -171,14 +171,13 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "quest",
         "description": "Scripted story quests. quest() lists them and where you stand (✔ done / ▶ available / … blocked); "
-                       "quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty: Cerulean's exits stay blocked "
-                       "without it); quest('cut') = HM01 Cut from the S.S. Anne's Captain (REQUIRED before Vermilion Gym); quest('surf') = HM03 "
-                       "from the Safari Zone's Secret House and quest('strength') = HM04 via the Safari Zone's Gold Teeth "
-                       "(each pays the ¥500 entry; wild Pokémon inside are fought with safari()). "
+                       "quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty); quest('cut') = HM01 Cut (REQUIRED before "
+                       "Vermilion Gym); quest('surf') / quest('strength') = HM03 / HM04 via the Safari Zone (¥500 entry); "
+                       "quest('rocket_hideout') = the Silph Scope from Giovanni under the Celadon Game Corner (for the Pokémon Tower). "
                        "A wild Pokémon or trainer on the way ENDS the call — play it, then call quest again to resume. "
                        "auto_trainers=true fights the trainers on the way for you.",
         "parameters": {"type": "object", "properties": {
-            "name": {"type": "string", "enum": ["ss_ticket", "cut", "surf", "strength", "coin_case"], "description": "omit to list the quests"},
+            "name": {"type": "string", "enum": ["ss_ticket", "cut", "surf", "strength", "coin_case", "rocket_hideout"], "description": "omit to list the quests"},
             "auto_trainers": {"type": "boolean",
                               "description": "auto-fight trainers met on the way (wild Pokémon are still handed to you)."},
         }, "required": []},

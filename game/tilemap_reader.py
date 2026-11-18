@@ -194,6 +194,36 @@ class TilemapReader:
         behind it and a single press in that direction hops 2 tiles over it."""
         return self._LEDGE_DIRS.get(self.metatile_behavior(x, y))
 
+    _SPIN_ARROWS = frozenset({0x54, 0x55, 0x56, 0x57})          # MB_SPIN_RIGHT / LEFT / UP / DOWN (Silph Co., Rocket Hideout, Viridian Gym)
+
+    _SPIN_DIRS = {0x54: "Right", 0x55: "Left", 0x56: "Up", 0x57: "Down"}
+
+    def spin_map(self) -> dict[tuple[int, int], str]:
+        """{(x, y): direction} for every arrow tile on the current map (see spin_tiles)."""
+        if self._width is None or self._height is None:
+            return {}
+        out = {}
+        for y in range(self._height):
+            for x in range(self._width):
+                d = self._SPIN_DIRS.get(self.metatile_behavior(x, y))
+                if d:
+                    out[(x, y)] = d
+        return out
+
+    def spin_stops(self) -> set[tuple[int, int]]:
+        """STOP tiles (MB_STOP_SPINNING, 0x58): where a slide ends."""
+        if self._width is None or self._height is None:
+            return set()
+        return {(x, y) for y in range(self._height) for x in range(self._width) if self.metatile_behavior(x, y) == 0x58}
+
+    def spin_tiles(self) -> set[tuple[int, int]]:
+        """Arrow ("spinner") tiles on the current map: stepping on one slides you along its arrow until something stops you — a
+        planner that treats them as plain floor loses control of the player mid-route."""
+        if self._width is None or self._height is None:
+            return set()
+        return {(x, y) for y in range(self._height) for x in range(self._width)
+                if self.metatile_behavior(x, y) in self._SPIN_ARROWS}
+
     def grass_tiles(self) -> list[tuple[int, int]]:
         """All tall-grass tiles on the current map (for grind to walk to/stay on)."""
         if self._width is None or self._height is None:
