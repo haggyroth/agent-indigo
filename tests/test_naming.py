@@ -20,6 +20,11 @@ class FakeNaming:
     def read32(self, a):
         return Addr.NAMING_CB2 if (a == Addr.GMAIN_CALLBACK2 and self.open) else 0
 
+    def read8(self, a):
+        if a == Addr.NAMING_PAGE:
+            return {UPPER: 1, LOWER: 2, SYMBOLS: 0}[self.page]            # the game's currentPage numbering
+        return 0                                                          # BATTLE_YESNO_CURSOR: YES
+
     def read16(self, a):
         return {Addr.NAMING_CURSOR_X: self.x, Addr.NAMING_CURSOR_Y: self.y}.get(a, 0)
 
@@ -110,3 +115,86 @@ def test_truncates_to_ten():
     f = FakeNaming()
     NamingDriver(f).enter_name("Abcdefghijklmno")
     assert "".join(f.buf) == "Abcdefghij"
+
+
+def test_the_page_is_read_from_the_game_not_assumed():
+    f = FakeNaming()
+    f.page = LOWER                                    # the screen is somewhere the driver did not expect
+    d = NamingDriver(f)
+    assert d.current_page() == LOWER
+    assert d.enter_name("Rex").startswith("Named") and "".join(f.buf) == "Rex"
+
+
+def test_abort_clears_the_box_and_leaves_with_the_default_name():
+    f = FakeNaming()
+    d = NamingDriver(f)
+    for ch in "Hob":
+        d.type_char(ch)
+    assert f.buf and d.abort() and not f.open and f.buf == []
+
+
+def test_clear_empties_a_prefilled_box():
+    f = FakeNaming()
+    f.buf = list("OLD")
+    assert NamingDriver(f).clear() and f.buf == []
+
+
+# ── agent.skills.battle._give_nickname: it never strands the battle on the keyboard ───────────────────────────────────────────────
+import pytest  # noqa: E402
+
+pytest.importorskip("openai")
+from agent.lm_studio_client import AgentClient  # noqa: E402
+
+
+class NickGame(FakeNaming):
+    """The Yes/No box in front of the naming screen: the keyboard only opens when A is pressed on YES (unless `never_opens`)."""
+
+    def __init__(self, never_opens=False, **kw):
+        super().__init__(**kw)
+        self.open = False
+        self.never_opens = never_opens
+        self.asked = False
+        self.b_after_prompt = 0
+
+    def tap(self, b):
+        if not self.open and not self.asked and b == "A" and not self.never_opens:
+            self.asked = True
+            self.open = True
+            return
+        if not self.open and b == "B":
+            self.b_after_prompt += 1
+            return
+        super().tap(b)
+
+
+def _client(game):
+    c = AgentClient.__new__(AgentClient)
+    c.mgba = game
+    return c
+
+
+def test_give_nickname_types_the_models_pick():
+    g = NickGame()
+    out = _client(g)._give_nickname("Zap Daddy", "Pikachu", [])
+    assert out == "Named it 'Zap Daddy'." and "".join(g.buf) == "Zap Daddy" and not g.open
+
+
+def test_give_nickname_falls_back_to_a_pool_name_when_the_pick_cannot_be_typed():
+    g = NickGame()
+    out = _client(g)._give_nickname("Bad#Name", "Pikachu", [])
+    from knowledge.nicknames import POOL
+    assert out.startswith("Named it") and "couldn't be typed" in out and not g.open
+    assert "".join(g.buf) in POOL
+
+
+def test_give_nickname_leaves_the_keyboard_even_when_nothing_can_be_typed():
+    g = NickGame(drop_every=1)                       # every D-pad press is dropped: only letters on the first key can land
+    out = _client(g)._give_nickname("Waffles", "Pikachu", [])
+    assert not g.open                                  # never stranded on the naming screen
+    assert out.startswith(("Named", "(couldn't type"))
+
+
+def test_give_nickname_declines_the_prompt_when_the_keyboard_never_opens():
+    g = NickGame(never_opens=True)
+    out = _client(g)._give_nickname("Hobbes", "Rattata", [])
+    assert "never opened" in out and g.b_after_prompt == 1

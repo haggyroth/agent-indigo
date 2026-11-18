@@ -19,6 +19,17 @@ All notable changes to this project are documented here. Format loosely follows
   looks at our second battler in a double battle, and `_send_next_mon` brings in a benched Pokémon.
 - Test staging: `live.strong_lead()` / `live.boost_party()` (the fixture party is far under the cave's L40+ wilds).
 
+### Changed — hardened nickname driver, with a varied pool of ideas
+- `knowledge/nicknames.py`: a pool of 211 typeable, ≤10-character names that have nothing to do with the species (dad jokes, food, pets, titles, objects,
+  places: "Zap Daddy", "Hobbes", "Waffles", "Sir Wiggle"…), `suggest()` (a fresh draw that skips names already on the team), `pick()` and `usable()`.
+  The wild-catch / Safari hints now show three of them, and a refused pick (no ball spent) lists four to take or remix. A pick that is empty after
+  the clean-up, a duplicate or has fewer than two letters/digits is replaced by a pool name instead of reaching the keyboard.
+- `game/naming.py`: the keyboard page is read from the game's own struct (`NAMING_PAGE`, `currentPage`), not counted with a blind Select tally;
+  `clear()` and `abort()` (empty box + OK keeps the default name) so a failed typing run can always leave the screen.
+- `_give_nickname` never strands a catch on the keyboard: the Yes/No is declined if the screen never opens, an untypeable pick is retried with a
+  pool name, and if nothing can be typed the screen is left with the default name.
+- Tests: pool invariants, fake-keyboard desync / abort / fallback cases, and a live mixed-case "Zap Daddy" catch that checks the RAM page read.
+
 ### Added — `quest('silph_co')`: the Card Key, the Lapras, Giovanni and the Master Ball
 - Silph Co. is 11 floors joined by stairs and teleport pads, with 20 card-key doors. `tools/gen_silph.py` turns the decomp's map collision, warps and the
   `Close<N>FDoor<K>` scripts (the doors are closed on map load while their `FLAG_SILPH_<N>F_DOOR_<K>` is clear) into `knowledge/silph_data.py`;
