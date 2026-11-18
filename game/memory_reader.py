@@ -327,6 +327,21 @@ class LeafGreenReader:
             pass
         return mon
 
+    def read_enemy_party(self) -> list[PokemonStatus]:
+        """The opponent's whole team (gEnemyParty[0..5], empty slots dropped) — HP as stored in the party structs, so the mon that is
+        out right now may be stale until it leaves the field; use it to COUNT what a trainer has left, not to read the live foe."""
+        raw = self.client.read_range(Addr.ENEMY_PARTY, 600)
+        out = []
+        for i in range(6):
+            chunk = raw[i * 100:(i + 1) * 100]
+            if len(chunk) < 100 or chunk[0x54] == 0:
+                continue
+            try:
+                out.append(self._decode_mon(chunk, 0))
+            except Exception:
+                continue
+        return out
+
     def read_key_item_count(self) -> int:
         """Number of occupied key-item slots in the bag. The key-item event fires when
         this increases. Item IDs are cleartext; empty slots read id 0."""

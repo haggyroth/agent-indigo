@@ -74,6 +74,10 @@ RESUME            = os.getenv("RESUME", "").strip()
 # CHECKPOINT_EVERY: save an emulator checkpoint every N decision ticks (and on every new badge); 0 = off.
 CHECKPOINT_EVERY  = _env_int("CHECKPOINT_EVERY", 20, minimum=0)
 MAX_STEPS         = _env_int("MAX_STEPS", 0, minimum=0)
+# BATTLE_STYLE: the in-game Option 'BATTLE STYLE'. "shift" (default) = after a trainer's Pokémon faints the game asks 'Will you change POKéMON?' before
+#   the next one comes out — a FREE switch (no turn lost), which is how a lagging teammate gets into the fight. "set" = no such prompt. "" = leave
+#   whatever the save has. Written into SaveBlock2 every step (game/options.py), so a loaded state or a fresh save cannot undo it.
+BATTLE_STYLE      = os.getenv("BATTLE_STYLE", "shift").strip().lower()
 # LOG_LEVEL: how much of the game-event stream (agent/events.py) the terminal shows — "quiet" (milestones: catches,
 #   badges, level-ups, battle results, faints), "events" (default: + every tool call and the quieter events),
 #   "debug" (+ observations/reasoning). STATUS_EVERY: a one-line status (party, money, balls, tokens) every N ticks.

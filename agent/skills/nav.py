@@ -94,17 +94,24 @@ class NavMixin:
             return ""
         others = npcs - trees
 
+        from game.tilemap_reader import deck_step_ok
+
         def passable(x, y):
             return (x, y) == goal or (x, y) in trees or (grid[y][x] and (x, y) not in others and (x, y) not in blocked)
-        path = find_path(start, goal, passable, w, h)          # no ledge hops: every move is exactly one tile
+        # Plan like walk_to does — ledge hops and elevation included. Without them Route 9's grass (a ledge hop east of the tree) read as
+        # "no path" even though a Cut tree was the only thing in the way: grind() then walked the whole map back and forth to it.
+        path = find_path(start, goal, passable, w, h, ledge=lambda x, y: None if (x, y) in blocked else self.tilemap.ledge_dir(x, y),
+                         edge_ok=deck_step_ok(self.tilemap.decks, self.tilemap.ramps))
         if not path:
             return ""
         x, y = start
         for mv in path:
             dx, dy = self._MOVE_DELTA[mv]
-            if (x + dx, y + dy) in trees:
+            n = (x + dx, y + dy)
+            if n in trees:
                 break
-            x, y = x + dx, y + dy
+            hop = 0 <= n[0] < w and 0 <= n[1] < h and not grid[n[1]][n[0]] and self.tilemap.ledge_dir(*n) == mv
+            x, y = (x + 2 * dx, y + 2 * dy) if hop else n               # a ledge hop lands two tiles on
         else:
             return ""                                           # the route needs no tree after all
         if not self._can_use_cut():

@@ -1151,3 +1151,56 @@ def test_grind_from_route_4_pocket_goes_back_to_route_3_not_round_to_route_22(li
     assert tuple(live.r.read_current_map()) == (3, 22)
     out = live.c._execute("grind", json.dumps({"level": 20}))
     assert tuple(live.r.read_current_map()) == (3, 21), out
+
+
+def test_shift_style_offers_a_free_switch_after_a_trainer_mon_faints_and_accepts_it(live):
+    """Battle Style SHIFT on the real ROM: Surge's Voltorb faints, the 'Will you change POKéMON?' box comes up and the model is OFFERED the free switch
+    (use_move returns the offer instead of silently declining); switch_pokemon then answers YES, picks the teammate and costs no turn; use_move
+    after a second offer answers NO."""
+    from game.options import apply_battle_style
+    live.load("vermilion_gym_surge")
+    assert apply_battle_style(live.m, "shift") in (True, False)
+    c = live.c
+    offered = switched = declined = False
+    for _ in range(60):
+        live.heal_hp()
+        if live.r.detect_context().name != "IN_BATTLE":
+            c._execute("challenge_leader", json.dumps({}))
+            continue
+        moves = live.r.read_active_battle_moves()[1]
+        if offered and not switched:
+            tgt = next(p for p in live.r.read_party()[1:] if p.current_hp > 0)
+            out = c._execute("switch_pokemon", json.dumps({"target": tgt.species_name}))
+            assert "FREE switch" in out, out
+            assert not c._shift_prompt_live() and live.r.read_active_battle_species() == tgt.species_id
+            switched = True
+            continue
+        out = c._execute("use_move", json.dumps({"move": moves[0]}))
+        if "FREE SWITCH" in out:
+            offered = True
+            if switched:
+                out = c._execute("use_move", json.dumps({"move": live.r.read_active_battle_moves()[1][0]}))
+                declined = not c._shift_prompt_live()
+                break
+    assert offered and switched and declined
+
+
+def test_grind_walks_through_route_9s_cut_tree_to_the_grass(live):
+    """Regression (watched run): Route 9's grass is behind a Cut tree AND a ledge hop. The Cut planner ignored ledges, so walk_to said 'no path' at the
+    map's west edge and grind() relocated Route 11 <-> Route 9 six times. The tree must be cut and the grass reached."""
+    live.load("vermilion_gym_surge")
+    c = live.c
+    for _ in range(8):
+        c._execute("go_to", json.dumps({"destination": "Route 9", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 27):
+            break
+    assert tuple(live.r.read_current_map()) == (3, 27)
+    for _ in range(8):                                   # trainers on the route interrupt the walk
+        c._walk_to(7, 5)
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_player_pos()) == (7, 5):
+            break
+    assert tuple(live.r.read_player_pos()) == (7, 5)

@@ -630,6 +630,10 @@ class OverworldMixin:
             if "Cut tree blocks" in res:               # the pocket is walled off and we cannot Cut (the trees only load up close)
                 self._sealed_grass.add(self.reader.read_current_map())
                 st["stuck"] = max(st["stuck"], 24)
+            elif res.startswith("No walkable path"):   # the flood fill said reachable, the planner says no: a real run walked Cerulean<->Route 11 <-> Route 9 six times
+                here = self.reader.read_current_map()
+                self._failed_grass[here] = self._failed_grass.get(here, 0) + 1
+                st["stuck"] = max(st["stuck"], 24)
         elif self.reader.read_current_map() in self._sealed_grass:
             st["stuck"] = max(st["stuck"], 24)      # this map's grass is walled off: relocate now, not after 25 idle ticks
         st["stuck"] += 1

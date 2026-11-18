@@ -1,9 +1,10 @@
 from agent.skills.base import log_once
 from datetime import datetime
 from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
-                    USE_VISION, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
+                    USE_VISION, BATTLE_STYLE, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
                     LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
 from game.memory_reader import LeafGreenReader
+from game.options import apply_battle_style
 from game.state import GameContext, GameState, StateDiff
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
@@ -637,6 +638,8 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                     continue
             else:
                 run.transitioning_steps = 0
+
+            apply_battle_style(mgba, BATTLE_STYLE)     # SHIFT: the free switch after a trainer's Pokémon faints (a loaded state can revert it)
 
             # Refresh tilemap cache whenever the map changes
             map_key = (state.map_bank, state.map_id)

@@ -287,3 +287,27 @@ def xp_share_hint(party, active_species: int, foe_level: int = 0) -> str:
     return (f"XP SHARE: {low.species_name} L{low.level} trails the team (top L{top}). Next fight lead with it "
             f"(reorder_party('{low.species_name}') before walking) and switch to a strong teammate on turn 1 — "
             "both gain XP. Trainer battles pay 1.5×.")
+
+
+def shift_switch_offer(party, active_idx: int, foes_left: int, foe_level: int = 0) -> str:
+    """The text for the trainer's 'Will you change POKéMON?' box (Battle Style SHIFT): a switch now is FREE (no turn lost). Names the lagging
+    teammate worth sending in, or says to stay. '' when there is nobody healthy to switch to. Pure."""
+    from knowledge.party import lagging_mons
+    if not 0 <= active_idx < len(party):
+        return ""
+    fit = [(i, p) for i, p in enumerate(party) if i != active_idx and p.max_hp and p.current_hp > 0]
+    if not fit:
+        return ""
+    head = (f"FREE SWITCH: the trainer is about to send out its next Pokémon"
+            f"{f' ({foes_left} left)' if foes_left > 0 else ''} and the game asks if you want to change yours — a switch now costs NO turn.")
+    me = party[active_idx]
+    trail = [(i, p) for i, p in lagging_mons(party) if i != active_idx and p.current_hp / p.max_hp >= 0.6]
+    top = max(p.level for p in party)
+    if trail and me.level >= top - 7:
+        i, weak = max(trail, key=lambda ip: ip[1].level)             # the strongest of the laggards: the likeliest to survive
+        nm = weak.nickname or weak.species_name
+        return (f"{head} {me.nickname or me.species_name} (L{me.level}) is your top level (L{top}) and keeps taking the XP while {nm} (L{weak.level}) "
+                f"trails — switch_pokemon('{nm}') to send it in (it takes the next fight; once it has shared the XP you can switch the ace back in), "
+                f"or use_move(...) to keep {me.nickname or me.species_name} in.")
+    return (f"{head} Optional: switch_pokemon('<name>') for a better type matchup or to rest a hurt Pokémon; otherwise just use_move(...) "
+            f"to keep {me.nickname or me.species_name} in.")
