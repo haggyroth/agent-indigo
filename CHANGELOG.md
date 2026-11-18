@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — readiness gates for the non-gym story beats (#271)
+- `knowledge/beat_readiness.py`: a recommended-strength table (best Pokémon level + how many at a floor level) for `rocket_hideout`, `pokemon_tower`, `snorlax`,
+  `silph_co`, `pokemon_mansion` and `victory_road`, from the level ranges of their trainers and wild Pokémon. `quest('<beat>')` now warns **once** when the
+  party is short ("only 1 of your team is L34+ … grind() with no level lifts the weaker members, then heal() and shop()"); the next call goes ahead, and a
+  resumed driver is never re-warned. The beat's plan (`quest` on a guide beat) also prints the recommendation. Elite Four prep (#259) and the full-chain eval (#260) can reuse the table.
+
 ### Added — Battle Style SHIFT: a free switch after a trainer's Pokémon faints (watched run: the ace out-levelled the team by 8+)
 - The agent now pins the game's **Battle Style** option to SHIFT (`BATTLE_STYLE=shift` default, `set` or empty to leave it; `game/options.py` writes SaveBlock2
   every step). With SHIFT the game asks "Will you change POKéMON?" before a trainer's next Pokémon comes out — a switch that costs **no turn**.

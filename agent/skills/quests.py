@@ -92,6 +92,10 @@ class QuestMixin:
         missing = [n for n in legacy_needs.get(beat.key, ()) if status.get(n) != "done"]
         if missing:
             return f"quest('{beat.key}') needs quest('{missing[0]}') first."
+        from knowledge.beat_readiness import readiness
+        if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party())):
+            self._ready_warned.add(beat.key)            # once per beat: a second call (or a resumed one) goes ahead
+            return warn
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
                 "strength": self._get_strength, "coin_case": self._get_coin_case,
                 "rocket_hideout": self._get_silph_scope, "tea": self._get_tea, "pokemon_tower": self._get_pokemon_tower,

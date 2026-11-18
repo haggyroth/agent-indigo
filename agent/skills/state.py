@@ -37,6 +37,7 @@ class SkillState:
     _in_puzzle = False           # a gym/cave puzzle solver is running (don't recurse into it)
     _in_town_visit = False       # first-visit town heal in progress
     _surf_retry = False          # one Surf retry per trip
+    _ready_warned = lazy(set)    # story beats whose 'party not ready' warning was already given (a 2nd quest() call proceeds)
     _gym_warned = None           # gym map where the under-levelled warning was already given (a 2nd call proceeds)
     _balance_warned = None       # …and the lopsided-team warning
     _trainer_losses = lazy(dict)  # {map: n} lost trainer battles per map (a mandatory trainer beating an under-levelled team)
