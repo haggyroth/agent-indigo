@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — `use_item` in battle after a switch
+- `use_item` judged success by party slot 1's HP, but the item goes to the ACTIVE battler, which after a switch or a forced
+  replacement is someone else: a heal that landed was reported "Couldn't use the Super Potion — you're back in the battle" (twice
+  in one watched run, each costing a turn). It now tracks the active battler (`gBattleMons[0]` HP, matched party mon for status and
+  name) and reports "X is already at full HP — the Potion would do nothing" instead of mashing A.
+
 ### Fixed — shopping in Celadon City
 - `shop()` from Celadon routed to Saffron's Mart ("gate guards want Tea") and a run sat at 0 Poké Balls with ¥3044: the Celadon Dept.
   Store was not a mart waypoint. Its 2F items clerk is now one (`MAP_KIND[(10, 1)] = "mart"`), `shop()` walks to the clerk that sells

@@ -833,3 +833,23 @@ def test_shop_restocks_at_the_celadon_dept_store_with_substitutes(live):
     assert live.r.read_current_map() == (10, 1)                 # Celadon Dept. Store 2F
     assert live.r.count_item(3) > balls and live.r.count_item(22) > supers
     assert live.r.read_money() < 6000
+
+
+def test_use_item_heals_the_active_battler_after_a_switch_and_reports_it(live):
+    """Watched runs: after a switch / forced replacement the active Pokémon is not party slot 1. use_item judged success by the
+    LEAD's HP, so a heal that landed was reported as 'Couldn't use the Super Potion — you're back in the battle' (twice in a row,
+    each costing a turn). It now reads the active battler (gBattleMons[0]), and says so when the target is already at full HP."""
+    live.load("threemon")
+    live.give_item(13, 5)
+    live.give_item(22, 3)
+    assert live.wild_battle()
+    c = live.c
+    out = c._execute("switch_pokemon", json.dumps({"target": "Pikachu"}))
+    assert "Switched in Pikachu" in out, out
+    pika = next(p for p in live.r.read_party() if p.species_name.upper() == "PIKACHU")
+    live.m.write16(0x02023BE4 + 0x28, 2)                     # gBattleMons[0].hp: the active Pikachu is nearly dead
+    out = c._execute("use_item", json.dumps({"item": "Super Potion"}))
+    assert out.startswith("Used Super Potion — Pikachu healed +") and f"/{pika.max_hp})" in out, out
+    assert live.r.read_active_battle_hp() == pika.max_hp
+    again = c._execute("use_item", json.dumps({"item": "Potion"}))
+    assert "already at full HP" in again, again
