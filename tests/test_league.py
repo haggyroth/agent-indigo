@@ -42,3 +42,15 @@ def test_the_quest_warns_once_when_the_team_is_far_below_the_leagues_levels():
     out = readiness("elite_four", [NS(level=lv) for lv in (50, 40, 38, 36, 30, 20)])
     assert "Not ready for quest('elite_four')" in out and "no healing between them" in out
     assert readiness("elite_four", [NS(level=lv) for lv in (58, 52, 50, 48, 47, 46)]) == ""
+
+
+def test_a_run_started_after_the_game_is_cleared_does_not_end_at_step_zero():
+    """main()'s goal is the hall_of_fame milestone recorded DURING the run — an earlier run's progress.json (or a post-credits save) must not end the next run at once."""
+    import main
+    done = NS(data={"milestones": ["hall_of_fame"]})
+    assert main._cleared_this_run(done)(None, done) is False
+    fresh = NS(data={"milestones": ["beat_brock"]})
+    goal = main._cleared_this_run(fresh)
+    assert goal(None, fresh) is False
+    fresh.data["milestones"].append("hall_of_fame")                       # recorded by _apply_progress / the quest
+    assert goal(None, fresh) is True

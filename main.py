@@ -808,6 +808,13 @@ def _resume_state() -> str:
     return info["path"]
 
 
+def _cleared_this_run(ltm):
+    """Goal predicate: the Hall of Fame milestone was recorded DURING this run. A run that starts after the game is already cleared (a post-credits save,
+    or logs/progress.json kept from an earlier run) must not end at step 0."""
+    had = "hall_of_fame" in ltm.data.get("milestones", [])
+    return lambda _s, l: not had and "hall_of_fame" in l.data.get("milestones", [])
+
+
 def main():
     resume = _resume_state()
     rt = build_runtime(verbose=True, **({"start_state": resume} if resume else {}))
@@ -822,7 +829,7 @@ def main():
     console.print(f"[cyan]Run log: {rlog.dir}[/]")
     try:
         result = run_episode(rt, max_steps=MAX_STEPS, verbose=True, run_log=rlog,
-                             goal=lambda _s, ltm: "hall_of_fame" in ltm.data.get("milestones", []), goal_desc="Hall of Fame (the game is cleared)")
+                             goal=_cleared_this_run(rt.ltm), goal_desc="Hall of Fame (the game is cleared)")
     finally:
         rlog.close()
     # run_episode already printed the stop line. Propagate any non-goal stop (a

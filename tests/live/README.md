@@ -16,6 +16,8 @@ python -m pytest tests/live -v          # needs: built binding, ROM, fixtures in
 | `post_misty.ss1` | Route 24 (north of Cerulean), Misty beaten, Ivysaur L26, no SS Ticket yet |
 | `vermilion_gym_surge.ss1` | Vermilion Gym, 2 badges, Ivysaur L30 with five L22 teammates, in front of Surge's trainers (run checkpoint `ckpt_00117_OVERWORLD`) |
 | `league_door.ss1` | Indigo Plateau Pokémon Center 1F, 8 badges, a boosted L70 lead (made by the elite_four live test's staging; used by the `elite_four` eval scenario) |
+| `league_agatha.ss1` | Agatha's room just entered (Lorelei and Bruno beaten), a boosted L70 team — for the League loss-path test |
+| `league_champion.ss1` | The Champion's room just entered, a boosted L70 team — for the Hall of Fame / credits test |
 | `route3_weak_team.ss1` | Route 3 east end, 1 badge, Ivysaur L17 with five L11-12 teammates (run checkpoint) |
 | `vermilion.ss1` | Vermilion City (arrived via the Underground Path), Ivysaur L30, SS Ticket held, no Cut yet |
 | `forced.ss1` | mid-battle, the active mon fainted → forced party screen |
