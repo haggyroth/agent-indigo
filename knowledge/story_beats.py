@@ -122,13 +122,19 @@ BEATS: tuple[Beat, ...] = (
                 "its trainers and wild Pokémon are L36-45.",
                 "Indigo Plateau: heal and save at the Pokémon Center, stock Full Restores / Revives, then talk to the Elite Four's door. Aim for L50+ across the team."),
          tip="After this there is only the Elite Four (Lorelei, Bruno, Agatha, Lance) and your rival as Champion."),
+    Beat("elite_four", "Pokémon League: the Elite Four and the Champion", "Indigo Plateau, north door of the Pokémon Center",
+         needs=("victory_road",), driver="elite_four", done=(("flag", 0x82C),),                       # FLAG_SYS_GAME_CLEAR: set in the Hall of Fame
+         steps=("Prep BEFORE the first door: heal, shop (Full Restores, Revives, Max Potions), save_state — the League's doors seal behind you, there is no healing or leaving until the Champion.",
+                "Lorelei (Ice, L51-56) → Bruno (Fighting/Rock) → Agatha (Ghost/Poison) → Lance (Dragon/Flying, L56-62) → your rival the Champion (L53-65, a mixed team that counters your starter).",
+                "Every room: walk up to the leader and talk; each win opens the next door. After the Champion: the Hall of Fame, Oak's speech and the credits."),
+         tip="A loss resets the whole League (the decomp's EventScript_ResetEliteFourEnd clears every defeated flag), heals the party, costs some money and respawns you in the Plateau's Center: quest('elite_four') starts again from the first door (load_state(3) restores the pre-door save if you prefer)."),
 )
 BY_KEY = {b.key: b for b in BEATS}
 CHAIN_KEYS = tuple(b.key for b in BEATS)
 # extra aliases accepted by quest('…')
 ALIASES = {"tower": "pokemon_tower", "mansion": "pokemon_mansion", "flute": "poke_flute", "pokeflute": "poke_flute",
            "silph": "silph_co", "silphco": "silph_co", "hideout": "rocket_hideout", "scope": "rocket_hideout", "silph_scope": "rocket_hideout",
-           "saffron": "silph_co", "snorlax_12": "snorlax", "victory": "victory_road", "league": "victory_road", "oak": "parcel"}
+           "saffron": "silph_co", "elite4": "elite_four", "league_rooms": "elite_four", "champion": "elite_four", "hall_of_fame": "elite_four", "snorlax_12": "snorlax", "victory": "victory_road", "league": "victory_road", "oak": "parcel"}
 
 
 def resolve(name):

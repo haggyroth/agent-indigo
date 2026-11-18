@@ -1245,3 +1245,38 @@ def test_forget_move_deletes_an_hm_move_at_the_fuchsia_move_deleter(live):
     assert "forgot Cut" in out, out
     assert [m for m in live.r.read_party()[1].move_names if m] == ["Surf", "Strength"], live.r.read_party()[1].move_names     # nothing else went with it
     assert tuple(live.r.read_current_map()) == (11, 9) and live.r.detect_context().name == "OVERWORLD"
+
+
+def test_elite_four_quest_clears_the_league_to_the_hall_of_fame(live):
+    """quest('elite_four') on the real ROM (#259), staged by flying to Indigo Plateau with all eight badges and a boosted L70 lead: prep at the Center
+    (heal, shop, save to slot 3), the north door, the five sealed rooms (the forced walk up each, the leader's talk, the door opening on the win) and the
+    Hall of Fame, which sets FLAG_SYS_GAME_CLEAR. Every foe is made one hit from fainting so the test is about the driver, not the damage race."""
+    import pytest
+    from game.constants import Addr
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("indigo plateau", badges=0xFF)
+    live.strong_lead(level=70, exp=344960)
+    foe = Addr.BATTLE_MON0_SPECIES + 0x58
+    use_move = c._use_move
+
+    def weak_foe(name):
+        if live.m.read16(foe) and live.m.read16(foe + 0x28) > 1:
+            live.m.write16(foe + 0x28, 1)
+        return use_move(name)
+    c._use_move = weak_foe
+    out = ""
+    for _ in range(60):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        live.boost_party()
+        live.patch_mon(0, moves=[63, 89, 58, 57], pps=[5, 10, 10, 15])
+        out = c._execute("quest", json.dumps({"name": "elite_four", "auto_trainers": True}))
+        if live.r.read_flag(0x82C):
+            break
+    assert live.r.read_flag(0x82C), out                                                  # FLAG_SYS_GAME_CLEAR
+    assert tuple(live.r.read_current_map()) == (1, 80), live.r.read_current_map()        # the Hall of Fame

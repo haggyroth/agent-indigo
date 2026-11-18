@@ -21,6 +21,7 @@ NEEDS: dict[str, Need] = {
     "silph_co": Need(38, 28, 3, "Rocket trainers L25-37, your rival, and Giovanni (L35-41)"),
     "pokemon_mansion": Need(34, 26, 3, "wild and trainer Pokémon L30-37 and the Fire-types that guard the Key"),
     "victory_road": Need(42, 34, 4, "trainers and wild Pokémon L36-45"),
+    "elite_four": Need(54, 46, 5, "five back-to-back fights (Lorelei L51-56 … Lance L56-62, the Champion L53-65) with no healing between them"),
 }
 
 

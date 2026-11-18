@@ -445,6 +445,9 @@ def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
         log_once("main._apply_progress", "main._apply_progress: tolerated failure (continuing with a default)")
         pass
 
+    if reader.read_flag(0x82C) and ltm.add_milestone("hall_of_fame", "beat the Pokémon League"):          # FLAG_SYS_GAME_CLEAR: set in the Hall of Fame
+        events.emit("milestone", "milestone: hall_of_fame — the Pokémon League is beaten, the game is cleared")
+
     if run.prev_state is not None and state.party_count > run.prev_state.party_count:
         # first-party addition → starter chosen
         if run.prev_state.party_count == 0 and state.party_count == 1:
@@ -818,7 +821,8 @@ def main():
                     temperature=TEMPERATURE, started=time.strftime("%Y-%m-%d %H:%M:%S"))
     console.print(f"[cyan]Run log: {rlog.dir}[/]")
     try:
-        result = run_episode(rt, max_steps=MAX_STEPS, verbose=True, run_log=rlog)
+        result = run_episode(rt, max_steps=MAX_STEPS, verbose=True, run_log=rlog,
+                             goal=lambda _s, ltm: "hall_of_fame" in ltm.data.get("milestones", []), goal_desc="Hall of Fame (the game is cleared)")
     finally:
         rlog.close()
     # run_episode already printed the stop line. Propagate any non-goal stop (a
