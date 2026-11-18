@@ -102,6 +102,17 @@ SCENARIOS += [
               "are brought within ~25% — covers train/grind, PP management and self-healing.",
     ),
 ]
+SCENARIOS += [
+    Scenario(
+        name="elite_four",
+        goal=goals.has_milestone("hall_of_fame"),
+        max_steps=120,
+        start_state=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saves", "live", "league_door.ss1"),
+        notes="Indigo Plateau, all eight badges, a level-60+ team (local fixture, see tests/live/README.md). quest('elite_four') preps, "
+              "walks the five sealed rooms (Lorelei, Bruno, Agatha, Lance, the Champion) and the Hall of Fame; the model plays every battle. "
+              "Passes when FLAG_SYS_GAME_CLEAR sets the hall_of_fame milestone.",
+    ),
+]
 
 
 def by_name(name: str) -> Optional[Scenario]:

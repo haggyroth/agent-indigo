@@ -5,6 +5,19 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('elite_four')`: the Pokémon League, start to Hall of Fame (#259)
+- New `elite_four` beat after `victory_road` and `agent/skills/league.py` (`LeagueMixin`). From Indigo Plateau it PREPS before the first door (heal, `shop`, a save to
+  slot 3), walks in through the Center's north door and then, room by room (Lorelei, Bruno, Agatha, Lance, the Champion; maps/positions/flags from the decomp's
+  `PokemonLeague_*`): waits out the forced walk up, stands in front of the leader, faces and talks, hands the battle to the model (or autopilot with `auto_trainers`),
+  and walks through the exit once the leader's defeated flag is set. It resumes from whatever room it finds itself in. The readiness gate asks for a best Pokémon of L54+
+  and five at L46+.
+- **Done**: `FLAG_SYS_GAME_CLEAR` (0x82C, set in the Hall of Fame) records the new `hall_of_fame` milestone (also from `main._apply_progress`, so winning by hand counts) and
+  `main()` now ENDS the run on it (`goal="hall_of_fame"`). New `elite_four` eval scenario (fixture `saves/live/league_door.ss1`, see `tests/live/README.md`).
+- **A loss** (from the decomp, NOT yet verified live: `DoWhiteOut` → `EventScript_ResetEliteFourEnd`) clears every defeated flag, heals, takes money and respawns at the Plateau's Center; the quest
+  simply starts over, and `main`'s blackout handler reloads the pre-door save (slot 3) first.
+- Live-verified end to end (all five rooms and the Hall of Fame in ~2 minutes with one-hit foes). Not verified: what the credits do to the native backend; the run
+  ends when the milestone is recorded, before them.
+
 ### Added — `forget_move`: the Move Deleter in Fuchsia City (#273)
 - HM moves can't be forgotten at the normal prompt, so a party with four HM moves was stuck. `forget_move(pokemon, move)` travels to the Move Deleter (Fuchsia
   City house 3, now `go_to("Move Deleter's House")`), drives his dialogue → the party screen → the summary screen → "forgotten completely?" and confirms the

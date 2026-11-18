@@ -101,7 +101,7 @@ class QuestMixin:
                 "rocket_hideout": self._get_silph_scope, "tea": self._get_tea, "pokemon_tower": self._get_pokemon_tower,
                 "poke_flute": self._get_poke_flute, "snorlax": self._get_snorlax,
                 "pokemon_mansion": self._get_secret_key, "silph_co": self._get_silph_co,
-                "victory_road": self._get_victory_road}[beat.driver](auto_trainers)
+                "victory_road": self._get_victory_road, "elite_four": self._get_elite_four}[beat.driver](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:
