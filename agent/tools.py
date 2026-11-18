@@ -155,7 +155,7 @@ TOOLS = [
                        "with no level BALANCES the team up to a floor fixed at the start (best − 7, capped at the "
                        "next gym's level): the weakest member leads and the ACE IS BENCHED (don't switch it in). It "
                        "heals itself at a Center when HP/PP run low and stops with a diagnosis if the ace is taking "
-                       "the XP. auto_battles=N autopilots the next N boring wild fights.",
+                       "the XP. Boring wild fights autopilot (balancing mode: 12 per call; auto_battles=N overrides).",
         "parameters": {"type": "object", "properties": {
             "level": {"type": "integer",
                       "description": "target level for your BEST Pokémon, e.g. 13. Omit (or 0) to balance the whole team."},
@@ -164,7 +164,8 @@ TOOLS = [
                                      "them. Pass false to only fight."},
             "auto_battles": {"type": "integer", "minimum": 0, "maximum": 50,
                              "description": "autopilot this many boring wild fights before handing "
-                                            "encounters to you (default 0 = you play every one)."},
+                                            "encounters to you (default: 12 when balancing the team, 0 when "
+                                            "grinding to a level; 0 = you play every one)."},
         }, "required": []},
     }},
     {"type": "function", "function": {

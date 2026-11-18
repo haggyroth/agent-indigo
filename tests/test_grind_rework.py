@@ -144,6 +144,31 @@ def test_auto_battles_plays_only_boring_fights_itself():
     assert "wild RATTATA L15" in c2._grind(0, True, 3)
 
 
+def test_a_balancing_grind_autopilots_boring_fights_by_default():
+    """Watched run: every L13 Spearow cost ~30 s / 60k tokens of LLM turns, so the trainees crawled while the ace out-levelled them
+    2x. grind() with no auto_battles now autopilots (a balancing session only); an explicit 0 still means 'I play every one'."""
+    def trainee_world():
+        return FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE, foe_level=7)
+    w = trainee_world()
+    c = grind_client(w)
+    fights = []
+
+    def train(sig):
+        fights.append(sig)
+        w.ctx = GameContext.OVERWORLD
+        w.party = [mon(25, 1), mon(30, 2)]
+    c._train_fight = train
+    assert c._grind(0, True, None).startswith("Party balanced") and len(fights) == 1      # omitted → autopilot
+    w0 = trainee_world()
+    c0 = grind_client(w0)
+    c0._train_fight = lambda sig: pytest.fail("an explicit 0 means the model plays it")
+    assert "wild RATTATA L7" in c0._grind(0, True, 0)
+    w1 = trainee_world()
+    c1 = grind_client(w1)
+    c1._train_fight = lambda sig: pytest.fail("a level-target grind stays model-driven unless asked")
+    assert "wild RATTATA L7" in c1._grind(40, True, None)
+
+
 def test_worth_a_ball_is_never_autopiloted_and_is_pointed_out():
     w = FakeWorld([mon(8, 1), mon(30, 2)], ctx=GameContext.IN_BATTLE, foe_level=7)
     w.foe = NS(species_id=25, species_name="PIKACHU", level=7, current_hp=14, max_hp=14)   # a new type

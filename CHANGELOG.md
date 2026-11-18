@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — Route 8 ping-pong, and a team that never catches up (watched run)
+- **Walled-off grass.** Route 8's tall grass is a pocket sealed by two Cut trees. `grind` aimed for the nearest grass by distance;
+  `walk_to` counted the trees as NPCs, "engaged" one, then the other (the bounce), and the run left for Route 10 and came back.
+  Now `walk_to` cuts the tree that is the only way through (and says so when it cannot Cut), trees are never "engaged",
+  `grind`'s grass target must be reachable (Cut trees count as open only if the party can Cut), and a map whose only grass is
+  sealed is remembered and skipped.
+- **Ace out-levelling the team (~2×).** `grind()` that balances the team played every wild fight through the LLM (~30 s and ~60k
+  tokens each), so the trainees gained about one level in 15 minutes. A balancing session now autopilots boring fights by default
+  (12 per call; `auto_battles=0` restores the old behaviour, a level-target grind stays model-driven).
+
 ### Fixed — forced-switch dead end (unwatched Gemma run, 200 steps)
 - After the active Pokémon fainted the game's forced "Choose a POKéMON" screen reads as TRANSITIONING, and the observation said
   "dialog/transition not advancing — press A". Pressing A on the fainted lead only shows "has no energy left to battle!", so the

@@ -60,7 +60,9 @@ def test_grind_balance_never_spins_with_attacks_out_of_pp(live, monkeypatch):
     live.load("threemon")
     live.patch_mon(0, [33, 45, 73, 22], [0, 40, 0, 0], level=19, exp=4575)   # attacks gone, L19
     live.patch_mon(2, [106, 81, 0, 0], [30, 40, 0, 0])                         # Harden-only trainee
-    out = live.c._execute("grind", json.dumps({}))        # one call: it must end (heal, hand over, or time limit)
+    out = live.c._execute("grind", json.dumps({"auto_battles": 0}))   # one call: it must end (heal, hand over, or time limit).
+    # auto_battles=0 pins the model-driven path: the new autopilot default changes how much game/Python state this leaves behind, and
+    # test_watchdog_cuts_off… (next) is sensitive to that (it relies on the watchdog firing before its stubbed relocation can matter)
     assert "no progress" not in out, out          # a stall = the bug; a plain time limit is fine
     assert ("heal" in out or "time limit" in out or "Party balanced" in out or "Training progress" in out
             or "while grinding" in out), out
@@ -767,3 +769,44 @@ def test_forced_switch_screen_is_named_in_the_observation_and_blind_presses_are_
     other = next(p for p in party if p.current_hp > 0 and p.species_id != fainted_sp)
     out = live.c._execute("switch_pokemon", json.dumps({"target": other.nickname or other.species_name}))
     assert not forced_party_screen(live.m, live.r), out
+
+
+def test_route8_fenced_grass_is_reached_by_cutting_a_tree_not_by_ping_ponging(live, monkeypatch):
+    """Watched-run finding: Route 8's tall grass is a pocket walled off by two Cut trees. grind targeted it by distance, walk_to
+    saw the trees as NPCs and 'engaged' them one after the other (the bounce), then the run left for Route 10 and came back.
+    Now walk_to cuts the tree that is the only way in, and without Cut the grass counts as unreachable (the map is skipped)."""
+    import pytest
+    live.load("route8")
+    if live.r.read_current_map() != (3, 26):
+        pytest.skip("fixture is not on Route 8")
+    c = live.c
+    assert c._can_use_cut(), "the fixture's party must know Cut with the Cascade Badge"
+    target = c._nearest_grass()
+    assert target is not None and 34 <= target[0] <= 46 and 9 <= target[1] <= 18, target     # inside the fenced pocket
+    for _ in range(40):                                       # a wild/trainer battle on the way interrupts a walk: play it out
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._execute("flee_battle", "{}")
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._execute("use_move", json.dumps({"move": live.r.read_active_battle_moves()[1][0]}))
+            continue
+        out = c._walk_to(*target)
+        if live.r.read_player_pos() == target:
+            break
+    assert live.r.read_player_pos() == target, out
+    assert c.tilemap.is_tall_grass(*target)
+    assert (47, 12) not in c._cut_tree_tiles(*c.tilemap.passable_grid()[1:]), "the east Cut tree should have been cut"
+    # without Cut the pocket is a dead end: grind's grass step notices, remembers the map as sealed and relocates
+    live.load("route8")
+    monkeypatch.setattr(c, "_can_use_cut", lambda: False)
+    st = {"stuck": 0, "reloc": 0}
+    for _ in range(40):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._execute("flee_battle", "{}")
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._execute("use_move", json.dumps({"move": live.r.read_active_battle_moves()[1][0]}))
+            continue
+        monkeypatch.setattr(c, "_relocate_to_grass", lambda **kw: False)   # (only the detection is under test, not the trip)
+        c._grass_step(st, "grind()")
+        if (3, 26) in c._sealed_grass:
+            break
+    assert (3, 26) in c._sealed_grass and st["stuck"] >= 24

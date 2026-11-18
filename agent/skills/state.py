@@ -40,6 +40,7 @@ class SkillState:
     _gym_warned = None           # gym map where the under-levelled warning was already given (a 2nd call proceeds)
     _balance_warned = None       # …and the lopsided-team warning
     _trainer_losses = lazy(dict)  # {map: n} lost trainer battles per map (a mandatory trainer beating an under-levelled team)
+    _sealed_grass = lazy(set)     # maps whose only grass is walled off (a Cut-tree pocket) and the party cannot Cut: skip them
     _edge_fail = lazy(dict)       # {(map, direction): n} seamless-edge crossings that failed
     _avoid_maps = ()              # maps travel must not route through (the Safari Zone quest keeps clear of its own exit)
 
