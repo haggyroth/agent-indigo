@@ -1153,36 +1153,28 @@ def test_grind_from_route_4_pocket_goes_back_to_route_3_not_round_to_route_22(li
     assert tuple(live.r.read_current_map()) == (3, 21), out
 
 
-def test_shift_style_offers_a_free_switch_after_a_trainer_mon_faints_and_accepts_it(live):
-    """Battle Style SHIFT on the real ROM: Surge's Voltorb faints, the 'Will you change POKéMON?' box comes up and the model is OFFERED the free switch
-    (use_move returns the offer instead of silently declining); switch_pokemon then answers YES, picks the teammate and costs no turn; use_move
-    after a second offer answers NO."""
+def test_shift_style_hands_the_free_switch_to_a_lagging_teammate_after_a_trainer_mon_faints(live):
+    """Battle Style SHIFT on the real ROM: Surge's Voltorb faints with Ivysaur (L30) out and five L22 teammates behind it. The 'Will you change
+    POKéMON?' box comes up and the bot answers YES itself, sending in the strongest healthy laggard at no cost of a turn (the result says so)."""
     from game.options import apply_battle_style
     live.load("vermilion_gym_surge")
-    assert apply_battle_style(live.m, "shift") in (True, False)
+    apply_battle_style(live.m, "shift")
     c = live.c
-    offered = switched = declined = False
-    for _ in range(60):
+    ace = live.r.read_party()[0].species_id
+    auto = ""
+    for _ in range(40):
         live.heal_hp()
         if live.r.detect_context().name != "IN_BATTLE":
             c._execute("challenge_leader", json.dumps({}))
             continue
         moves = live.r.read_active_battle_moves()[1]
-        if offered and not switched:
-            tgt = next(p for p in live.r.read_party()[1:] if p.current_hp > 0)
-            out = c._execute("switch_pokemon", json.dumps({"target": tgt.species_name}))
-            assert "FREE switch" in out, out
-            assert not c._shift_prompt_live() and live.r.read_active_battle_species() == tgt.species_id
-            switched = True
-            continue
         out = c._execute("use_move", json.dumps({"move": moves[0]}))
-        if "FREE SWITCH" in out:
-            offered = True
-            if switched:
-                out = c._execute("use_move", json.dumps({"move": live.r.read_active_battle_moves()[1][0]}))
-                declined = not c._shift_prompt_live()
-                break
-    assert offered and switched and declined
+        if "Auto: the free switch" in out:
+            auto = out
+            break
+    assert auto, "no automatic free switch happened"
+    assert "FREE switch" in auto and not c._shift_prompt_live()
+    assert live.r.read_active_battle_species() != ace and live.r.read_party()[0].level >= 22
 
 
 def test_grind_walks_through_route_9s_cut_tree_to_the_grass(live):

@@ -12,6 +12,12 @@ All notable changes to this project are documented here. Format loosely follows
   before each, because a spare A after a stack empties sold the neighbouring items. `_open_buy_menu` gained a `sell` option.
 - Not yet: a money target per milestone, earning plans (Game Corner, repeatable trainers), and showing money against the next shopping list in `team_report`.
 
+### Changed — the free switch is taken automatically so the ace stops hogging trainer XP
+- With Battle Style SHIFT (#283) the model was only *offered* the free switch and, in autopilot fights, never saw it. `_battle_settle` now answers the
+  trainer's "Will you change POKéMON?" itself when the Pokémon on the field is not lagging and a teammate more than 7 levels under the top is healthy
+  (>= 60% HP) and within 4 levels of the toughest Pokémon the trainer has left (`knowledge.party.pick_shift_trainee`; the strongest such teammate is picked).
+  The result says so and how to swap the ace back; boss fights whose Pokémon outclass the team are left alone. Applies to model-driven and autopilot fights.
+
 ### Added — readiness gates for the non-gym story beats (#271)
 - `knowledge/beat_readiness.py`: a recommended-strength table (best Pokémon level + how many at a floor level) for `rocket_hideout`, `pokemon_tower`, `snorlax`,
   `silph_co`, `pokemon_mansion` and `victory_road`, from the level ranges of their trainers and wild Pokémon. `quest('<beat>')` now warns **once** when the

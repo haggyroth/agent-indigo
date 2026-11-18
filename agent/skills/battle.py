@@ -389,6 +389,29 @@ class BattleMixin:
             self.mgba.tick(20)
         self._shift_offered = False
 
+    def _shift_to_trainee(self) -> str:
+        """Use the free switch ourselves when the ace is on the field and a lagging teammate can take the next fight (knowledge.party.pick_shift_trainee):
+        a watched run left the ace 8-11 levels over a team that never got a turn because the model never took the offer. '' = nothing done."""
+        from knowledge.party import pick_shift_trainee
+        try:
+            party = self.reader.read_party()
+            active = self.reader.read_active_battle_species()
+            idx = next((i for i, p in enumerate(party) if p.species_id == active), -1)
+            left = [m.level for m in self.reader.read_enemy_party() if m.current_hp > 0]
+            pick = pick_shift_trainee(party, idx, left)
+        except Exception:
+            log_once("battle._shift_to_trainee", "battle._shift_to_trainee: tolerated failure (leaving the choice to the model)")
+            return ""
+        if pick is None:
+            return ""
+        out = self._switch_pokemon(str(pick + 1))
+        if not out.startswith("Switched in"):
+            self._decline_shift_prompt()
+            return ""
+        ace = party[idx]
+        return (f"{out} (Auto: the free switch sent the lagging {party[pick].nickname or party[pick].species_name} in so the team levels up evenly — "
+                f"{ace.nickname or ace.species_name} stays on the bench unless things go badly: switch_pokemon('{ace.nickname or ace.species_name}') swaps it back.)")
+
     def _shift_offer(self) -> str:
         """The model-facing text for that box ('' = nothing worth offering): who could be sent in, free of charge."""
         from knowledge.battle import shift_switch_offer
@@ -447,6 +470,8 @@ class BattleMixin:
             if learn:
                 return learn
             if self._shift_prompt_live():        # Battle Style SHIFT: put the free switch to the model ONCE; its next action answers the box
+                if (auto := self._shift_to_trainee()):
+                    return auto
                 if not self._shift_offered and (offer := self._shift_offer()):
                     self._shift_offered = True
                     return offer
