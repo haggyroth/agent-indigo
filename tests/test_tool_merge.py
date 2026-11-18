@@ -24,7 +24,7 @@ def test_schemas_require_only_what_is_always_needed():
 def test_the_safari_quests_are_registered_and_offered():
     from agent.tools import TOOLS
     enum = next(t for t in TOOLS if t["function"]["name"] == "quest")["function"]["parameters"]["properties"]["name"]["enum"]
-    assert enum == ["ss_ticket", "cut", "surf", "strength", "coin_case"]
+    assert enum == ["ss_ticket", "cut", "surf", "strength", "coin_case", "rocket_hideout"]
     text = listing({"ss_ticket"})
     assert "▶ surf" in text and "▶ strength" in text and resolve("Strength").key == "strength"
 
@@ -43,3 +43,18 @@ def test_pc_front_door_validates_before_touching_the_emulator():
     assert "needs `pokemon`" in AgentClient._pc_tool(me, "deposit")
     assert "box_pokemon" in AgentClient._pc_tool(me, "swap", "Pidgey")
     assert "one of: list, deposit, withdraw, swap" in AgentClient._pc_tool(me, "release", "Pidgey")
+
+
+def test_the_rocket_hideout_quest_is_registered_and_runs_after_nothing():
+    from knowledge.quests import BY_KEY, listing, resolve
+    q = BY_KEY["rocket_hideout"]
+    assert q.needs == ()
+    assert resolve("rocket") is q
+    assert "▶ rocket_hideout" in listing(set())
+    assert "✔ rocket_hideout" in listing({"rocket_hideout"})
+
+
+def test_hideout_geometry_b4f_halves():
+    from agent.skills.hideout import b4f_east
+    assert not b4f_east(11, 15) and not b4f_east(3, 3)           # the stairs arrive in the west half
+    assert b4f_east(20, 23) and b4f_east(19, 5) and b4f_east(16, 16)    # the elevator lands south; Giovanni's room is east

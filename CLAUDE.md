@@ -92,8 +92,9 @@ Pokemon_LeafGreen.gba
    ├── game/state.py            GameState, PokemonStatus, StateDiff, helpers
    ├── game/constants.py        Memory addresses (authoritative), lookup tables, charset
    ├── game/tilemap_reader.py   ROM tile passability, warps, connections (navigation)
-   ├── game/pathfinding.py      A* grid pathfinding + door_centers (pure, testable)
+   ├── game/pathfinding.py      A* grid pathfinding + door_centers + find_path_spin (arrow-tile slides: Rocket Hideout, Silph Co.) (pure, testable)
    ├── game/viewer.py           Optional pygame window (SHOW_WINDOW)
+   ├── agent/skills/hideout.py  quest('rocket_hideout'): Game Corner poster → 4 floors (spinner maze, Lift Key, elevator) → Giovanni → Silph Scope
    ├── agent/lm_studio_client.py OpenAI-compat client (local OR cloud), tool calling +
    │                            the nav/battle skills (walk_to/go_to/go_to_map/use_move)
    ├── agent/tools.py           Tool schemas + button-name normalization
@@ -215,7 +216,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `pick_up_items` | overworld | — | Collect the item balls on this map (see 'Items on the ground:' in the observation). |
 | `use_move` | battle | move | Use one of your active Pokémon's moves by name (the 'Your moves' list). |
 | `grind` | overworld | level?, catch?, auto_battles? | Level up on wild Pokémon in tall grass.  It walks to a route whose wild levels fit the Pokémon being trained; each wild encounter then ENDS the call — you fight it, then call grind again (the session persists). |
-| `quest` | overworld | name?, auto_trainers? | Scripted story quests.  quest() lists them and where you stand (✔ done / ▶ available / … blocked); quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty: Cerulean's exits stay blocked without it); quest('cut') = HM01 Cut from the S.S. |
+| `quest` | overworld | name?, auto_trainers? | Scripted story quests.  quest() lists them and where you stand (✔ done / ▶ available / … blocked); quest('ss_ticket') = Bill's SS Anne ticket (REQUIRED after Misty); quest('cut') = HM01 Cut (REQUIRED before Vermilion Gym); quest('surf') / quest('strength') = HM03 / HM04 via the Safari Zone (¥500 entry); quest('rocket_hideout') = the Silph Scope from Giovanni under the Celadon Game Corner (for the Pokémon Tower). |
 | `inspect_pokemon` | battle + overworld | pokemon | Look closely at ONE Pokémon: real stats, IVs, EVs, nature, Hidden Power and a quality grade for what its species is used for, compared with your team. |
 | `team_report` | battle + overworld | — | Read-only team analysis: the types your KNOWN moves hit super effectively, shared weaknesses, who can carry each HM, whether the team answers the NEXT gym and — if not — what to catch and where (or which PC Pokémon to swap in with pc). |
 | `pc` | overworld | action, pokemon?, box_pokemon?, detail?, force? | The Pokémon PC (box storage).  action='list' shows what is stored (reads memory, works anywhere; detail=true adds box:slot, types, moves, HM ability and a quality grade — use it to pick who to withdraw). |

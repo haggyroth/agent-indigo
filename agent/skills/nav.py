@@ -66,6 +66,17 @@ class NavMixin:
 
     _MOVE_DELTA = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
 
+    def _settle_spin(self) -> None:
+        """Wait out an arrow-tile slide: tick until the player's tile has not changed for a few checks (max ~2 s)."""
+        last, still = tuple(self.reader.read_player_pos()), 0
+        for _ in range(40):
+            self.mgba.tick(5)
+            now = tuple(self.reader.read_player_pos())
+            still = still + 1 if now == last else 0
+            last = now
+            if still >= 3:
+                return
+
     def _cut_tree_tiles(self, w: int, h: int) -> set:
         """Cut trees on THIS map (loaded object events with the tree graphic). They are objects, so _npc_tiles lists them too —
         which made walk_to treat a tree like a talkable NPC and ping-pong between two of them (Route 8's fenced grass)."""
@@ -256,7 +267,7 @@ class NavMixin:
         that just moved. When a tap doesn't change our position, we mark the tile
         we tried to enter as blocked and replan AROUND it, instead of re-planning
         the identical path and stalling (the Viridian Forest / ledge stall)."""
-        from game.pathfinding import find_path
+        from game.pathfinding import find_path, find_path_spin
         from game.state import GameContext
         # A lingering post-battle / dialog / heal-fade state (DIALOG_OPEN / TRANSITIONING
         # / IN_MENU) absorbs the D-pad, so A* taps can't move the player and walk_to
@@ -334,8 +345,17 @@ class NavMixin:
                     return None
                 return self.tilemap.ledge_dir(x, y)
             from game.tilemap_reader import deck_step_ok
-            path = find_path((px, py), (tx, ty), _passable, w, h, ledge=_ledge,
-                             edge_ok=deck_step_ok(self.tilemap.decks, self.tilemap.ramps))
+            edge_ok = deck_step_ok(self.tilemap.decks, self.tilemap.ramps)
+            spin_dirs = getattr(self.tilemap, "spin_map", dict)()
+            spin = set(spin_dirs) - {(px, py), (tx, ty)}
+            expected = None                       # where each press should leave the player (only on a path through arrow tiles)
+            path = find_path((px, py), (tx, ty), (lambda x, y: _passable(x, y) and (x, y) not in spin) if spin else _passable,
+                             w, h, ledge=_ledge, edge_ok=edge_ok)         # arrow tiles slide the player: avoid them while a way round exists
+            if path is None and spin_dirs:
+                # No way round: the only route runs through the arrows (Rocket Hideout B3F). Plan with the slides simulated.
+                planned = find_path_spin((px, py), (tx, ty), _passable, w, h, spin_dirs, getattr(self.tilemap, "spin_stops", set)())
+                if planned is not None:
+                    path, expected = planned
             if path is None:
                 # Could be a genuinely blocked target, or a transient (an NPC on
                 # the only corridor, a not-yet-settled map). Settle and retry a few
@@ -373,7 +393,7 @@ class NavMixin:
                 self.mgba.tick(8)
                 continue
             saw_path = True
-            for mv in path:
+            for step_i, mv in enumerate(path):
                 before = self.reader.read_player_pos()
                 # Gen III turn-vs-step: the FIRST press of a direction you aren't
                 # facing only TURNS the character (no tile change); the second
@@ -381,6 +401,8 @@ class NavMixin:
                 # otherwise every corner in the path reads as an obstacle.
                 for _ in range(2):
                     self.mgba.tap(mv)
+                    if expected is not None:
+                        self._settle_spin()          # an arrow slide ignores input until it ends
                     if self.reader.read_current_map() != start_map:
                         nb, ni = self.reader.read_current_map()
                         return f"Entered a new map ({nb}/{ni}) at ({self.reader.read_player_pos()})."
@@ -393,6 +415,8 @@ class NavMixin:
                         return f"A dialog opened while walking (at {self.reader.read_player_pos()})."
                     if self.reader.read_player_pos() != before:
                         break   # stepped
+                if expected is not None and self.reader.read_player_pos() != before and tuple(self.reader.read_player_pos()) != expected[step_i]:
+                    break                            # the slide ended somewhere else than planned: replan from here
                 if self.reader.read_player_pos() == before:
                     # Two presses and still on the same tile → genuinely blocked
                     # (not just a turn): an obstacle the tilemap can't see (object
@@ -1059,6 +1083,9 @@ class NavMixin:
         for dx, dy, btn in ((0, 1, "Up"), (1, 0, "Left"), (-1, 0, "Right"), (0, -1, "Down")):
             stand = (wx + dx, wy + dy)
             self._walk_to(*stand)
+            if self.reader.read_current_map() != before:
+                return True                              # the walk itself stepped through the warp (Rocket Hideout B1F): done —
+                                                         # probing on would walk the NEW map to this map's stand tiles
             if self._in_battle_now():
                 return False                             # a wild/trainer battle started while probing: let go_to handle it
             if self.reader.read_player_pos() != stand:

@@ -120,7 +120,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "W"),
 
     (4, "Clear the Rocket Hideout under the Game Corner in Celadon to get the Silph Scope",
-     "Enter the Game Corner (north of Celadon City). Find the hidden switch behind a poster for the Hideout entrance. Defeat Giovanni on B4F to get the Silph Scope.",
+     "quest('rocket_hideout') does it: Game Corner (north of Celadon City) → beat the Grunt, press the poster switch → down the Hideout (spinner mazes, Lift Key, elevator) → Giovanni on B4F gives the Silph Scope.",
      None),
 
     (4, "Go to Lavender Town and clear Pokemon Tower to rescue Mr. Fuji",
@@ -268,7 +268,7 @@ ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
     },
     (3, 6): {  # Celadon City
         "post_surge_heading_east":      "Gym is in the WEST (gray building). Erika uses Grass — Flying/Fire/Ice moves win. Before the Gym, visit Game Corner (north center) to find the Rocket Hideout entrance (talk to the poster-Rocket, press the switch). Clear Rocket Hideout B1F-B4F to get Silph Scope from Giovanni.",
-        "post_erika_need_silph_scope":  "Enter the Game Corner (north, pink building). Find the Rocket Grunt in the back; press the poster switch to open the Hideout. Clear 4 basement floors — Giovanni is on B4F and drops the Silph Scope.",
+        "post_erika_need_silph_scope":  "quest('rocket_hideout') does it: the Game Corner Grunt + poster switch, the hideout's four floors (spinner mazes, Lift Key, elevator) and Giovanni on B4F, who drops the Silph Scope.",
         "post_silph_scope_clear_tower": "Head EAST via Route 7 → Route 8 → Lavender Town. Use the Silph Scope in Pokemon Tower.",
     },
     (3, 10): {  # Saffron City
