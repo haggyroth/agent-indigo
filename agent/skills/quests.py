@@ -13,6 +13,7 @@ so nothing past Cerulean — Vermilion, Cut, Surge — is reachable. The script,
   2. use the computer (stand below it, face up, A) → the cell-separation cutscene → human Bill appears;
   3. talk to human Bill → SS Ticket (key item 265, flag 0x234).
 """
+from agent.skills.base import log_once
 from game.state import GameContext
 
 SS_TICKET_ITEM = 265
@@ -69,6 +70,31 @@ class QuestMixin:
         out["rocket_hideout"] = self._has_silph_scope() and tuple(self.reader.read_current_map()) not in HIDEOUT_MAPS
         return out
 
+    def _bag_or_none(self):
+        """{item id: count} for the readiness supply check, or None when the bag cannot be read (the levels are then checked alone)."""
+        try:
+            bag = dict(self.reader.read_bag())
+            for iid in {i for i, _q in self.reader.read_items_pocket()}:           # read_bag keeps only the LAST stack of an id
+                bag[iid] = sum(q for i, q in self.reader.read_items_pocket() if i == iid)
+            return bag
+        except Exception:
+            log_once("quests._bag_or_none", "quests._bag_or_none: tolerated failure (levels only)")
+            return None
+
+    def _money_note(self) -> str:
+        """The MONEY line for team_report: what the next story beat wants in yen against what we hold ('' when enough / no beat / unreadable)."""
+        from knowledge.money import money_line
+        from knowledge.story_beats import next_beats
+        try:
+            from knowledge.money import MONEY_NEEDS
+            ready = [b for b in next_beats(self._story()) if b.key in MONEY_NEEDS]
+            if not ready:
+                return ""
+            return money_line(ready[0].key, self.reader.read_money(), self.reader.read_bag(), self.reader.read_party())
+        except Exception:
+            log_once("quests._money_note", "quests._money_note: tolerated failure (no money line)")
+            return ""
+
     def _story(self) -> dict:
         from agent.story import story_status
         return story_status(self.reader, self.ltm, self._driver_done())
@@ -93,7 +119,7 @@ class QuestMixin:
         if missing:
             return f"quest('{beat.key}') needs quest('{missing[0]}') first."
         from knowledge.beat_readiness import readiness
-        if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party())):
+        if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party(), self._bag_or_none())):
             self._ready_warned.add(beat.key)            # once per beat: a second call (or a resumed one) goes ahead
             return warn
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,

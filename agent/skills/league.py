@@ -24,6 +24,7 @@ ROOMS = (
     ((1, 79), 0x4BC, (6, 9), "the Champion", (6, 2)),
 )
 ROOM_BY_MAP = {r[0]: r for r in ROOMS}
+ITEM_LABELS_BY_ID = {24: "Revive", 19: "Full Restore"}
 SAVE_SLOT = 3                            # the pre-door save (load_state(3)). A loss needs no reload: the whiteout runs EventScript_ResetEliteFourEnd (every
                                          # FLAG_DEFEATED_* cleared), heals the party, takes some money and respawns at the Plateau's Center, so the quest just starts over
 
@@ -35,8 +36,20 @@ class LeagueMixin:
         heal = self._heal()
         notes.append("healed" if heal.startswith(("Healed", "Party is already")) else f"heal: {heal}")
         try:
-            shop = self._shop()
-            notes.append(shop.split(".")[0] if shop else "shopped")
+            from knowledge.money import treasure_value
+            if treasure_value(self.reader.read_bag()):                 # the Center's clerk buys treasure too: Full Restores are ¥3000 each
+                sold = self._sell()
+                notes.append(sold.split(".")[0] if sold else "sold treasure")
+        except Exception:
+            notes.append("sell skipped")
+        try:
+            from knowledge.money import supply_purchases
+            bought = []
+            bag = self.reader.read_bag()
+            for iid, qty in supply_purchases("elite_four", self.reader.read_money(), bag):      # Revives, then Full Restores, with the money we have
+                res = self._shop_for(ITEM_LABELS_BY_ID[iid], qty)
+                bought.append(res.split(".")[0] if res.startswith("Bought") else f"{ITEM_LABELS_BY_ID[iid]}: {res[:60]}")
+            notes.append(", ".join(bought) if bought else "supplies already stocked (or no money)")
         except Exception:
             notes.append("shop skipped")
         ok = self.mgba.save_state(SAVE_SLOT)

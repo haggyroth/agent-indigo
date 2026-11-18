@@ -32,6 +32,8 @@ class SellMixin:
         Each unit re-reads the pocket and re-aims the cursor at the item first: when a stack empties the list shifts up, and a spare A at the old
         row would sell the NEXT item (a live run sold an Awakening and a Burn Heal beside a Nugget that way)."""
         sold = 0
+        if not self._bag_pocket_open(0):          # the sell bag opens on the pocket used LAST (the Poké Balls pocket holds only CANCEL: A there closes the bag)
+            return 0
         for _ in range(qty):
             pocket = [i for i, _q in self.reader.read_items_pocket()]
             if iid not in pocket or not self._bag_cursor_to(pocket.index(iid)):
@@ -56,7 +58,6 @@ class SellMixin:
 
     def _sell(self, item: str = "", quantity: int = 1) -> str:
         from agent import events
-        from knowledge.map_graph import MAP_KIND
         from knowledge.selling import TREASURE, sell_plan
         from knowledge.shopping import item_label
         bag = dict(self.reader.read_bag())
@@ -65,9 +66,9 @@ class SellMixin:
         plan, msg = sell_plan(bag, item, quantity)
         if not plan:
             return msg
-        if MAP_KIND.get(self.reader.read_current_map()) != "mart":
+        if not self._at_a_shop():
             res = self._go_to("Mart")
-            if MAP_KIND.get(self.reader.read_current_map()) != "mart":
+            if not self._at_a_shop():
                 return f"On the way to a Mart to sell: {res}"
         approach, face = None, "Up"
         cur = tuple(self.reader.read_current_map())

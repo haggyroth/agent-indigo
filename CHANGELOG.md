@@ -5,6 +5,20 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — money targets, supply checks and earning advice for the story beats (#270, #271)
+- **Supplies** (`knowledge/beat_readiness.py`): each beat now also wants a number of HP items and Revives in the bag (Victory Road 10 + 3, the League 12 + 4…).
+  `quest('<beat>')`'s warn-once gate names the shortfall ("2 Potions / Restores in the bag (10 recommended)"), and the plan and the `quest()` listing show the
+  recommendation (`[rec. L42+]`).
+- **Money** (`knowledge/money.py`): a yen target per beat (League ¥20000, Victory Road ¥9000…) and `earn_advice` — sell treasure first (`shop(sell=true)`), Pay Day if a
+  party member knows it, else trainer prize money (wild Pokémon pay nothing). A `MONEY:` line appears in `team_report` and under `STORY NEXT` in the observation
+  when the next costly beat wants more than you hold.
+- **League prep** now sells treasure and buys supplies with the budget: Revives to the recommended count first, then Full Restores (`supply_purchases`). The Indigo
+  Plateau's Pokémon Center has a clerk, so `shop` / `sell` work there (`_at_a_shop`).
+- **Fixed**: `sell` opened the bag on the pocket used last — at the Plateau the empty Poké Balls pocket, where A on "Cancel" closed the bag — so it now switches to Items
+  first; and the Poké Mart "Potion → substitute" table listed item 24 (a **Revive**) as a Hyper Potion (it is 21).
+- Not yet: Game Corner coins / repeatable trainers as scripted income (#270's remaining idea), Dept. Store TM planning (#277).
+
+
 ### Verified — the League's loss path and the credits, live (#259 follow-up)
 - **Loss** (`test_a_league_loss_resets_the_rooms_...`): losing in Agatha's room heals the party, takes money (¥14,044 → ¥5,524 in the staged run), clears all five
   `FLAG_DEFEATED_*` and respawns at the Plateau's Pokémon Center; `quest('elite_four')` then goes back in from Lorelei. No reload is needed (main's blackout handler
