@@ -1280,3 +1280,18 @@ def test_elite_four_quest_clears_the_league_to_the_hall_of_fame(live):
             break
     assert live.r.read_flag(0x82C), out                                                  # FLAG_SYS_GAME_CLEAR
     assert tuple(live.r.read_current_map()) == (1, 80), live.r.read_current_map()        # the Hall of Fame
+
+
+def test_league_prep_sells_treasure_at_the_plateau_clerk_and_buys_revives_and_full_restores(live):
+    """The Plateau's Pokémon Center has a clerk (Full Restores, Max Potions, Revives): with ¥1500 and four Nuggets the League prep sells the treasure there
+    (the sell bag opens on the LAST used pocket — here the empty Poké Balls pocket — so the driver must switch to Items) and spends the money on Revives, then
+    Full Restores; team_report shows the MONEY line while the money is short."""
+    live.load("league_door")
+    c = live.c
+    live.set_money(1500)
+    live.give_item(110, 3)
+    assert "MONEY:" in c._execute("team_report", json.dumps({}))
+    note = c._league_prep("quest('elite_four')")
+    assert "Sold" in note and "Revive" in note and "Full Restore" in note, note
+    bag = live.r.read_bag()
+    assert 110 not in bag and bag.get(24, 0) >= 4 and bag.get(19, 0) >= 1, bag

@@ -124,6 +124,20 @@ def _story_status_for(t: Tick) -> dict:
     return story_status(r, t.ltm, overrides)
 
 
+def _next_beat_money(t: Tick, items) -> str:
+    """The MONEY line when the next story beat wants more yen than we hold (knowledge.money): the gap and how to earn it."""
+    from knowledge.money import money_line
+    from knowledge.story_beats import next_beats
+    from knowledge.money import MONEY_NEEDS
+    ready = [b for b in next_beats(_story_status_for(t)) if b.key in MONEY_NEEDS]          # the first open beat that costs money to prepare for
+    if not ready:
+        return ""
+    bag: dict = {}
+    for iid, qty in items:                                           # the pocket can hold the same id in two stacks
+        bag[iid] = bag.get(iid, 0) + qty
+    return money_line(ready[0].key, t.reader.read_money(), bag, t.state.party)
+
+
 def _readiness_and_bag(t: Tick) -> list[str]:
     """The fundamentals a good player sorts out BEFORE walking on (heal, restock, team, levels, TMs…) plus the bag digest."""
     r, party, out = t.reader, t.state.party, []
@@ -152,6 +166,9 @@ def _readiness_and_bag(t: Tick) -> list[str]:
     story = _safe("story", lambda: story_line(_story_status_for(t)), "")        # what the main story wants next (after Brock)
     if story and d.get("badges_earned", 0) >= 1:
         out.append(story)
+        nxt = _safe("money", lambda: _next_beat_money(t, items), "")
+        if nxt:
+            out.append(nxt)
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
         sig = (tuple(tms), tuple((i, q) for i, q in items if i in BAG_SIG_ITEMS),
                tuple(tuple(p.move_names) for p in party), tuple(p.held_item for p in party))

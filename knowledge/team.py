@@ -212,7 +212,7 @@ def wanted_species(party, boxes=None, gyms_beaten=()) -> dict[int, str]:
     return {s: g.text.split(":")[0] for g in gaps(party, boxes, gyms_beaten) for s in g.species}
 
 
-def team_report(party, boxes=None, gyms_beaten=()) -> str:
+def team_report(party, boxes=None, gyms_beaten=(), money_note: str = "") -> str:
     """The full read-only report behind the `team_report` tool."""
     if not party:
         return "No party to analyse."
@@ -240,4 +240,6 @@ def team_report(party, boxes=None, gyms_beaten=()) -> str:
         lines.extend("  " + brief(n) for n in ("Lorelei", "Bruno", "Agatha", "Lance", "Gary"))
     for g in gaps(party, boxes, gyms_beaten):
         lines.append(f"Gap ({g.code}): {g.text}")
+    if money_note:
+        lines.append(money_note)
     return "\n".join(lines)

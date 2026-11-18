@@ -195,6 +195,9 @@ def listing(status: dict) -> str:
         mark = {"done": "✔", "next": "▶", "blocked": "…"}[st]
         tag = f" [quest('{b.driver}') runs it]" if b.driver and st != "done" else (" [guide]" if not b.driver and st != "done" else "")
         opt = " (optional)" if b.optional else ""
+        from knowledge.beat_readiness import NEEDS
+        if st != "done" and b.key in NEEDS:
+            opt += f" [rec. L{NEEDS[b.key].top}+]"
         need = ""
         if st == "blocked":
             need = " — first: " + ", ".join(n.key for n in missing_needs(b, status))

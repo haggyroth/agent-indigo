@@ -165,7 +165,7 @@ class OverworldMixin:
     # purchase by the bag count rising. Menu inputs get dropped during animations, so
     # every step re-reads state and retries rather than pressing blindly.
     _MART_CLERK_APPROACH = (2, 4)
-    _SHOP_SUBSTITUTES = {4: (3,), 13: (22, 24)}      # Poké Ball → Great Ball; Potion → Super / Hyper Potion (a mart that lacks the cheap grade)
+    _SHOP_SUBSTITUTES = {4: (3,), 13: (22, 21)}      # Poké Ball → Great Ball; Potion → Super / Hyper Potion (a mart that lacks the cheap grade). (It said 24 = a REVIVE for Hyper Potion until the Plateau's clerk sold one in place of a Potion.)
 
     def _buy_list_open(self) -> bool:
         from game.constants import Addr
@@ -390,17 +390,23 @@ class OverworldMixin:
         extra = (" Teach it with teach_move." if iid in TMHM else "") + (f" ({FREE_SOURCES[iid]}.)" if iid in FREE_SOURCES else "")
         return f"Bought {got}× {label} (¥{got * price}). You now have {self.reader.count_item(iid)} (was {before}); ¥{self.reader.read_money()} left.{extra}"
 
+    def _at_a_shop(self) -> bool:
+        """On a Mart — or on a map with a clerk in the shop data (the Indigo Plateau's Pokémon Center has one: Full Restores, Max Potions, Revives)."""
+        from knowledge.map_graph import MAP_KIND
+        from knowledge.shop_stock import SHOPS
+        cur = tuple(self.reader.read_current_map())
+        return MAP_KIND.get(cur) == "mart" or any((b, m) == cur for b, m, *_rest in SHOPS)
+
     def _shop(self, item: str = "", quantity: int = 1) -> str:
         """Restock at the Poké Mart per the badge-gated purchase policy: travel to a
         Mart if needed, open the buy menu, buy the affordable par-level list of items
         this mart sells, and leave. With `item`, buy that specific item instead (_shop_for)."""
         if str(item or "").strip():
             return self._shop_for(str(item), quantity)
-        from knowledge.map_graph import MAP_KIND
         from knowledge.shopping import compute_shopping_list, ITEM_NAMES, ITEM_PRICES
-        if MAP_KIND.get(self.reader.read_current_map()) != "mart":
+        if not self._at_a_shop():
             res = self._go_to("Mart")
-            if MAP_KIND.get(self.reader.read_current_map()) != "mart":
+            if not self._at_a_shop():
                 return f"On the way to a Mart to restock: {res}"
         money = self.reader.read_money()
         plan = compute_shopping_list(self.reader.read_bag(),
