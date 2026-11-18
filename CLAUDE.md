@@ -211,7 +211,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `go_to` | overworld | destination?, force?, auto_trainers? | Travel to a named map ('Pewter City') or waypoint ('Pokemon Center', 'Mart', 'Gym'). |
 | `challenge_leader` | overworld | — | Walk up to the Gym Leader and start the battle (inside the gym, healed and save_state'd first). |
 | `heal` | overworld | — | Restore the whole party (HP, PP, status) at the nearest Pokémon Center — travels there, fleeing wild battles on the way. |
-| `shop` | overworld | item?, quantity? | Restock at a Poké Mart (travels there if needed): buys the badge-scaled par levels of Balls, Potions and cures with the money you have. |
+| `shop` | overworld | sell?, item?, quantity? | Restock at a Poké Mart (travels there if needed): buys the badge-scaled par levels of Balls, Potions and cures with the money you have. |
 | `switch_pokemon` | battle | target | Switch your active Pokémon (species name or 1-based slot). |
 | `use_item` | battle + overworld | item, target? | Use a Bag item.  In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status cure. |
 | `give_item` | overworld | item, pokemon | Make a party Pokémon HOLD a Bag item (Leftovers, Exp. |

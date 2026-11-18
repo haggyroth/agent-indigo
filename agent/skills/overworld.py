@@ -198,7 +198,7 @@ class OverworldMixin:
             return []
         return [self.mgba.read16(lp + 2 * i) for i in range(min(n, 30))]
 
-    def _open_buy_menu(self, approach=None, face: str = "Up") -> bool:
+    def _open_buy_menu(self, approach=None, face: str = "Up", sell: bool = False) -> bool:
         """Talk to the clerk, then select Buy so the interactive item list is open.
         sShopData.itemList is set as soon as the Buy/Sell menu appears (before Buy is
         chosen), so 'itemList valid' only means the shop menu is up — we then select
@@ -225,10 +225,17 @@ class OverworldMixin:
         if not shop_up:
             return False
         # 2. Select Buy (default top option) → enter the item list, then settle so the
-        #    fade finishes and the list starts taking D-pad input.
+        #    fade finishes and the list starts taking D-pad input. With `sell`, move down to SELL first: that opens the BAG
+        #    (callback2 = the bag screen), not an item list.
+        if sell:
+            self.mgba.tap("Down")
+            self.mgba.tick(10)
         self.mgba.tap("A")
         self._wait_idle()
         self.mgba.tick(40)
+        if sell:
+            from game.constants import Addr
+            return self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.BAG_CB2
         return self._buy_list_open()
 
     def _buy_one_item(self, item_id: int, qty: int, unit_price: int) -> int:

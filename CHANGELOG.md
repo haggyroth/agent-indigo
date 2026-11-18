@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `shop(sell=true)`: sell treasure at a Poké Mart (#270, first part)
+- The Mart driver could only buy. `shop(sell=true)` now sells every spare treasure in the bag (Nugget ¥5000, Star Piece ¥4900, Big Pearl ¥3750, Big Mushroom, Stardust,
+  Pearl, Tiny Mushroom), or `item` / `quantity` of a named item. Stones, vitamins / Rare Candy, healing and status items, Repels, Escape Rope and Poké Balls are protected
+  (`knowledge/selling.py`). Flow (live-verified): clerk → SELL → the bag in shop mode → A, A, A per unit; one unit at a time, re-aiming the cursor at the item
+  before each, because a spare A after a stack empties sold the neighbouring items. `_open_buy_menu` gained a `sell` option.
+- Not yet: a money target per milestone, earning plans (Game Corner, repeatable trainers), and showing money against the next shopping list in `team_report`.
+
 ### Added — readiness gates for the non-gym story beats (#271)
 - `knowledge/beat_readiness.py`: a recommended-strength table (best Pokémon level + how many at a floor level) for `rocket_hideout`, `pokemon_tower`, `snorlax`,
   `silph_co`, `pokemon_mansion` and `victory_road`, from the level ranges of their trainers and wild Pokémon. `quest('<beat>')` now warns **once** when the

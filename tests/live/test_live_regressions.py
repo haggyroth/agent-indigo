@@ -1204,3 +1204,30 @@ def test_grind_walks_through_route_9s_cut_tree_to_the_grass(live):
         elif tuple(live.r.read_player_pos()) == (7, 5):
             break
     assert tuple(live.r.read_player_pos()) == (7, 5)
+
+
+def test_shop_sell_turns_treasure_into_money_and_keeps_the_potions(live):
+    """shop(sell=true) at a Mart on the real ROM (#270): the clerk's SELL → the bag → A, A, A per unit. Treasure goes, money rises by its price,
+    Potions are untouched, a named protected item is refused, and a second call with nothing left says so."""
+    live.load("vermilion_gym_surge")
+    c = live.c
+    for _ in range(8):                                    # the gym trainer is on the way out
+        c._execute("go_to", json.dumps({"destination": "Mart", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (9, 5):
+            break
+    live.heal_hp()
+    live.give_item(110, 2)
+    live.give_item(106, 3)
+    held = {i: live.r.count_item(i) for i in (14, 17, 15, 18)}              # cures: must survive (a spare A once sold the neighbours of a sold stack)
+    money = live.r.read_money()
+    out = c._execute("shop", json.dumps({"sell": True, "item": "pearl", "quantity": 3}))
+    assert out.startswith("Sold 3× Pearl"), out
+    out = c._execute("shop", json.dumps({"sell": True}))                     # whatever treasure is left: the fixture holds a Nugget of its own
+    assert out.startswith("Sold") and "Nugget" in out, out
+    assert live.r.count_item(106) == 0 and not any(i in live.r.read_bag() for i in (110, 106))
+    assert live.r.read_money() > money + 2 * 5000 + 3 * 700 - 1
+    assert {i: live.r.count_item(i) for i in held} == held
+    assert "Not selling" in c._execute("shop", json.dumps({"sell": True, "item": "antidote"}))
+    assert "Nothing spare" in c._execute("shop", json.dumps({"sell": True}))
