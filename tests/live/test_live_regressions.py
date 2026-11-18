@@ -853,3 +853,24 @@ def test_use_item_heals_the_active_battler_after_a_switch_and_reports_it(live):
     assert live.r.read_active_battle_hp() == pika.max_hp
     again = c._execute("use_item", json.dumps({"item": "Potion"}))
     assert "already at full HP" in again, again
+
+
+def test_shop_with_too_little_money_says_so_and_stops_the_readiness_nag(live):
+    """Watched run: 13 heal→shop trips at ¥600 'bought nothing' because the Dept. Store's cheapest ball / potion cost more, while the
+    READINESS block kept saying shop()."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    live.set_money(300)
+    out = ""
+    for _ in range(6):
+        out = c._execute("shop", "{}")
+        if "bought nothing" in out:
+            break
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._execute("flee_battle", "{}")
+    assert "you have ¥300" in out and "Earn more first" in out, out
+    assert c.ltm.data.get("shop_broke_at") == 300
+    c.ltm.data.pop("shop_broke_at", None)

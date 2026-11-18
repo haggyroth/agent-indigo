@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — third unwatched run (200 steps: Erika beaten, team L32 vs the ace's L38 — the ace gap is closed)
+- **Futile level-target grinds.** After Erika the model called `grind(42)` at L38 and spent ~700 s on Route 7/8 (wild L17–22): the ace
+  gained nothing. `grind(level)` now refuses up front when the best OPEN (un-gated) grass tops out 12+ levels below the Pokémon, and
+  says what to do instead; the READINESS gym line no longer suggests `grind(N)` for an ace ≥ L30.
+- **Pointless shop trips.** 13 heal→shop visits at ¥600 "bought nothing" (the Dept. Store's cheapest ball / potion costs more) while READINESS
+  kept saying `shop()`. `shop()` now says what it costs and the need stays quiet until the money grows (`ltm.data["shop_broke_at"]`).
+
 ### Fixed — `use_item` in battle after a switch
 - `use_item` judged success by party slot 1's HP, but the item goes to the ACTIVE battler, which after a switch or a forced
   replacement is someone else: a heal that landed was reported "Couldn't use the Super Potion — you're back in the battle" (twice

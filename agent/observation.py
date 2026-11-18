@@ -126,6 +126,12 @@ def _readiness_and_bag(t: Tick) -> list[str]:
     # The PC contents are only read where the PC is: "you already own one — pc('swap') it in".
     boxes = _safe("boxes", lambda: r.read_boxes() if MAP_KIND.get(t.here) == "pokecenter" else None, None)
     d = t.ltm.data
+    broke = d.get("shop_broke_at")                 # a shop() visit that bought nothing for lack of money: no "shop()" nag until richer
+    if broke is not None:
+        if money > broke:
+            d.pop("shop_broke_at", None)
+        else:
+            money = 0                              # (money only feeds the shop() need in readiness)
     due = save_note(d.get("badges_earned", 0), battles_total(d), d.get("saved_badges"), d.get("saved_battles", 0))
     block = readiness_render(readiness_assess(party, balls, pots, money, d.get("gyms_beaten", []),
                                               dex=dex, tms=tms, boxes=boxes, save_due=due))
