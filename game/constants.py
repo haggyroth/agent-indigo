@@ -179,6 +179,7 @@ class Addr:
     CB2_PARTY_MENU     = 0x0811EB79
     NAMING_CB2         = 0x0809FB45
     NAMING_TEXT        = 0x0200FF34
+    NAMING_PAGE        = NAMING_TEXT + 0x622    # u8 currentPage in struct NamingScreenData (textBuffer is at +0x1800, currentPage at +0x1E22): 0 symbols, 1 UPPER, 2 lower
     NAMING_CURSOR_X    = 0x0202066A
     NAMING_CURSOR_Y    = 0x0202066C
     BATTLE_YESNO_CURSOR = 0x02023E83

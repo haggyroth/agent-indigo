@@ -105,6 +105,32 @@ def test_catch_vets_the_nickname_then_names_the_catch(live):
     assert any(p.nickname == "Mr. Zap!" for p in live.r.read_party())
 
 
+def test_naming_screen_page_comes_from_the_game_and_a_mixed_case_name_types(live, monkeypatch):
+    """The keyboard page is read from the game's own struct (NAMING_PAGE), not counted: a mixed-case, spaced nickname crosses UPPER <-> lower
+    pages and must land exactly; the page values the RAM read returned include both letter pages."""
+    from game.naming import NamingDriver
+    seen = []
+    orig = NamingDriver.current_page
+
+    def spy(self):
+        page = orig(self)
+        seen.append((self.m.read8(Addr.NAMING_PAGE), page))
+        return page
+    monkeypatch.setattr(NamingDriver, "current_page", spy)
+    live.load("threemon")
+    assert live.wild_battle()
+    out = ""
+    for _ in range(10):
+        live.set_foe_hp(1)
+        out = live.c._catch("Zap Daddy")
+        if "Gotcha" in out:
+            break
+    assert "Gotcha" in out and "Named it 'Zap Daddy'" in out, out
+    assert any(p.nickname == "Zap Daddy" for p in live.r.read_party())
+    assert {1, 2} <= {ram for ram, _p in seen}, seen                       # the RAM read saw the UPPER and the lower page
+    assert all({1: 0, 2: 1, 0: 2}[ram] == page for ram, page in seen if ram in (0, 1, 2)), seen
+
+
 def test_broke_free_ball_returns_without_a_long_menu_wait(live):
     live.load("threemon")
     assert live.wild_battle()

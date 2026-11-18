@@ -441,10 +441,12 @@ class BattleMixin:
         r2 = self.mgba.read8(cur)
         return r1 != r0 or r2 != r1
 
-    def _give_nickname(self, nickname: str) -> str:
-        """At the 'Give a nickname?' Yes/No: choose YES, wait for the keyboard, type, confirm."""
+    def _give_nickname(self, nickname: str, species: str = "", taken=()) -> str:
+        """At the 'Give a nickname?' Yes/No: choose YES, wait for the keyboard, type, confirm. Never strands the battle: if the box never opens the
+        prompt is declined; if the name can't be typed a pool name is tried, and failing that the keyboard is left empty (the default name)."""
         from game.constants import Addr
         from game.naming import NamingDriver
+        from knowledge.nicknames import pick
         for _ in range(3):                       # cursor to YES (0), then A
             if self.mgba.read8(Addr.BATTLE_YESNO_CURSOR) == 0:
                 break
@@ -456,8 +458,17 @@ class BattleMixin:
             if nd.active():
                 break
         if not nd.active():
-            return "(nickname screen never opened)"
-        return nd.enter_name(nickname)
+            self.mgba.tap("B"); self.mgba.tick(12)                       # the A was dropped: decline the box so the battle can end
+            return "(nickname screen never opened — skipped naming)"
+        out = nd.enter_name(nickname)
+        if out.startswith("Named") or not nd.active():
+            return out
+        backup = pick(species, [*taken, nickname])                      # typing failed: a pool name is always typeable
+        retry = nd.enter_name(backup)
+        if retry.startswith("Named"):
+            return f"{retry} (the first pick couldn't be typed: {out})"
+        nd.abort()
+        return f"(couldn't type a nickname — {out}) The default name was kept."
 
     def _enter_name(self, name: str) -> str:
         """Type `name` on the naming screen if it is open (nickname / player / rival name)."""
@@ -492,7 +503,7 @@ class BattleMixin:
         # "Kakuna1"). Refuse ONCE per species with the reason (no ball thrown) so it invents something
         # better; a second try is accepted as sanitized, so this can never loop.
         if nickname:
-            from knowledge.nicknames import critique, sanitize
+            from knowledge.nicknames import critique, pick, sanitize, suggest, usable
             foe = self.reader.read_enemy_lead()
             species = (foe.species_name or "") if foe else ""
             taken = [p.nickname for p in self.reader.read_party()]
@@ -500,11 +511,14 @@ class BattleMixin:
             asked = self._nick_refused
             if why and asked != species:
                 self._nick_refused = species
+                ideas = ", ".join(suggest(species, taken, 4))
                 return (f"No ball thrown — {why}. Pick a more inventive nickname for this {species or 'Pokémon'} "
-                        "(a pun, a pop-culture nod, a funny title — your call; max 10 chars, letters/digits/"
-                        "space/. , ! ? only) and call catch(nickname=...) again.")
+                        "(a pun, a pop-culture nod, a funny title — it needn't have anything to do with the species; max 10 chars, "
+                        f"letters/digits/space/. , ! ? only). Ideas to take or remix: {ideas}. Then call catch(nickname=...) again.")
             self._nick_refused = None
             nickname = sanitize(nickname)
+            if not usable(nickname, taken):                          # nothing typeable / unique survived the clean-up: pick one for it
+                nickname = pick(species, taken)
         if safari:
             committed = self._safari_commit("ball")
             for _ in range(30):                      # the counter drops when the throw is executed, a moment after the choice
@@ -579,7 +593,7 @@ class BattleMixin:
             if menu_seen >= 20:
                 break
             if nickname and not at_menu and not named and self._battle_yesno_live():
-                named = self._give_nickname(nickname)    # YES -> naming screen -> OK
+                named = self._give_nickname(nickname, species, taken)    # YES -> naming screen -> OK
                 continue
             # Safari battle text waits for A (B does nothing there), but the post-catch "nickname?" box must still be declined with B.
             self.mgba.tap("A" if safari and not at_menu and not self._battle_yesno_live() else "B")

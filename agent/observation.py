@@ -26,6 +26,7 @@ from knowledge.gym_advice import brief as gym_brief
 from knowledge.game_corner import PRIZES
 from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
+from knowledge.nicknames import suggest as nickname_ideas
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
 from knowledge.story_beats import story_line
@@ -234,7 +235,7 @@ def _safari_battle(t: Tick) -> list[str]:
             taken = [p.nickname for p in party if p.nickname]
             out.append(f"Worth catching: {v.reason}. A rock doubles the catch rate (but it may flee), bait halves it (but calms it); "
                        "rock then ball is the usual line. When you throw the ball, pass a funny, inventive nickname you make up"
-                       + (f" (taken: {', '.join(taken)})" if taken else "") + ".")
+                       + (f" (taken: {', '.join(taken)})" if taken else "") + f" — e.g. {', '.join(nickname_ideas(enemy.species_name, taken, 3))}.")
         else:
             out.append(f"Not worth a ball: {v.reason}. safari('run') unless you want it for the Pokédex.")
     return out
@@ -353,7 +354,8 @@ def _catch_advice(t: Tick, enemy, move_names, pp_view) -> list[str]:
         taken = [p.nickname for p in party if p.nickname]
         return [f"NEW SPECIES you don't own ({balls} Poké Balls in bag) — worth catching: {v.reason}. "
                 "Weaken it first with use_move (low HP raises the catch rate). When you catch it, pass a funny, inventive "
-                "nickname you make up (not the species name)" + (f"; already taken: {', '.join(taken)}" if taken else "")
+                "nickname you make up (not the species name; it needn't relate to the Pokémon — e.g. "
+                + ", ".join(nickname_ideas(enemy.species_name, taken, 3)) + ")" + (f"; already taken: {', '.join(taken)}" if taken else "")
                 + ". " + catch_setup_hint(move_names, pp_view)]
     if balls == 0 and len(party) < 6:
         return ["You have no Poké Balls — buy some with shop() to catch wild Pokémon for your team."]
