@@ -70,3 +70,12 @@ def test_a_weak_line_only_adding_a_type_still_needs_a_small_gap():
 def test_a_trade_only_line_is_not_a_premium_catch():
     team = party((IVYSAUR, "Ivysaur", 30), (CATERPIE, "Caterpie", 10), (PIDGEY, "Pidgey", 12))
     assert not evaluate(team, ABRA, 14).catch      # Alakazam needs a link trade: Abra tops out at Kadabra
+
+
+def test_a_species_already_stored_in_the_pc_is_not_worth_another_ball():
+    """Watched run: 8 Meowth / 5 Pidgey / 5 Bellsprout piled up in the PC because only the PARTY was checked for a copy."""
+    weak = party(*[(KAKUNA, "Kakuna", 20)] * 6)                    # a full, weak team: any strong line is an 'upgrade'
+    assert evaluate(weak, GROWLITHE, 20, dex_owned=True).catch      # without the PC knowledge it is worth a ball
+    v = evaluate(weak, GROWLITHE, 20, dex_owned=True, stored={GROWLITHE})
+    assert not v.catch and "PC box" in v.reason
+    assert evaluate(weak, GROWLITHE, 20, dex_owned=True, stored={999}).catch    # a different species in the PC changes nothing

@@ -216,7 +216,7 @@ def test_first_arrival_in_a_town_heals_at_its_center_once(live):
 
 def test_grind_points_out_a_worthwhile_wild_pokemon_and_leaves_the_catch_to_the_model(live, monkeypatch):
     import knowledge.catch_policy as cp
-    monkeypatch.setattr(cp, "evaluate", lambda party, sid, lvl, max_team=6, dex_owned=None, wanted=None: cp.Verdict(True, "test", 0))
+    monkeypatch.setattr(cp, "evaluate", lambda party, sid, lvl, max_team=6, dex_owned=None, wanted=None, stored=None: cp.Verdict(True, "test", 0))
     live.load("threemon")
     balls = live.c._ball_count()
     out = ""
@@ -336,7 +336,7 @@ def test_tagged_out_trainee_shares_the_xp_and_is_never_swapped_back(live, monkey
 def test_go_to_hands_a_worthwhile_wild_pokemon_to_the_model_instead_of_fleeing(live, monkeypatch):
     """The team stalled at four because go_to fled everything; now the model is told it is worth a ball (#202)."""
     import knowledge.catch_policy as cp
-    monkeypatch.setattr(cp, "evaluate", lambda party, sid, lvl, max_team=6, dex_owned=None, wanted=None: cp.Verdict(True, "test", 0))
+    monkeypatch.setattr(cp, "evaluate", lambda party, sid, lvl, max_team=6, dex_owned=None, wanted=None, stored=None: cp.Verdict(True, "test", 0))
     live.load("threemon")
     balls = live.c._ball_count()
     assert live.wild_battle(), "no wild battle found"

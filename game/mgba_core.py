@@ -52,6 +52,8 @@ class NativeMGBAClient:
         if self._h == ffi.NULL:
             raise RuntimeError(f"libmgba failed to load ROM: {rom}")
         SAVE_DIR.mkdir(parents=True, exist_ok=True)
+        self._session_saves: dict[int, int] = {}      # slot -> save order, for slots written by THIS process (see saved_this_session)
+        self._save_seq = 0
 
         # Live framebuffer view + optional window.
         w = ffi.new("uint32_t*"); h = ffi.new("uint32_t*")
@@ -192,7 +194,20 @@ class NativeMGBAClient:
     def save_state(self, slot: int = 0) -> bool:
         """Save to a numbered slot. Returns True on success (False if the core
         rejected it), so callers don't silently believe a failed save."""
-        return bool(lib.pycore_save_state(self._h, self._slot_path(slot).encode()))
+        ok = bool(lib.pycore_save_state(self._h, self._slot_path(slot).encode()))
+        if ok:
+            self._save_seq += 1
+            self._session_saves[int(slot)] = self._save_seq
+        return ok
+
+    def saved_this_session(self, slot: int) -> bool:
+        """Was `slot` written by this process? Slot files live in saves/ across runs, so a file that merely EXISTS can be months
+        old (a title-screen state from July): loading it 'recovered' a blackout by resetting the game to its new-game intro."""
+        return int(slot) in self._session_saves
+
+    def latest_session_slot(self) -> int | None:
+        """The slot this process saved most recently, or None when it has not saved yet."""
+        return max(self._session_saves, key=self._session_saves.get) if self._session_saves else None
 
     def load_state(self, slot: int = 0) -> bool:
         """Load from a numbered slot. Returns False if the slot file is missing

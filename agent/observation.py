@@ -208,7 +208,8 @@ def _safari_battle(t: Tick) -> list[str]:
         out.append(f"SAFARI battle: {enemy.species_name} L{enemy.level} — you have {balls} Safari Balls and {steps} steps left. "
                    "Act with safari('ball'|'bait'|'rock'|'run').")
         v = catch_evaluate(party, enemy.species_id, enemy.level or 0, dex_owned=r.read_dex_owned(enemy.species_id),
-                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])))
+                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])),
+                           stored=_safe("stored", r.read_stored_species, set()))
         if v.catch:
             taken = [p.nickname for p in party if p.nickname]
             out.append(f"Worth catching: {v.reason}. A rock doubles the catch rate (but it may flee), bait halves it (but calms it); "
@@ -324,9 +325,10 @@ def _catch_advice(t: Tick, enemy, move_names, pp_view) -> list[str]:
     balls = sum(r.read_bag().get(b, 0) for b in BALL_IDS)
     if balls > 0 and enemy and enemy.species_id and enemy.species_id not in {p.species_id for p in party}:
         v = catch_evaluate(party, enemy.species_id, enemy.level or 0, dex_owned=r.read_dex_owned(enemy.species_id),
-                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])))
+                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])),
+                           stored=_safe("stored", r.read_stored_species, set()))
         if not v.catch:
-            return [f"New species, but NOT worth a ball right now: {v.reason}. "
+            return [f"NOT worth a ball right now: {v.reason}. "
                     "Skip it (flee_battle) unless you have a reason to want it."]
         taken = [p.nickname for p in party if p.nickname]
         return [f"NEW SPECIES you don't own ({balls} Poké Balls in bag) — worth catching: {v.reason}. "

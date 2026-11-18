@@ -477,6 +477,9 @@ class AgentClient(SkillBase, SkillState, GameCornerMixin, PCMixin, PartyMixin, Q
                        f"Save to slot {slot} FAILED (state not written)."
             case "load_state":
                 slot = args.get("slot", 0)
+                if hasattr(self.mgba, "saved_this_session") and not self.mgba.saved_this_session(slot):
+                    return (f"Slot {slot} has no state saved THIS session — loading a leftover file from an older run would reset "
+                            "the game. save_state(slot) first (before a gym leader or a risky fight); after a loss you can load it.")
                 ok = self.mgba.load_state(slot)
                 return f"State loaded from slot {slot}." if ok else \
                        f"Load from slot {slot} FAILED — no saved state in that slot yet."
