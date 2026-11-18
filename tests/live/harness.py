@@ -66,6 +66,14 @@ class Live:
         self.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])        # back to real attacks (Razor Leaf / Vine Whip / Tackle)
         self.heal_hp()
 
+    def defeat_all_trainers(self) -> None:
+        """Stage: mark every trainer (flags 0x500..0x7E6) as already beaten — for tests about NAVIGATION, where a fight on the way is noise
+        (a defeated trainer just repeats his post-battle line; line-of-sight trainers no longer start fights)."""
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        for n in range(0x500, 0x7E7):
+            a = sb1 + Addr.FLAGS_OFFSET + (n >> 3)
+            self.m.write8(a, self.m.read8(a) | (1 << (n & 7)))
+
     def set_money(self, yen: int) -> None:
         sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
         self.m.write32(sb1 + Addr.MONEY_OFFSET, yen ^ self.r._encryption_key())

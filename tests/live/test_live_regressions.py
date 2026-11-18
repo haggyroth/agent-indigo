@@ -992,3 +992,49 @@ def test_pokemon_mansion_quest_gets_the_secret_key(live):
             break
     assert 351 in live.r.read_key_items(), out                                  # ITEM_SECRET_KEY
     assert out.startswith("Got the Secret Key")
+
+
+def _staged_gym(live, town, beaten, approach, gym_map, flags=(), key_items=()):
+    """Fly to `town`, mark every trainer beaten (so the test is about NAVIGATION: a fight on the way is noise), go_to the gym and call challenge_leader()
+    until the player stands on the Leader's approach tile. Returns the last message."""
+    live.load("celadon_gym_door")
+    live.c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to(town, flags=flags, key_items=key_items)
+    c = live.c
+    old = list(c.ltm.data.get("gyms_beaten", []))
+    c.ltm.data["gyms_beaten"] = beaten
+    try:
+        live.defeat_all_trainers()
+        c._execute("go_to", json.dumps({"destination": "Gym", "force": True}))
+        assert tuple(live.r.read_current_map()) == gym_map, "never got into the gym"
+        out = ""
+        for _ in range(6):
+            out = c._execute("challenge_leader", "{}")
+            if tuple(live.r.read_player_pos()) == approach:
+                break
+        assert tuple(live.r.read_player_pos()) == approach, out
+        return out
+    finally:
+        c.ltm.data["gyms_beaten"] = old
+
+
+def test_giovanni_gym_spinner_maze_reaches_the_leader(live):
+    """Viridian Gym: arrow tiles slide the player (find_path_spin in walk_to)."""
+    _staged_gym(live, "viridian city", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina", "Blaine"], (2, 3), (5, 1))
+
+
+def test_koga_gym_invisible_walls_reach_the_leader(live):
+    """Fuchsia Gym: the invisible walls are real collisions, so the live grid already has them."""
+    _staged_gym(live, "fuchsia city", ["Brock", "Misty", "Lt. Surge", "Erika"], (7, 14), (11, 3))
+
+
+def test_sabrina_gym_teleport_pads_reach_the_leader(live):
+    """Saffron Gym: 30 pads, each teleporting to a partner pad (knowledge.gym_pads plans the chain; walk_to must not cross a pad by accident).
+    The Rockets are gone (FLAG_HIDE_SAFFRON_ROCKETS) so the city's gym door is open."""
+    _staged_gym(live, "saffron city", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga"], (14, 12), (14, 3), flags=(0x3E,))
+
+
+def test_blaine_gym_quiz_doors_reach_the_leader(live):
+    """Cinnabar Gym: six quiz machines (YES / NO per the decomp, pressed from the tile south of the machine). The gym door unlocks at map load when
+    the Secret Key's hide flag (0x1A8) is set."""
+    _staged_gym(live, "cinnabar island", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina"], (5, 5), (12, 0), flags=(0x1A8,), key_items=(351,))

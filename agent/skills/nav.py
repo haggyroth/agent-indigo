@@ -329,6 +329,7 @@ class NavMixin:
             # them). The goal itself is always allowed: door/stairs warp tiles sit
             # on "wall" tiles but are steppable-onto from a passable neighbour.
             npcs = self._npc_tiles()   # refresh each attempt — NPCs move
+            avoid = self._walk_avoid or ()      # tiles a caller must not step on by accident (a gym's teleport pads)
             from knowledge.puzzle_tiles import PUZZLE_TILES as _PT
             on_puzzle_map = start_map in _PT       # barrier maps: a wall goal is really blocked
             def _passable(x, y):
@@ -336,7 +337,7 @@ class NavMixin:
                     # A goal wall that is NOT a door/warp is genuinely blocked (e.g. a closed barrier):
                     # report "no path" so the puzzle/NPC solvers can act, instead of bumping it forever.
                     return bool(grid[y][x]) or (tx, ty) in warps or not on_puzzle_map
-                return grid[y][x] and (x, y) not in npcs and (x, y) not in blocked
+                return grid[y][x] and (x, y) not in npcs and (x, y) not in blocked and (x, y) not in avoid
             # One-way ledges: A* may hop a ledge in its facing direction (Route 1's
             # downhill trap). Exclude any ledge a prior jump failed on (marked
             # blocked) so a mistimed hop replans instead of retrying forever.
@@ -1179,6 +1180,8 @@ class NavMixin:
             res = self._solve_vermilion_switches()
             if not res.startswith(("Both", "The electric")):
                 return res
+        if (msg := self._gym_puzzle(cur, approach)):
+            return msg
         self._walk_to(*approach)
         # Face the Leader (they stand just NORTH of the approach tile) and talk.
         for _ in range(5):

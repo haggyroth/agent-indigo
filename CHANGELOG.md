@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the puzzle gyms reach their Leader (verified on the real ROM: Viridian, Fuchsia, Saffron, Cinnabar)
+- `challenge_leader()` now solves what stood between the model and the last four Leaders:
+  - **Saffron / Sabrina**: 30 teleport pads, each warping to a partner pad of the same map. `knowledge/gym_pads.py` (decomp data + a BFS where a step onto
+    a pad is a teleport edge) plans the chain; `walk_to` takes an avoid-set so a walk never crosses a pad by accident.
+  - **Cinnabar / Blaine**: six quiz machines (correct answers from the decomp: YES NO NO NO YES NO, pressed from the tile south of the machine). The rules
+    are five fixed A presses; pressing A while the QUESTION prints skips to its end and the next A takes the default YES ("Bad call").
+  - **Viridian / Giovanni** (spinner maze) and **Fuchsia / Koga** (invisible walls = real collisions) needed nothing new: `find_path_spin` and the live grid.
+- Test staging: `live.defeat_all_trainers()` (flags 0x500..0x7E6) for navigation-only tests.
+
 ### Added — `quest('pokemon_mansion')`: the Secret Key (verified end to end on the real ROM)
 - The Mansion's barriers hang on ONE global statue switch (`FLAG_POKEMON_MANSION_SWITCH_STATE` 0x26C): `tools/gen_mansion.py` turns the decomp's
   `PressSwitch_<floor>` scripts, map collision and warps into `knowledge/mansion_data.py`; `knowledge/mansion_route.py` solves floors × switch state
