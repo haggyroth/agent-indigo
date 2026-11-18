@@ -8,9 +8,9 @@ quest('flash'): Prof. Oak's Aide in the Route 2 east building (15,2) at (4,6) gi
 quest('dig'): the Rocket grunt behind the robbed house in Cerulean City, at (33,6): beat him and he returns TM28 Dig (FLAG_GOT_TM28_FROM_ROCKET 0x23F).
 quest('hitmon'): Saffron's Fighting Dojo (14,2): beat Master Koichi at (6,5), then take Hitmonchan from the ball at (7,3) (FLAG_GOT_HITMON_FROM_DOJO 0x278) — a one-time
 choice, the other ball goes. quest('magikarp'): the salesman at (1,3) in Route 4's Pokémon Center (16,0) sells a L5 Magikarp for ¥500 (FLAG_BOUGHT_MAGIKARP 0x249).
-quest('fly'): the woman in the Route 16 house (25,0), at (4,2), just gives HM02 Fly (FLAG_GOT_HM02 0x238) — but the house is on Route 16's WEST end, behind the sleeping
-Snorlax at (31,13) (Celadon's exit lands on the east end): it needs the Poké Flute and the Snorlax gone (FLAG_HIDE_ROUTE_16_SNORLAX 0x080, set when it is beaten,
-caught or flees). Waking that Snorlax is not scripted yet (#272): quest('fly') says so and carries on once it is gone."""
+quest('fly'): the woman in the Route 16 house (25,0), at (4,2), just gives HM02 Fly (FLAG_GOT_HM02 0x238). The house is on Route 16's WEST end; Celadon's exit lands
+on the east end: cut the tree at (41,11), take the upper gatehouse (27,6)→(20,6) and walk west (the sleeping Snorlax at (31,13) blocks only the lower road to Route
+17, so no Poké Flute is needed). go_to plans this with the region graph's Cut-tree links (#293)."""
 from game.state import GameContext
 
 CELADON_MANSION_1F = (10, 7)
@@ -19,8 +19,6 @@ TEA_ITEM = 369
 TEA_WOMAN_SPOTS = (((2, 10), "Up"), ((3, 9), "Left"), ((1, 9), "Right"))      # she stands at (2,9)
 ROUTE2_EAST_BUILDING, ROUTE16_HOUSE = (15, 2), (25, 0)
 FLAG_GOT_HM05, FLAG_GOT_HM02 = 0x23B, 0x238
-FLAG_HIDE_ROUTE16_SNORLAX, POKE_FLUTE_ITEM, FLAG_GOT_FLUTE = 0x080, 350, 0x23D
-ROUTE16_SNORLAX = (31, 13)
 CERULEAN, SAFFRON_DOJO, ROUTE4_CENTER = (3, 3), (14, 2), (16, 0)
 FLAG_GOT_TM28, FLAG_GOT_HITMON, FLAG_BOUGHT_MAGIKARP = 0x23F, 0x278, 0x249
 FLAG_BEAT_KOICHI = 0x500 + 317                                          # TRAINER_BLACK_BELT_KOICHI's trainer flag
@@ -84,7 +82,7 @@ class ErrandsMixin:
                 break
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 return out
-            if "Can't get to" in out or "No route" in out or "Blocked" in out or "gated" in out:
+            if "Can't get to" in out or "No route" in out or "Blocked" in out or "gated" in out or "no walking route" in out:
                 return f"Can't reach {dest}: {out}"
         if tuple(self.reader.read_current_map()) != dest_map:
             return f"Didn't reach {dest} yet — call {call} again to continue (it resumes)."
@@ -131,12 +129,9 @@ class ErrandsMixin:
             return "You already have HM02 Fly — teach_move('Fly') to a Pokémon, then fly_to(<town>) (needs the Thunder Badge) goes to any town you have visited."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
-        if not (self.reader.read_flag(FLAG_GOT_FLUTE) or POKE_FLUTE_ITEM in self.reader.read_key_items()):
-            return "The Fly house is on Route 16's far west end, behind a sleeping Snorlax: you need the Poké Flute first (Mr. Fuji: quest('poke_flute'))."
-        if not self.reader.read_flag(FLAG_HIDE_ROUTE16_SNORLAX):
-            return (f"A sleeping Snorlax at {ROUTE16_SNORLAX} on Route 16 blocks the way west to the Fly house (Celadon's exit lands on Route 16's east end). Walk up to it "
-                    f"(go_to('Route 16'), then walk_to next to it), face it, press A and answer YES to play the Poké Flute, then beat or catch it (L30). Scripting that fight is "
-                    f"not done yet; once it is gone, call {call} again and it walks to the house.")
+        if not self._can_use_cut():
+            return ("The Fly house is on Route 16's west end: from Celadon's exit you cut the tree at (41,11), take the upper gatehouse and walk west. That needs a "
+                    "Pokémon that knows Cut (and the Cascade Badge): quest('cut').")
         if (msg := self._gift_errand(call, "Route 16 House", ROUTE16_HOUSE, FLY_WOMAN_SPOTS, FLAG_GOT_HM02, "the woman at (4,2)", auto_trainers)):
             return msg
         return "Got HM02 Fly. teach_move('Fly') to a Pokémon that can learn it (Pidgeotto, Fearow…), then fly_to(<town>) — it needs the Thunder Badge and an outdoor spot."

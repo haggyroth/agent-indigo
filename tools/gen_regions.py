@@ -69,8 +69,11 @@ NUM_PRIMARY = 640
 # Objects that physically block a tile until the right HM/event (Cut tree, Rock Smash rock,
 # Strength boulder, sleeping Snorlax). The tilemap shows them as plain floor, so without this
 # a Cut-tree-sealed gate looked reachable (Route 2's east building). Treated as walls here;
-# route_to falls back to the optimistic graph when this strict view finds no route.
+# route_to retries with BLOCKER_LINKS (the Cut trees / Rock Smash rocks, below) before it falls
+# back to the optimistic graph — that fallback is region-blind and plans through the gatehouse-less
+# direct door (Route 16's Fly house).
 BLOCKER_GFX = ("CUT_TREE", "ROCK_SMASH_ROCK", "PUSHABLE_BOULDER", "SNORLAX")
+SOFT_BLOCKER_GFX = ("CUT_TREE", "ROCK_SMASH_ROCK")      # an HM clears these: a link between the regions they separate
 
 
 def ledge_tiles(pf, layout, attrs):
@@ -159,12 +162,20 @@ def main():
         if not lay:
             continue
         g, w, h, decks, ramps = grid_for(pf, lay)
+        soft = []
         for o in d.get("object_events") or []:
             if any(k in o.get("graphics_id", "") for k in BLOCKER_GFX):
                 ox, oy = int(o["x"]), int(o["y"])
                 if 0 <= ox < w and 0 <= oy < h:
+                    if any(k in o.get("graphics_id", "") for k in SOFT_BLOCKER_GFX) and g[oy][ox]:
+                        soft.append((ox, oy))
                     g[oy][ox] = False
         lab, n = components(g, w, h, decks, ramps)
+        blk = set()                              # (label a, label b, a-side tile, b-side tile): a tree between two regions, straight through
+        for (ox, oy) in soft:
+            for (ax, ay), (bx, by) in (((ox - 1, oy), (ox + 1, oy)), ((ox, oy - 1), (ox, oy + 1))):
+                if 0 <= ax < w and 0 <= ay < h and 0 <= bx < w and 0 <= by < h and lab[ay][ax] >= 0 and lab[by][bx] >= 0 and lab[ay][ax] != lab[by][bx]:
+                    blk.add((lab[ay][ax], lab[by][bx], ax, ay, bx, by))
         touch = set()
         for wv in d.get("warp_events") or []:
             touch |= departure_labels(lab, w, h, int(wv["x"]), int(wv["y"]))
@@ -186,7 +197,7 @@ def main():
                 la, lb = lab[ay][ax], lab[by][bx]
                 if la >= 0 and lb >= 0 and la != lb:
                     ledges.add((la, lb))          # one-way: hop from region la down to lb
-        info[gn] = dict(lab=lab, w=w, h=h, touch=touch, ledges=ledges)
+        info[gn] = dict(lab=lab, w=w, h=h, touch=touch, ledges=ledges, blk=blk)
     # Incoming connections also make a region interesting on the DESTINATION side.
     for gn, d in maps.items():
         for c in d.get("connections") or []:
@@ -283,6 +294,15 @@ def main():
     out.write("LEDGE_LINKS: dict[tuple[int, int], list[tuple[str, str]]] = {\n")
     for gn in sorted(split):
         links = sorted({(tag[gn][a], tag[gn][b]) for (a, b) in info[gn]["ledges"]
+                        if a in tag[gn] and b in tag[gn]})
+        if links:
+            out.write(f"    {gn}: {links!r},\n")
+    out.write("}\n\n")
+    out.write("# Cut trees / Rock Smash rocks between two regions of the same map: (tag a, tag b, a-side tile x, y, b-side tile x, y). Two-way; usable only\n")
+    out.write("# with the HM, so route_to tries it only after the strict search without it found nothing.\n")
+    out.write("BLOCKER_LINKS: dict[tuple[int, int], list[tuple]] = {\n")
+    for gn in sorted(split):
+        links = sorted({(tag[gn][a], tag[gn][b], ax, ay, bx, by) for (a, b, ax, ay, bx, by) in info[gn]["blk"]
                         if a in tag[gn] and b in tag[gn]})
         if links:
             out.write(f"    {gn}: {links!r},\n")

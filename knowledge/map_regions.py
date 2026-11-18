@@ -3787,3 +3787,15 @@ LEDGE_LINKS: dict[tuple[int, int], list[tuple[str, str]]] = {
     (3, 43): [('1', '0')],
     (3, 61): [('1', '0')],
 }
+
+# Cut trees / Rock Smash rocks between two regions of the same map: (tag a, tag b, a-side tile x, y, b-side tile x, y). Two-way; usable only
+# with the HM, so route_to tries it only after the strict search without it found nothing.
+BLOCKER_LINKS: dict[tuple[int, int], list[tuple]] = {
+    (3, 2): [('1', '0', 29, 5, 31, 5)],
+    (3, 3): [('0', '2', 26, 31, 26, 33)],
+    (3, 5): [('0', '2', 19, 23, 19, 25)],
+    (3, 6): [('0', '1', 40, 34, 40, 36)],
+    (3, 20): [('0', '1', 11, 12, 11, 14), ('1', '2', 18, 25, 18, 27), ('4', '3', 14, 69, 16, 69), ('4', '3', 15, 62, 17, 62)],
+    (3, 32): [('1', '0', 0, 47, 2, 47)],
+    (3, 34): [('1', '4', 41, 10, 41, 12)],
+}

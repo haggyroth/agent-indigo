@@ -534,7 +534,7 @@ MAP_KIND: dict[tuple[int, int], str] = {
 # region graph finds no route, and the runtime learns failed edges (nav._go_to).
 from collections import deque  # noqa: E402
 
-from knowledge.map_regions import CONN_LINKS, LEDGE_LINKS, REGION_GRIDS, WARP_ARRIVAL  # noqa: E402
+from knowledge.map_regions import BLOCKER_LINKS, CONN_LINKS, LEDGE_LINKS, REGION_GRIDS, WARP_ARRIVAL  # noqa: E402
 
 SPLIT_MAPS: frozenset = frozenset(REGION_GRIDS)
 
@@ -627,6 +627,21 @@ def _build_region_graph():
 
 
 _R_CONN, _R_WARP = _build_region_graph()
+
+
+def _build_blocker_graph():
+    """node -> [(x, y, dest node)]: cross a Cut tree / Rock Smash rock from one region of a split map into the next (two-way). (x, y) is the tile on the FAR side:
+    walk_to there and it cuts the tree on the way (nav._go_to does the walk). Only used by route_to's second strict pass."""
+    blk: dict = {}
+    for mp, links in BLOCKER_LINKS.items():
+        for ta, tb, ax, ay, bx, by in links:
+            na, nb = (mp[0], mp[1], ta), (mp[0], mp[1], tb)
+            blk.setdefault(na, []).append((bx, by, nb))
+            blk.setdefault(nb, []).append((ax, ay, na))
+    return blk
+
+
+_R_BLK = _build_blocker_graph()
 # Coarse (region-blind) graph — the optimistic fallback.
 _C_CONN = {m: sorted(d.items()) for m, d in MAP_CONNECTIONS.items()}
 _C_WARP = MAP_WARPS
@@ -645,9 +660,10 @@ def _matches(node, goal) -> bool:
 UNWALKABLE_MAPS = frozenset({(3, 11)})
 
 
-def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=()):
+def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=(), blk=None):
     """BFS. accept(node) -> truthy ends the search; returns (node, steps) or None.
-    avoid_edges: set of (from_node, kind, arg) the runtime has learned are blocked."""
+    avoid_edges: set of (from_node, kind, arg) the runtime has learned are blocked. `blk` (node -> [(x, y, node)]) adds ("cut", (x, y), node) steps:
+    walk to the tile beyond a Cut tree / rock (the walk clears it)."""
     q = deque([(start, [])])
     seen = {start}
     while q:
@@ -655,6 +671,8 @@ def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=()
         cand = [("connection", d, n) for d, n in sorted(conn.get(cur, []), key=str)]
         if warps:
             cand += [("warp", (x, y), n) for (x, y, n) in warp.get(cur, [])]
+            if blk:
+                cand += [("cut", (x, y), n) for (x, y, n) in blk.get(cur, [])]
         for step in cand:
             if (cur, step[0], step[1]) in avoid_edges:
                 continue
@@ -696,6 +714,10 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=()):
         return []
     avoid_maps = {tuple(m[:2]) for m in avoid_maps}
     hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps)
+    if hit is None and warps:
+        # Same strict graph, but a Cut tree / rock may be cleared: a gate the strict view saw as a wall (Route 16's tree before the upper gatehouse) is a real way
+        # through — the region-blind fallback below would plan a direct door that skips the gatehouse.
+        hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps, blk=_R_BLK)
     if hit is None and warps:
         # coarse fallback: plain maps; a learned-blocked edge is keyed by region node, so
         # also match it by its plain map to keep the avoidance effective.
