@@ -57,6 +57,13 @@ class NavMixin:
             console.log(f"[dim]NPC read failed ({e}); pathing without NPC avoidance[/]")
         return tiles
 
+    def _stored_species(self) -> set:
+        """Species already in the PC boxes (for the catch policy); empty when unreadable."""
+        try:
+            return self.reader.read_stored_species()
+        except Exception:
+            return set()
+
     _MOVE_DELTA = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
 
     def _cut_tree_tiles(self, w: int, h: int) -> set:
@@ -554,7 +561,7 @@ class NavMixin:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
                                  dex_owned=self.reader.read_dex_owned(foe.species_id),
-                                 wanted=self._wanted_species(party))
+                                 wanted=self._wanted_species(party), stored=self._stored_species())
                     verdict = (f" Worth a ball: {v.reason}." if v.catch else f" Not worth a ball: {v.reason}.") \
                         + f" ({balls} Poké Balls.)"
         except Exception:
@@ -1082,6 +1089,8 @@ class NavMixin:
         # graph tile is a standalone warp we should target directly.
         return (cx, cy) if max(abs(cx - wx), abs(cy - wy)) <= 1 else warp
 
+    _GYM_RETRY_LEVELS = 8          # team-level total to gain after a loss in a gym before challenge_leader will walk in again
+
     def _challenge_leader(self) -> str:
         """Start the fight with the current gym's Leader. Walks to the tile below
         the Leader (GYM_LEADER_APPROACH) and TALKS to them (face up + A) — the model
@@ -1099,6 +1108,15 @@ class NavMixin:
         if not approach:
             return ("I don't have this gym's Leader position — walk_to the Leader at "
                     "the top of the gym and press A to challenge them.")
+        # A previous loss in THIS gym (a blackout inside it, recorded by main._handle_blackout): do not walk in again until the team
+        # has actually grown. A watched run lost to Erika, reloaded its pre-gym save and could only have repeated the same fight.
+        lost_at = ((getattr(getattr(self, "ltm", None), "data", None) or {}).get("gym_losses") or {}).get(f"{cur[0]}/{cur[1]}")
+        if lost_at:
+            now = sum(p.level for p in self.reader.read_party())
+            if now < lost_at + self._GYM_RETRY_LEVELS:
+                return (f"You blacked out in this gym when your team's levels totalled {lost_at} (now {now}). Don't walk back into "
+                        f"the same fight: train first — grind() with no level lifts the weaker members — until the total reaches "
+                        f"{lost_at + self._GYM_RETRY_LEVELS}, then call challenge_leader() again.")
         # Under-levelled guard: a gym loss costs half your money and a long walk back.
         # Warn once per gym (a second consecutive call proceeds — the agent may judge
         # that it can win with type advantage).

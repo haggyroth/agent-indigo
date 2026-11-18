@@ -44,16 +44,19 @@ def weakest_line(party):
 
 
 def evaluate(party, species_id: int, level: int, max_team: int = 6, dex_owned: bool | None = None,
-             wanted: dict | None = None) -> Verdict:
+             wanted: dict | None = None, stored=None) -> Verdict:
     """Verdict for a wild `species_id` at `level` against the current `party`. `wanted` is {species id: reason}
     from knowledge.team.wanted_species — a catch that fills a team gap (a counter for the next gym, an HM carrier) is
-    worth a ball whatever its BST, within the premium level debt."""
+    worth a ball whatever its BST, within the premium level debt. `stored` = species ids already in the PC boxes: a watched
+    run caught 8 Meowth, 5 Pidgey and 5 Bellsprout in one session because only the PARTY was checked for "already have one"."""
     data = SPECIES_DATA.get(species_id)
     if data is None:
         return Verdict(False, "unknown species")
     bst, types, line_best = data
     if any(p.species_id == species_id for p in party):
         return Verdict(False, "you already have one")
+    if stored and species_id in stored:
+        return Verdict(False, "you already have one stored in the PC box (pc('swap') brings it into the team)")
     top = max((p.level for p in party), default=0)
     debt = max(0, min_level_for(top) - level) if top else 0
     weak = weakest_line(party)

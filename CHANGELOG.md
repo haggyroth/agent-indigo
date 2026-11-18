@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — what a second unwatched Gemma run turned up
+- **A blackout reset the whole game.** `_handle_blackout` reloaded `saves/slot_0.ss1` — a file from July that survives between
+  runs — which put the run back on the new-game naming screen (party gone, 75 steps wasted typing names). Only a slot saved by
+  THIS process counts now (`saved_this_session` / `latest_session_slot`); the blackout handler reloads the most recent one (the
+  pre-gym `save_state(1)`), or plays the whiteout when there is none, and the `load_state` tool refuses a slot this session never saved.
+- **PC duplicates.** The catch policy only checked the party for "already have one", so the run caught 8 Meowth, 5 Pidgey and 5
+  Bellsprout (45 stored mons, 11 of them Spearow), blocking the autopilot (every foe was "worth a ball") and burning all its balls.
+  `evaluate(..., stored=)` now refuses a species already in the PC and says to `pc('swap')` it in.
+- **Gym retries.** A blackout inside a gym is recorded (`ltm.data["gym_losses"]`, team level total); `challenge_leader` refuses to walk
+  back in until the total has grown by 8 levels — the run had challenged Erika three times with the same lopsided team.
+
 ### Fixed — Route 8 ping-pong, and a team that never catches up (watched run)
 - **Walled-off grass.** Route 8's tall grass is a pocket sealed by two Cut trees. `grind` aimed for the nearest grass by distance;
   `walk_to` counted the trees as NPCs, "engaged" one, then the other (the bounce), and the run left for Route 10 and came back.

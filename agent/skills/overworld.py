@@ -823,7 +823,7 @@ class OverworldMixin:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
                                  dex_owned=self.reader.read_dex_owned(foe.species_id),
-                                 wanted=self._wanted_species(party))
+                                 wanted=self._wanted_species(party), stored=self._stored_species())
                     verdict = (f" Worth a ball: {v.reason}." if v.catch else f" Not worth a ball: {v.reason}.") \
                         + f" ({balls} Poké Balls.)"
         except Exception:
@@ -1050,7 +1050,8 @@ class OverworldMixin:
             if run["catch"] and self._ball_count() > 0:
                 from knowledge.catch_policy import evaluate
                 dex = self.reader.read_dex_owned(foe.species_id)
-                if evaluate(party, foe.species_id, foe.level, dex_owned=dex, wanted=self._wanted_species(party)).catch:
+                if evaluate(party, foe.species_id, foe.level, dex_owned=dex, wanted=self._wanted_species(party),
+                            stored=self._stored_species()).catch:
                     return False
             return True
         except Exception:

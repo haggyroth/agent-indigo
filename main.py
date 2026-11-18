@@ -459,8 +459,8 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
     """Handle an all-fainted party: announce the blackout once, then recover.
 
     Returns True if the caller should `continue` (the blackout path never falls
-    through to the LLM decision step). Tries a slot-0 state reload first; if none
-    was saved this session, advances the game's own whiteout sequence with A."""
+    through to the LLM decision step). Tries a reload of the state saved most recently THIS session first; if none
+    was saved, advances the game's own whiteout sequence with A."""
     party_wiped = bool(state.party) and all(p.current_hp == 0 for p in state.party)
     if not party_wiped:
         run.blackout_active = False   # recovered (respawn/heal) → re-arm
@@ -469,19 +469,29 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
     if not run.blackout_active:
         run.blackout_active = True
         events.emit("blackout", "BLACKOUT — all party fainted")
+        try:                                  # a loss INSIDE a gym is remembered: challenge_leader won't be re-tried until the team grows
+            from knowledge.map_graph import MAP_KIND
+            here = reader.read_current_map()
+            if MAP_KIND.get(here) == "gym":
+                ltm.data.setdefault("gym_losses", {})[f"{here[0]}/{here[1]}"] = sum(p.level for p in state.party)
+        except Exception:
+            pass
         ltm.save()
     # Try to reload the pre-fight state. If none was saved this session the load
     # FAILS (slot file missing) — don't pretend it worked and spin; let the game's
     # own whiteout sequence carry the player to the last Pokémon Center by advancing
     # its dialog with A.
-    if mgba.load_state(0):
-        events.emit("note", "loaded slot 0 after the blackout")
+    # Only a slot saved by THIS process counts: saves/slot_*.ss1 survive between runs, and a months-old slot 0 reset a run to the
+    # new-game intro (party gone, naming screen) instead of recovering it. Native backend only (the http client can't tell).
+    slot = mgba.latest_session_slot() if hasattr(mgba, "latest_session_slot") else 0
+    if slot is not None and mgba.load_state(slot):
+        events.emit("note", f"loaded slot {slot} after the blackout")
         mgba.tick(60)
         run.prev_state = None
         run.battle_was_active = False
         run.blackout_active = False   # recovered via reload
     else:
-        events.emit("note", "no save state in slot 0 — advancing the whiteout / Nurse Joy recovery")
+        events.emit("note", "no state saved this session — advancing the whiteout / Nurse Joy recovery")
         # The blackout plays a multi-box sequence (out of Pokémon → scurried to a
         # Center → warp → auto-heal) that only advances on A. Press it several times
         # per pass (not once) so recovery actually progresses instead of crawling one

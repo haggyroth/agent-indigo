@@ -520,6 +520,14 @@ class LeafGreenReader:
                     out.append(mon)
         return out
 
+    def read_stored_species(self) -> set[int]:
+        """Species ids of everything in the PC boxes (~3 ms): the catch policy must know a copy is already stored."""
+        try:
+            return {m["species_id"] for m in self.read_boxes()}
+        except Exception:
+            logger.warning("PC species read failed", exc_info=True)
+            return set()
+
     KANTO_DEX = 151
 
     def read_pokedex(self) -> tuple[int, int]:
