@@ -21,8 +21,8 @@ DIRW = {"up": "North", "down": "South", "left": "West", "right": "East"}
 def _kind(map_const: str) -> str | None:
     if "POKEMON_CENTER_1F" in map_const:
         return "pokecenter"
-    if map_const.endswith("_MART"):
-        return "mart"
+    if map_const.endswith("_MART") or map_const == "MAP_CELADON_CITY_DEPARTMENT_STORE_2F":
+        return "mart"                     # the Dept. Store's 2F items clerk sells balls-or-potions-and-cures like a Mart
     if map_const.endswith("_GYM"):
         return "gym"
     return None

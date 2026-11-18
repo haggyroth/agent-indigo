@@ -810,3 +810,26 @@ def test_route8_fenced_grass_is_reached_by_cutting_a_tree_not_by_ping_ponging(li
         if (3, 26) in c._sealed_grass:
             break
     assert (3, 26) in c._sealed_grass and st["stuck"] >= 24
+
+
+def test_shop_restocks_at_the_celadon_dept_store_with_substitutes(live):
+    """Watched run: from Celadon, shop() routed to Saffron's Mart ('gate guards want Tea') and sat at 0 Poké Balls with ¥3044 —
+    the Dept. Store was not a mart waypoint, its clerk is not at a Mart's (2,3), and it sells no Poké Ball / Potion."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    live.set_money(6000)
+    balls, supers = live.r.count_item(3), live.r.count_item(22)
+    out = ""
+    for _ in range(6):                                          # a wild/trainer fight on the way interrupts the trip
+        out = c._execute("shop", "{}")
+        if out.startswith("Bought"):
+            break
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._execute("flee_battle", "{}")
+    assert out.startswith("Bought") and "Great Ball (instead of Poké Ball)" in out, out
+    assert live.r.read_current_map() == (10, 1)                 # Celadon Dept. Store 2F
+    assert live.r.count_item(3) > balls and live.r.count_item(22) > supers
+    assert live.r.read_money() < 6000

@@ -40,3 +40,11 @@ def test_approach_is_the_customer_side_even_across_a_counter():
     # A standard mart: clerk (2,3), floor directly in front.
     floor = {(x, y) for x in range(0, 6) for y in range(4, 8)}
     assert approach_options((2, 3), lambda x, y: (x, y) in floor) == [((2, 4), "Up")]
+
+
+def test_celadon_dept_store_2f_is_a_mart_waypoint_reachable_from_the_city():
+    from knowledge.map_graph import MAP_KIND, node_for, route_to, nearest_of_kind
+    assert MAP_KIND[(10, 1)] == "mart"
+    assert route_to(node_for(3, 6, 48, 12), (10, 1))                   # Celadon City → 1F → 2F stairs
+    target, _route = nearest_of_kind(node_for(3, 6, 48, 12), "mart")
+    assert target == (10, 1)                                          # not Saffron's gated Mart

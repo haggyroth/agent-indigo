@@ -17,6 +17,7 @@ python -m pytest tests/live -v          # needs: built binding, ROM, fixtures in
 | `vermilion.ss1` | Vermilion City (arrived via the Underground Path), Ivysaur L30, SS Ticket held, no Cut yet |
 | `forced.ss1` | mid-battle, the active mon fainted → forced party screen |
 | `route8.ss1` | Route 8 (east end, (71,9)), Venusaur knows Cut, Cascade Badge — the fenced tall-grass pocket sealed by two Cut trees |
+| `celadon_gym_door.ss1` | Celadon City Gym door (10,16); Venusaur L35 + a lopsided team, 0 Poké Balls — Dept. Store / Erika scenarios |
 | `forced_stuck.ss1` | Route 11 wild Spearow, Beedrill fainted: the forced party screen a Gemma run pressed A on for 319 tool calls (a run checkpoint) |
 
 Point `LIVE_DIR` elsewhere to use another folder; `ROM_PATH` for the ROM.

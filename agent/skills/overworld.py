@@ -164,6 +164,7 @@ class OverworldMixin:
     # purchase by the bag count rising. Menu inputs get dropped during animations, so
     # every step re-reads state and retries rather than pressing blindly.
     _MART_CLERK_APPROACH = (2, 4)
+    _SHOP_SUBSTITUTES = {4: (3,), 13: (22, 24)}      # Poké Ball → Great Ball; Potion → Super / Hyper Potion (a mart that lacks the cheap grade)
 
     def _buy_list_open(self) -> bool:
         from game.constants import Addr
@@ -304,6 +305,26 @@ class OverworldMixin:
             self.mgba.tap("B")
             self.mgba.tick(12)
 
+    def _clerk_approach(self, clerk: tuple):
+        """((x, y), facing) — the tile on the customer's side of the counter to stand on to talk to the clerk at `clerk`, read from
+        the map (not a fixed tile), or None. A Dept. Store clerk is nowhere near a Mart's (2,3)."""
+        from knowledge.shopping import approach_options
+        self.tilemap.refresh()
+        grid, w, h = self.tilemap.passable_grid()
+        floor = (lambda x, y: bool(grid and 0 <= x < w and 0 <= y < h and grid[y][x]))
+        px, py = self.reader.read_player_pos()
+        seen, todo = {(px, py)}, [(px, py)]              # tiles the player can actually walk to (not the clerk's own side)
+        while todo:
+            x, y = todo.pop()
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if (nx, ny) not in seen and floor(nx, ny):
+                    seen.add((nx, ny))
+                    todo.append((nx, ny))
+        spots = approach_options(tuple(clerk), floor, lambda x, y: (x, y) in seen)
+        if not spots:
+            return None
+        return min(spots, key=lambda s: abs(s[0][0] - px) + abs(s[0][1] - py))
+
     def _shop_for(self, item: str, quantity: int = 1) -> str:
         """shop(item=…): buy a SPECIFIC item (a TM, a stone, a vitamin, an X-item…) from whichever clerk sells it — the nearest
         one by route. Travels there, stands on the customer's side of that clerk's counter (from the map, not a fixed tile),
@@ -311,7 +332,7 @@ class OverworldMixin:
         from knowledge.map_graph import node_for, route_to
         from knowledge.shop_stock import PRICES, SHOP_NAMES
         from agent import events
-        from knowledge.shopping import FREE_SOURCES, approach_options, item_label, resolve_item, shops_selling
+        from knowledge.shopping import FREE_SOURCES, item_label, resolve_item, shops_selling
         from knowledge.tmhm import TMHM
         iid, close = resolve_item(item)
         if iid is None:
@@ -346,21 +367,10 @@ class OverworldMixin:
                 return f"On the way to {SHOP_NAMES[(best[0], best[1])]} to buy {label}: {res}"
             here = [s for s in shops_selling(iid) if (s[0], s[1]) == (best[0], best[1])]
         clerk = here[0]
-        self.tilemap.refresh()
-        grid, w, h = self.tilemap.passable_grid()
-        floor = (lambda x, y: bool(grid and 0 <= x < w and 0 <= y < h and grid[y][x]))
-        px, py = self.reader.read_player_pos()
-        seen, todo = {(px, py)}, [(px, py)]              # tiles the player can actually walk to (not the clerk's own side)
-        while todo:
-            x, y = todo.pop()
-            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if (nx, ny) not in seen and floor(nx, ny):
-                    seen.add((nx, ny))
-                    todo.append((nx, ny))
-        spots = approach_options((clerk[2], clerk[3]), floor, lambda x, y: (x, y) in seen)
-        if not spots:
+        spot = self._clerk_approach((clerk[2], clerk[3]))
+        if spot is None:
             return f"Couldn't find a tile beside the clerk at ({clerk[2]},{clerk[3]}) to stand on."
-        (ax, ay), face = min(spots, key=lambda s: abs(s[0][0] - px) + abs(s[0][1] - py))
+        (ax, ay), face = spot
         before = self.reader.count_item(iid)
         if not self._open_buy_menu((ax, ay), face):
             return f"Couldn't open the buy menu — walk to ({ax},{ay}), face the clerk and call shop(item={item!r}) again."
@@ -389,20 +399,36 @@ class OverworldMixin:
                                      self.ltm.data["badges_earned"], money)
         if not plan["lines"]:
             return f"Bag is already stocked (¥{money}) — nothing to buy."
-        if not self._open_buy_menu():
+        approach, face = None, "Up"
+        cur = tuple(self.reader.read_current_map())
+        from knowledge.shop_stock import SHOPS
+        want = {line["item_id"] for line in plan["lines"]}
+        clerks = [(x, y, set(items)) for b, m, x, y, items in SHOPS if (b, m) == cur]
+        if clerks and (2, 3) not in [(x, y) for x, y, _ in clerks]:
+            # A multi-clerk store (Celadon Dept. Store 2F): the standard-mart tile (2,4) is the wrong place. Walk to the clerk
+            # that sells the most of what we want, standing on the customer's side of the counter.
+            x, y, _items = max(clerks, key=lambda c: len(c[2] & want))
+            spot = self._clerk_approach((x, y))
+            if spot is not None:
+                approach, face = spot
+        if not self._open_buy_menu(approach, face):
             return ("Couldn't open the Mart buy menu — walk up to the clerk at the "
                     "counter and call shop() again.")
         sold = set(self._shop_item_list())
         bought, spent, skipped = [], 0, []
         for line in plan["lines"]:
-            iid, qty = line["item_id"], line["qty"]
+            iid, qty, unit = line["item_id"], line["qty"], ITEM_PRICES.get(line["item_id"], line["unit_price"])
             if iid not in sold:
-                skipped.append(ITEM_NAMES.get(iid, str(iid)))
-                continue
-            got = self._buy_one_item(iid, qty, ITEM_PRICES.get(iid, line["unit_price"]))
+                # The Celadon Dept. Store has no Poké Ball / Potion: buy the next grade up with the same BUDGET (fewer of them).
+                sub = next((s for s in self._SHOP_SUBSTITUTES.get(iid, ()) if s in sold and ITEM_PRICES.get(s)), None)
+                if sub is None:
+                    skipped.append(ITEM_NAMES.get(iid, str(iid)))
+                    continue
+                qty, unit, iid = max(1, min(qty, qty * unit // ITEM_PRICES[sub])), ITEM_PRICES[sub], sub
+            got = self._buy_one_item(iid, qty, unit)
             if got > 0:
-                bought.append(f"{got}× {ITEM_NAMES.get(iid, iid)}")
-                spent += got * line["unit_price"]
+                bought.append(f"{got}× {ITEM_NAMES.get(iid, iid)}" + ("" if iid == line["item_id"] else f" (instead of {ITEM_NAMES.get(line['item_id'])})"))
+                spent += got * unit
         self._close_buy_menu()
         if not bought:
             return ("At the Mart but bought nothing (this mart doesn't sell the "
