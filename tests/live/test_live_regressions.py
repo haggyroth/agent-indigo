@@ -1117,3 +1117,26 @@ def test_victory_road_quest_reaches_indigo_plateau(live):
         if live.r.read_flag(0x899):
             break
     assert live.r.read_flag(0x899), out                                          # FLAG_VISITED_INDIGO_PLATEAU
+
+
+def test_under_levelled_party_is_kept_away_from_cerulean_rival(live):
+    """A watched run: grind() relocated to Route 24 and the autopilot lost to the rival's ambush at Cerulean's north exit over and over, reporting
+    'no tall grass is reachable'. With the party's best at L19 and the scene undone, Route 24 is gated: go_to says so (rival, L21) and grind() never
+    walks north; with the best at L21 the gate opens."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("cerulean city")                                                     # Fly needs the badges; the run in question had two
+    live.set_badges(0b11)
+    live.set_flag(0x29B, False)                                                      # the rival scene (FLAG_GOT_FAME_CHECKER) has not happened
+    for slot, lv in enumerate((19, 16, 16, 15, 14, 13)):
+        live.patch_mon(slot, level=lv)
+    out = c._execute("go_to", json.dumps({"destination": "Route 24", "force": True}))
+    assert "rival" in out and "L21" in out, out
+    assert tuple(live.r.read_current_map())[0] == 3                                  # still outdoors in Cerulean's region, not walked north
+    live.patch_mon(0, level=21)
+    out = c._execute("go_to", json.dumps({"destination": "Route 24", "force": True}))
+    assert "rival" not in out or "ambush" not in out

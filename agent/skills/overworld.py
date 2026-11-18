@@ -527,7 +527,9 @@ class OverworldMixin:
         bank, mid = self.reader.read_current_map()
         # Routes whose way in already beat us twice are off the list for the whole session.
         losses = self._trainer_losses
-        avoid: set = {m for m, n in losses.items() if n >= 2} | set(self._sealed_grass)   # + grass walled off behind Cut trees
+        best = max((p.level for p in self.reader.read_party()), default=0)
+        beaten_goals = {m for m, lvl in self._lost_goals.items() if best < lvl + 3}        # a trainer on the way beat us at that level: not before we are stronger
+        avoid: set = {m for m, n in losses.items() if n >= 2} | set(self._sealed_grass) | beaten_goals   # + grass walled off behind Cut trees
         for _attempt in range(3):
             found = None
             for _probe in range(16):                       # skip grass behind a gate (Brock, a ticket…) without spending an attempt
@@ -559,6 +561,9 @@ class OverworldMixin:
                     # A mandatory trainer (a rival) on the way beat us. Don't loop walking back into
                     # it: heal once, then try a different grass route.
                     lost = True
+                    self._lost_goals[goal_map] = best               # remembered across grind() calls, until the team is 3 levels stronger
+                    self._gate_why = (f"a trainer on the way to {MAP_NAMES.get(goal_map, goal_map)} beat you at L{best} — "
+                                      "that road stays off the list until your best Pokémon is 3 levels higher")
                     self._heal()
                     break
             if lost:
@@ -570,6 +575,11 @@ class OverworldMixin:
             avoid.add(goal_map)
         return False
 
+    def _why_no_grass(self) -> str:
+        """' Why: …' when grind skipped the nearest grass because of a story gate or a trainer that beat us (else '')."""
+        why, self._gate_why = self._gate_why, ""
+        return f" Why the closest grass was skipped: {why}" if why else ""
+
     def _grass_route_gated(self, here, goal) -> bool:
         """Is the way to the grass map `goal` closed by a story gate the player does not meet (the Pewter guard, a ticket, an HM)?"""
         from knowledge.gates import unmet_gates
@@ -577,7 +587,10 @@ class OverworldMixin:
         try:
             px, py = self.reader.read_player_pos()
             route = route_to(node_for(here[0], here[1], px, py), goal)
-            return bool(route and unmet_gates(route, self._gate_ok))
+            unmet = unmet_gates(route, self._gate_ok) if route else []
+            if unmet:
+                self._gate_why = unmet[0][1].hint            # so a failed grind can say WHY the nearest grass was skipped
+            return bool(unmet)
         except Exception:
             log_once("overworld._grass_route_gated", "overworld._grass_route_gated: tolerated failure (continuing with a default)")
             return False
@@ -608,7 +621,7 @@ class OverworldMixin:
                 st["stuck"] = 0
                 return None
             return ("Couldn't reach tall grass to grind. go_to a grassy route yourself, "
-                    f"then call {again} again.")
+                    f"then call {again} again." + self._why_no_grass())
         return None
 
     # ── Party balancing ─────────────────────────────────────────────────────────
@@ -721,7 +734,7 @@ class OverworldMixin:
         if self.reader.detect_context() != GameContext.OVERWORLD:
             self._advance_to_control(tries=24)
         if self._nearest_grass() is None and not self._relocate_to_grass():
-            return "Healed, but no tall grass is reachable from here — go_to a grassy route, then grind() again."
+            return "Healed, but no tall grass is reachable from here — go_to a grassy route, then grind() again." + self._why_no_grass()
         return None
 
     def _grind(self, target_level: int = 0, catch: bool = True, auto_battles: int | None = None) -> str:
