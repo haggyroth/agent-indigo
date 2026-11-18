@@ -913,7 +913,8 @@ def test_tea_quest_then_the_saffron_gate_guard_lets_you_in(live):
     live.set_badges(0b1111)                       # the fixture predates Erika: with the Rainbow Badge the Hideout and the Tea are open
     listing = c._execute("quest", "{}")
     assert "▶ tea" in listing and "▶ rocket_hideout" in listing and "… pokemon_tower" in listing, listing
-    assert "No script for this one yet" in c._execute("quest", json.dumps({"name": "pokemon_tower"}))
+    assert "No script for this one yet" in c._execute("quest", json.dumps({"name": "silph_co"}))          # (a beat still without a script)
+    assert "Silph Scope" in c._execute("quest", json.dumps({"name": "pokemon_tower"}))                    # the Tower's script says what it needs
     out = ""
     for _ in range(6):
         live.heal_hp()
@@ -935,3 +936,35 @@ def test_tea_quest_then_the_saffron_gate_guard_lets_you_in(live):
             break
     assert tuple(live.r.read_current_map()) == (3, 10), "never got into Saffron City"
     assert 369 not in live.r.read_key_items() and live.r.read_flag(0x2A6)           # the guard drank it; the flag stays
+
+
+def test_lavender_story_tower_flute_snorlax_end_to_end(live):
+    """quest('pokemon_tower') → quest('poke_flute') → quest('snorlax') on the real ROM, staged by flying to Lavender with the Silph Scope: the
+    tower's 7 floors (ghost wilds, the rival's trigger on 2F, the 6F Marowak ghost, the three Grunts on 7F), Fuji's warp to his house, the flute,
+    then Route 12: the gate house that cuts the north half off, the long walk south and the Snorlax prompt (YES) and fight."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))                  # the fixture is indoors; Fly needs the open air
+    live.fly_to("lavender town", key_items=(359,))                                      # Silph Scope in the bag
+
+    def run(name, done, rounds=30):
+        out = ""
+        for _ in range(rounds):
+            live.heal_hp()
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._auto_fight()
+                continue
+            out = c._execute("quest", json.dumps({"name": name, "auto_trainers": True}))
+            if done():
+                break
+        return out
+    out = run("pokemon_tower", lambda: live.r.read_flag(0x23C))
+    assert live.r.read_flag(0x23C), out                                                 # FLAG_RESCUED_MR_FUJI
+    out = run("poke_flute", lambda: live.r.read_flag(0x23D), rounds=6)
+    assert live.r.read_flag(0x23D) and 350 in live.r.read_key_items(), out              # the Poké Flute
+    out = run("snorlax", lambda: live.r.read_flag(0x253))
+    assert live.r.read_flag(0x253), out                                                  # FLAG_WOKE_UP_ROUTE_12_SNORLAX
+    assert "already awake" in c._execute("quest", json.dumps({"name": "snorlax"})) or "already done" in c._execute("quest", json.dumps({"name": "snorlax"}))

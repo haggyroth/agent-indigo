@@ -68,7 +68,7 @@ BEATS: tuple[Beat, ...] = (
          steps=("quest('tea') walks to Celadon Mansion 1F and takes the Tea from the old woman (she gives it freely).",
                 "Walk into any Saffron gate house (Routes 5, 6, 7, 8): the thirsty guard drinks it and lets you into Saffron City for good."),
          tip="go_to Saffron says 'gate guards want Tea' until you have it."),
-    Beat("pokemon_tower", "Pokémon Tower: rescue Mr. Fuji", "Lavender Town, the tall tower (1F-7F)", needs=("rocket_hideout",),
+    Beat("pokemon_tower", "Pokémon Tower: rescue Mr. Fuji", "Lavender Town, the tall tower (1F-7F)", needs=("rocket_hideout",), driver="pokemon_tower",
          done=(("flag", 0x23C),),
          steps=("Needs the Silph Scope (without it 6F's ghost is invisible). Heal and carry Antidotes / Paralyze Heals / Revives.",
                 "2F: your rival fights you on the way up. 3F-5F: Channelers and wild Gastly/Haunter (Ghost: Normal and Fighting moves do nothing — "
@@ -76,10 +76,10 @@ BEATS: tuple[Beat, ...] = (
                 "6F: the Marowak ghost — with the Silph Scope it becomes a normal fight; defeat it.",
                 "7F: three Rocket Grunts guard Mr. Fuji at (11,4): beat them and he is freed (he walks home to Lavender)."),
          tip="Mr. Fuji's reward is the Poké Flute — see the next beat."),
-    Beat("poke_flute", "Poké Flute from Mr. Fuji", "Lavender Town, Volunteer Pokémon House (west side)", needs=("pokemon_tower",),
+    Beat("poke_flute", "Poké Flute from Mr. Fuji", "Lavender Town, Volunteer Pokémon House (west side)", needs=("pokemon_tower",), driver="poke_flute",
          done=(("flag", 0x23D), ("item", POKE_FLUTE)),
          steps=("Walk into the Volunteer Pokémon House next to the Pokémon Center in Lavender; Mr. Fuji is at (3,3) — talk to him and take the Poké Flute.",)),
-    Beat("snorlax", "Wake the Snorlax (Route 12 → Fuchsia)", "Route 12, south of Lavender", needs=("poke_flute",), done=(("flag", 0x253),),
+    Beat("snorlax", "Wake the Snorlax (Route 12 → Fuchsia)", "Route 12, south of Lavender", needs=("poke_flute",), driver="snorlax", done=(("flag", 0x253),),
          steps=("Walk south from Lavender down Route 12 until the sleeping Snorlax blocks the path at (14,70).",
                 "Face it and press A: with the Poké Flute in the bag the game asks to play it → YES, then fight it (L30 Snorlax: weaken, then throw Ultra Balls, or just win).",
                 "Routes 12 → 13 → 14 → 15 lead on to Fuchsia City. (Route 16's Snorlax, west of Celadon, blocks the Cycling Road — also needs the flute and a Bicycle; "

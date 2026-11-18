@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — scripts for the Lavender story: `quest('pokemon_tower')`, `quest('poke_flute')`, `quest('snorlax')` (verified end to end on the real ROM)
+- **Pokémon Tower**: the climb to 7F (ghost wilds and Channelers are handed to the model like any quest battle; the rival's 2F trigger and the
+  6F Marowak ghost play out), the three Grunts' sight-line fights, then Mr. Fuji at (11,4) — he sets `FLAG_RESCUED_MR_FUJI` and warps you to his
+  house. Needs the Silph Scope.
+- **Poké Flute**: Fuji at (3,3) in the Volunteer Pokémon House. **Snorlax**: Route 12 is cut in two by a gate house (in at (14,15), out at the
+  south door (5,11)); then the long walk to (14,69), the Poké Flute prompt (YES) and the level-30 fight (`FLAG_WOKE_UP_ROUTE_12_SNORLAX`).
+- Test staging: `live.fly_to(town, flags=, key_items=)` and `live.give_key_item(id)` in the live harness.
+
 ### Added — the whole main story as a guided chain, start to Elite Four
 - **`knowledge/story_beats.py`**: ~30 ordered beats (Oak's Parcel → … → Victory Road) each with where / what must come first / how it is DONE
   (flags, key items, badges and milestones, verified against the pokefirered decomp) / numbered steps. `quest()` lists the chain
