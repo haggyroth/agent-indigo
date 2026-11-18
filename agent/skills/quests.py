@@ -57,37 +57,44 @@ class QuestMixin:
         trainer = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
         return self._yield_encounter(label, trainer, None, call)
 
+    def _driver_done(self) -> dict:
+        """{beat key: bool} for the beats whose script has a stricter notion of done than the game's flag (Cut TAUGHT, Surf TAUGHT, out of
+        the hideout) — they override the flag in the story chain."""
+        from agent.skills.hideout import HIDEOUT_MAPS
+        out = {"ss_ticket": self._has_ss_ticket(), "cut": self._knows_cut(), "coin_case": bool(self.reader.read_flag(FLAG_GOT_COIN_CASE)),
+               "surf": self._knows_move(SURF_MOVE_ID) or bool(self.reader.read_flag(FLAG_GOT_HM03)),
+               "strength": self._knows_move(STRENGTH_MOVE_ID) or bool(self.reader.read_flag(FLAG_GOT_HM04)),
+               "tea": self._has_tea()}
+        # still inside the hideout: quest('rocket_hideout') walks you out
+        out["rocket_hideout"] = self._has_silph_scope() and tuple(self.reader.read_current_map()) not in HIDEOUT_MAPS
+        return out
+
+    def _story(self) -> dict:
+        from agent.story import story_status
+        return story_status(self.reader, self.ltm, self._driver_done())
+
     def _quest_tool(self, name: str = "", auto_trainers: bool = False) -> str:
-        """quest(name?) — the registry front door (knowledge.quests): no name lists the quests and where you stand."""
-        from knowledge.quests import listing, resolve
-        done = set()
-        if self._has_ss_ticket():
-            done.add("ss_ticket")
-        if self._knows_cut():
-            done.add("cut")
-        if self.reader.read_flag(FLAG_GOT_COIN_CASE):
-            done.add("coin_case")
-        if self._has_silph_scope():
-            from agent.skills.hideout import HIDEOUT_MAPS
-            if tuple(self.reader.read_current_map()) not in HIDEOUT_MAPS:      # still inside: quest('rocket_hideout') walks you out
-                done.add("rocket_hideout")
-        if self._knows_move(SURF_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM03):
-            done.add("surf")
-        if self._knows_move(STRENGTH_MOVE_ID) or self.reader.read_flag(FLAG_GOT_HM04):
-            done.add("strength")
+        """quest(name?) — the story chain (knowledge.story_beats). No name lists every beat from the Pokédex to the Elite Four with
+        ✔ done / ▶ next / … blocked; a name runs its script when it has one (ss_ticket, cut, coin_case, rocket_hideout, tea, surf,
+        strength) or prints the state-aware plan (pokemon_tower, poke_flute, snorlax, silph_co, pokemon_mansion, the gyms, …)."""
+        from knowledge import story_beats as sb
+        status = self._story()
         if not str(name or "").strip():
-            return listing(done)
-        q = resolve(name)
-        if q is None:
-            return f"No quest called {name!r}. " + listing(done)
-        if q.key in done:
-            return f"{q.title}: already done."
-        missing = [n for n in q.needs if n not in done]
+            return sb.listing(status)
+        beat = sb.resolve(name)
+        if beat is None:
+            return f"No quest called {name!r}. " + sb.listing(status)
+        if status.get(beat.key) == "done":
+            return f"{beat.title}: already done."
+        if not beat.driver:
+            return "No script for this one yet — here is the plan:\n" + sb.plan(beat, status)
+        legacy_needs = {"cut": ("ss_ticket",)}
+        missing = [n for n in legacy_needs.get(beat.key, ()) if status.get(n) != "done"]
         if missing:
-            return f"quest('{q.key}') needs quest('{missing[0]}') first."
+            return f"quest('{beat.key}') needs quest('{missing[0]}') first."
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
                 "strength": self._get_strength, "coin_case": self._get_coin_case,
-                "rocket_hideout": self._get_silph_scope}[q.key](auto_trainers)
+                "rocket_hideout": self._get_silph_scope, "tea": self._get_tea}[beat.driver](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:

@@ -37,16 +37,17 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 27): [Req("key_item", SS_TICKET, _SS_HINT)],     # Route 9 (Cerulean's east exit)
     (1, 94): [Req("key_item", SILPH_SCOPE,
                   "Pokémon Tower 7F is blocked by ghosts until you have the Silph Scope "
-                  "(Celadon Rocket Hideout B4F, beat Giovanni's grunts there).")],
+                  "(Celadon Rocket Hideout B4F: quest('rocket_hideout') does it).")],
     (3, 10): [Req("key_item", TEA,
-                  "Saffron City's gate guards want Tea (a drink from the Celadon Mansion roof / "
-                  "Game Corner area). Once you've visited Saffron you can Fly there.",
-                  alt_flag=0x89A)],
+                  "Saffron City's gate guards want Tea — the old woman in Celadon Mansion (Condominiums) 1F gives it away: quest('tea'). "
+                  "Then walk into any Saffron gate house (Routes 5-8): the guard drinks it and lets you through for good.",
+                  alt_flag=0x2A6)],           # FLAG_GOT_TEA stays set after the guard consumes the item
     (3, 30): [Req("key_item", POKE_FLUTE,
-                  "A Snorlax blocks Route 12 — you need the Poké Flute (Mr. Fuji, Lavender Town, "
-                  "after rescuing him from the Pokémon Tower).")],
+                  "A Snorlax blocks Route 12 — you need the Poké Flute (Mr. Fuji in Lavender Town, after rescuing him from the Pokémon "
+                  "Tower: quest('pokemon_tower') then quest('poke_flute')), then face the Snorlax, press A and answer YES.",
+                  alt_flag=0x253)],           # FLAG_WOKE_UP_ROUTE_12_SNORLAX
     (3, 34): [Req("key_item", POKE_FLUTE,
-                  "A Snorlax blocks Route 16 — you need the Poké Flute (Mr. Fuji, Lavender Town).")],
+                  "A Snorlax blocks Route 16 — you need the Poké Flute (Mr. Fuji, Lavender Town: quest('poke_flute')).")],
     (3, 8): [Req("hm", "Surf", "Cinnabar Island is across the sea: teach Surf (HM03 from the Safari "
                  "Zone — quest('surf')) to a Pokémon, then use_hm('Surf') / go_to.")],
     (3, 37): [Req("hm", "Surf", "Route 19 is open water — you need Surf.")],
