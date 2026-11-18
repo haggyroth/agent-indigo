@@ -1447,3 +1447,77 @@ def test_early_gift_quests_dig_hitmon_and_magikarp(live):
     money = live.r.read_money()
     out = run("magikarp", 0x249)
     assert live.r.read_flag(0x249) and live.r.read_money() == money - 500, out
+
+
+def test_oak_aides_give_the_itemfinder_and_the_exp_share_for_species_caught(live):
+    """quest('itemfinder') / quest('exp_share') on the real ROM (#275): the Route 11 gatehouse aide wants 30 species CAUGHT (told how many more when short), the Route 15
+    one wants 50 and the Exp. Share ends up on the Pokémon that lags. The game counts a species caught only when its owned bit and all three seen arrays agree
+    (live.set_dex stages all four)."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("vermilion city", badges=0xFF)
+    live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])
+    live.defeat_all_trainers()
+    live.set_dex(12)
+    assert "caught 12" in c._execute("quest", json.dumps({"name": "itemfinder"}))
+    live.set_dex(31)
+    for _ in range(10):
+        out = c._execute("quest", json.dumps({"name": "itemfinder", "auto_trainers": True}))
+        if live.r.read_flag(0x252):
+            break
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+    assert live.r.read_flag(0x252), out                                                   # FLAG_GOT_ITEMFINDER
+    for _ in range(6):                                                                    # out of the gatehouse: Fly works outdoors only
+        c._execute("go_to", json.dumps({"destination": "Vermilion City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 5):
+            break
+    live.fly_to("fuchsia city", badges=0xFF)
+    live.set_dex(52)
+    live.set_flag(0x253)
+    for _ in range(10):
+        out = c._execute("quest", json.dumps({"name": "exp_share", "auto_trainers": True}))
+        if live.r.read_flag(0x256):
+            break
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+    assert live.r.read_flag(0x256), out                                                   # FLAG_GOT_EXP_SHARE_FROM_OAKS_AIDE
+    party = live.r.read_party()
+    holder = next(p for p in party if p.held_item == 182)
+    assert holder.level == min(p.level for p in party)                                    # the one that lags behind
+
+
+def test_pick_up_items_collects_the_worthwhile_hidden_items_on_route_9(live):
+    """pick_up_items on Route 9 (#276): the Ether at (15,7) and the Rare Candy at (63,2) are hidden tiles — walk beside each, FACE it (a 3-frame press turns; a tap would step
+    onto the walkable tile and A there does nothing) and press A. The Itemfinder is not needed once the tile is known; collected tiles are not walked to again."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("cerulean city", badges=0xFF)
+    live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])
+    for _ in range(10):
+        c._execute("go_to", json.dumps({"destination": "Route 9", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 27):
+            break
+    live.defeat_all_trainers()
+    before = dict(live.r.read_bag())
+    out = ""
+    for _ in range(4):
+        out += c._execute("pick_up_items", json.dumps({}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+    after = live.r.read_bag()
+    assert after.get(34, 0) == before.get(34, 0) + 1 and after.get(68, 0) == before.get(68, 0) + 1, (out, after)       # an Ether and a Rare Candy
+    assert {"3/27/15/7", "3/27/63/2"} <= set(c.ltm.data["hidden_taken"])
+    assert "No item balls visible" in c._execute("pick_up_items", json.dumps({}))                                      # nothing left to walk to

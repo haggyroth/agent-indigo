@@ -327,6 +327,13 @@ class LeafGreenReader:
             pass
         return mon
 
+    _FACING = {1: "Down", 2: "Up", 3: "Left", 4: "Right"}        # gObjectEvents[0].facingDirection: DIR_SOUTH, NORTH, WEST, EAST
+
+    def read_player_facing(self) -> str | None:
+        """The button name ('Up'/'Down'/'Left'/'Right') the player is facing, or None. Needed to face a WALKABLE tile (a hidden item): pressing the direction you
+        already face steps onto the tile instead of turning."""
+        return self._FACING.get(self.client.read8(Addr.OW_PLAYER + 0x18) & 0x0F)
+
     def read_enemy_party(self) -> list[PokemonStatus]:
         """The opponent's whole team (gEnemyParty[0..5], empty slots dropped) — HP as stored in the party structs, so the mon that is
         out right now may be stale until it leaves the field; use it to COUNT what a trainer has left, not to read the live foe."""

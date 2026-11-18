@@ -30,7 +30,11 @@ HITMONCHAN_SPOTS = (((7, 4), "Up"),)                                            
 SALESMAN_SPOTS = (((1, 4), "Up"), ((2, 3), "Left"), ((0, 3), "Right"))              # the Magikarp salesman at (1,3)
 AIDE_SPOTS = (((4, 7), "Up"), ((3, 6), "Right"), ((5, 6), "Left"))            # the Aide stands at (4,6)
 FLY_WOMAN_SPOTS = (((4, 3), "Up"), ((3, 2), "Right"), ((5, 2), "Left"))      # the woman stands at (4,2)
-AIDE_SEEN_NEEDED = 10
+AIDE_SEEN_NEEDED = 10          # (the aides count species CAUGHT — see knowledge.aides)
+ROUTE11_GATE_2F, ROUTE15_GATE_2F = (22, 1), (24, 1)
+FLAG_GOT_ITEMFINDER, FLAG_GOT_EXP_SHARE = 0x252, 0x256
+ITEMFINDER_AIDE_SPOTS = (((2, 7), "Up"), ((3, 6), "Left"), ((1, 6), "Right"))      # the aide stands at (2,6)
+EXP_SHARE_AIDE_SPOTS = (((5, 6), "Up"), ((4, 5), "Right"), ((6, 5), "Left"))        # the aide stands at (5,5)
 
 
 class ErrandsMixin:
@@ -115,10 +119,10 @@ class ErrandsMixin:
             return "You already have HM05 Flash — teach_move('Flash') to a Pokémon, then use_hm('Flash') in a dark cave (Rock Tunnel)."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
-        seen = self.reader.read_pokedex()[1]
-        if seen < AIDE_SEEN_NEEDED:
-            return (f"Prof. Oak's Aide wants {AIDE_SEEN_NEEDED} Pokémon species SEEN in the Pokédex and you have seen {seen}. Meet more (wild battles count, "
-                    f"catching is not required), then call {call} again.")
+        caught = self.reader.read_pokedex()[0]
+        if caught < AIDE_SEEN_NEEDED:
+            return (f"Prof. Oak's Aide wants {AIDE_SEEN_NEEDED} Pokémon species CAUGHT (complete Pokédex data) and you have caught {caught}. Catch more, "
+                    f"then call {call} again.")
         if (msg := self._gift_errand(call, "Route 2 East Building", ROUTE2_EAST_BUILDING, AIDE_SPOTS, FLAG_GOT_HM05, "Prof. Oak's Aide at (4,6)", auto_trainers)):
             return msg
         return "Got HM05 Flash from Prof. Oak's Aide. teach_move('Flash') to a Pokémon that can learn it, then use_hm('Flash') lights a dark cave (Rock Tunnel)."
@@ -177,3 +181,39 @@ class ErrandsMixin:
             return msg
         where = "it went to the PC box (your party was full)" if full else "it joined your party"
         return f"Bought a L5 Magikarp for ¥500; {where}. It is weak until L20 (Gyarados): grind() balances it, or leave it in the PC."
+
+    def _aide_reward(self, call: str, label: str, dest: str, dest_map: tuple, spots, flag: int, needed: int, who: str, auto_trainers: bool) -> str | None:
+        """An Oak's Aide who trades `label` for `needed` species CAUGHT. None = collected; else the message to return."""
+        if self.reader.read_flag(flag):
+            return f"You already have {label}."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        caught = self.reader.read_pokedex()[0]
+        if caught < needed:
+            return f"{who} wants {needed} species CAUGHT for {label} and you have caught {caught} — catch {needed - caught} more, then call {call} again."
+        return self._gift_errand(call, dest, dest_map, spots, flag, who, auto_trainers)
+
+    def _get_itemfinder(self, auto_trainers: bool = False) -> str:
+        call = "quest('itemfinder')"
+        if self.reader.read_flag(FLAG_GOT_ITEMFINDER):
+            return "You already have the Itemfinder — it shows hidden items beside you (and pick_up_items collects the worthwhile hidden ones it knows about)."
+        if (msg := self._aide_reward(call, "the Itemfinder", "Route 11 East Gate 2F", ROUTE11_GATE_2F, ITEMFINDER_AIDE_SPOTS, FLAG_GOT_ITEMFINDER, 30,
+                                     "Prof. Oak's Aide on Route 11", auto_trainers)):
+            return msg
+        return "Got the Itemfinder from Prof. Oak's Aide. Hidden items are collected by pick_up_items on the maps that have worthwhile ones."
+
+    def _get_exp_share(self, auto_trainers: bool = False) -> str:
+        call = "quest('exp_share')"
+        if self.reader.read_flag(FLAG_GOT_EXP_SHARE):
+            return "You already have the Exp. Share — give_item('Exp. Share', '<the Pokémon that lags>') if nobody holds it."
+        if (msg := self._aide_reward(call, "the Exp. Share", "Route 15 West Gate 2F", ROUTE15_GATE_2F, EXP_SHARE_AIDE_SPOTS, FLAG_GOT_EXP_SHARE, 50,
+                                     "Prof. Oak's Aide on Route 15", auto_trainers)):
+            return msg
+        from knowledge.held_items import holder_for
+        party = self.reader.read_party()
+        who = holder_for(182, party)                              # ITEM_EXP_SHARE: the one that lags behind
+        note = ""
+        if who is not None and not any(p.held_item == 182 for p in party):
+            held = self._give_item("Exp. Share", who.nickname or who.species_name)
+            note = f" {held}"
+        return f"Got the Exp. Share from Prof. Oak's Aide.{note}"

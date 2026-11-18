@@ -138,6 +138,20 @@ def _next_beat_money(t: Tick, items) -> str:
     return money_line(ready[0].key, t.reader.read_money(), bag, t.state.party)
 
 
+def _aide_line(t: Tick) -> str:
+    """One line when an Oak's Aide reward can be collected now (Flash 10 caught, Itemfinder 30, Exp. Share 50), or the next one is within 3 species."""
+    from knowledge.aides import next_reward, ready
+    owned = t.reader.read_pokedex()[0]
+    claim = ready(owned, t.reader.read_flag)
+    if claim:
+        key, label, _need = claim[0]
+        return f"OAK'S AIDE: you have caught {owned} species — {label} is waiting: quest('{key}')."
+    nxt = next_reward(owned, t.reader.read_flag)
+    if nxt and nxt[1] <= 3:
+        return f"OAK'S AIDE: {nxt[1]} more species caught and an aide gives you {nxt[0]}."
+    return ""
+
+
 def _readiness_and_bag(t: Tick) -> list[str]:
     """The fundamentals a good player sorts out BEFORE walking on (heal, restock, team, levels, TMs…) plus the bag digest."""
     r, party, out = t.reader, t.state.party, []
@@ -169,6 +183,9 @@ def _readiness_and_bag(t: Tick) -> list[str]:
         nxt = _safe("money", lambda: _next_beat_money(t, items), "")
         if nxt:
             out.append(nxt)
+    aide = _safe("aide", lambda: _aide_line(t), "")
+    if aide and d.get("badges_earned", 0) >= 1:
+        out.append(aide)
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
         sig = (tuple(tms), tuple((i, q) for i, q in items if i in BAG_SIG_ITEMS),
                tuple(tuple(p.move_names) for p in party), tuple(p.held_item for p in party))

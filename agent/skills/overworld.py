@@ -3,6 +3,7 @@ battles, and pick up item balls. See agent.lm_studio_client.AgentClient
 (which inherits OverworldMixin)."""
 
 from agent.skills.base import log_once
+from game.state import GameContext
 from knowledge.navigation import MAP_NAMES
 from knowledge.travel_rules import no_walk_reason
 
@@ -21,7 +22,7 @@ class OverworldMixin:
     def _bag_and_keys(self) -> tuple[dict, int]:
         return self.reader.read_bag(), self.reader.read_key_item_count()
 
-    def _pick_ball(self, bx: int, by: int) -> tuple[str, str]:
+    def _pick_ball(self, bx: int, by: int, hidden: bool = False) -> tuple[str, str]:
         """Walk next to the item ball at (bx, by), face it, press A and clear the 'found ITEM!' text. Returns (what was
         picked up, "") or ("", why not). Confirmed by the bag / key-item total rising or the ball vanishing."""
         from knowledge.shopping import ITEM_NAMES
@@ -32,14 +33,19 @@ class OverworldMixin:
         for _ in range(6):
             px, py = self.reader.read_player_pos()
             face = self._facing_dir(px, py, bx, by)
-            if face:
+            if face and hidden:
+                self.mgba.tick(24)           # let the last step finish: facing and position read mid-step are stale
+                if self.reader.read_player_facing() != face:
+                    self.mgba.hold(face, 3)  # a 3-frame press only TURNS (a tap steps, and onto a WALKABLE hidden-item tile A does nothing)
+                    self.mgba.tick(12)
+            elif face:
                 self.mgba.tap(face)          # turn to face the ball (bumps it, no move)
             self.mgba.tap("A")               # pick up
             self.mgba.tick(15)
             self._advance_to_control()       # advance "found ITEM!" text to control
             after_bag, after_keys = self._bag_and_keys()
             if after_keys > before_keys or sum(after_bag.values()) > sum(before_bag.values()) \
-                    or (bx, by) not in self.reader.read_item_ball_tiles():
+                    or (not hidden and (bx, by) not in self.reader.read_item_ball_tiles()):        # a hidden item has no ball to vanish: only the bag proves it
                 picked = True
                 break
         if not picked:
@@ -70,14 +76,33 @@ class OverworldMixin:
             if problem:
                 return self._pickup_result(got, problem)
             got.append(names)
+        got += self._pick_hidden_here()
         return self._pickup_result(got)
+
+    def _pick_hidden_here(self, limit: int = 6) -> list[str]:
+        """The worthwhile hidden items (knowledge.hidden_items) this map is known to hold: walk next to the tile, face it, press A. A tile that gives nothing is remembered
+        as taken (ltm 'hidden_taken') so it is not walked to again; the result names each find as 'X (hidden)'."""
+        from knowledge.hidden_items import hidden_on
+        cur = tuple(self.reader.read_current_map())
+        taken = self.ltm.data.setdefault("hidden_taken", [])
+        got: list[str] = []
+        for name, x, y in hidden_on(cur, set(taken))[:limit]:
+            names, problem = self._pick_ball(x, y, hidden=True)
+            if problem.startswith("couldn't reach"):
+                continue                                         # blocked (a trainer, a battle): try again on a later call, don't write it off
+            taken.append(f"{cur[0]}/{cur[1]}/{x}/{y}")           # collected, or the tile gave nothing: either way it is done
+            if not problem:
+                got.append(f"{names} (hidden)")
+            if self.reader.detect_context() != GameContext.OVERWORLD:
+                break
+        return got
 
     @staticmethod
     def _pickup_result(got: list[str], problem: str = "") -> str:
         if not got and problem:
             return f"No items picked up — {problem}."
         if not got:
-            return "No item balls visible here."
+            return "No item balls visible here (and no worthwhile hidden items known on this map)."
         head = f"Picked up {len(got)} item(s): {'; '.join(got)}."
         return head + (f" Stopped: {problem}." if problem else "")
 
