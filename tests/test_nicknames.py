@@ -7,7 +7,10 @@ pytest.importorskip("openai")
 
 from agent.lm_studio_client import AgentClient   # noqa: E402
 from game.state import GameContext, PokemonStatus  # noqa: E402
-from knowledge.nicknames import critique, sanitize  # noqa: E402
+import random  # noqa: E402
+
+from game.naming import typeable  # noqa: E402
+from knowledge.nicknames import MAX_NAME, POOL, critique, pick, sanitize, suggest, usable  # noqa: E402
 
 
 def test_sanitize_folds_accents_and_drops_untypeable_chars():
@@ -71,3 +74,40 @@ def test_creative_nickname_goes_straight_through():
     f = _F()
     _client(f)._catch("Batty Boop")
     assert f.bag_opened
+
+
+def test_every_pool_name_can_be_typed_kept_and_passes_the_critique():
+    assert len(POOL) >= 150 and len({n.lower() for n in POOL}) == len(POOL)
+    for n in POOL:
+        assert 2 <= len(n) <= MAX_NAME and typeable(n) and sanitize(n) == n, n
+        assert critique(n, "Pikachu", []) is None, n
+
+
+def test_the_pool_is_varied_not_a_theme():
+    assert {"Hobbes", "Zap Daddy"} <= set(POOL)
+    firsts = {n[0].upper() for n in POOL}
+    assert len(firsts) >= 18                                  # spread across the alphabet
+
+
+def test_suggest_skips_taken_names_and_the_species_and_varies_between_calls():
+    taken = ["Hobbes", "waffles"]
+    seen = set()
+    for seed in range(20):
+        got = suggest("Rattata", taken, 4, random.Random(seed))
+        assert len(got) == len(set(got)) == 4
+        assert "Hobbes" not in got and "Waffles" not in got
+        seen.update(got)
+    assert len(seen) > 30                                      # a fresh draw each time
+    assert suggest("Rattata", [], 4, random.Random(1)) == suggest("Rattata", [], 4, random.Random(1))   # seedable
+
+
+def test_pick_always_returns_something_unused():
+    assert pick("Zubat", POOL, random.Random(0)) == "Buddy"       # even if every pool name were taken
+    assert pick("Zubat", ["Hobbes"], random.Random(3)) in POOL
+
+
+def test_usable_needs_two_alphanumerics_and_a_fresh_name():
+    assert usable("Zap Daddy", ["Hobbes"])
+    assert not usable("!!", []) and not usable("", []) and not usable("A", [])
+    assert not usable("hobbes", ["HOBBES"])
+    assert "two letters or digits" in critique("?!", "Pikachu", [])

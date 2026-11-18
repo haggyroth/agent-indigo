@@ -21,6 +21,7 @@ _PAGES = {
 _COLS = {UPPER: 8, LOWER: 8, SYMBOLS: 6}        # keys/row; the button column is at this index
 _ENCODE = {v: k for k, v in GEN3_CHARSET.items() if v and len(v) == 1}
 MAX_NAME = 10                                   # nickname length (player names are 7)
+_RAM_PAGE = {1: UPPER, 2: LOWER, 0: SYMBOLS}    # the game's currentPage (0 symbols, 1 UPPER, 2 lower) -> our page ids
 
 
 def key_pos(ch: str):
@@ -63,20 +64,29 @@ class NamingDriver:
         return (self.m.read16(Addr.NAMING_CURSOR_X), self.m.read16(Addr.NAMING_CURSOR_Y))
 
     def _press(self, button: str, ticks: int = 12) -> None:
-        wait = getattr(self.m, "wait_until_idle", None)
         self.m.tap(button)
         self.m.tick(ticks)
-        if wait:
-            pass
+
+    def current_page(self) -> int:
+        """The keyboard page the screen is really on (read from the game's struct; our own count is the fallback when the read is out of range)."""
+        read8 = getattr(self.m, "read8", None)
+        if read8 is not None:
+            try:
+                ram = read8(Addr.NAMING_PAGE)
+            except Exception:
+                ram = None
+            if ram in _RAM_PAGE:
+                self.page = _RAM_PAGE[ram]
+        return self.page
 
     # ── primitives ──────────────────────────────────────────────────────────
     def _goto_page(self, page: int) -> bool:
         for _ in range(4):
-            if self.page == page:
+            if self.current_page() == page:
                 return True
-            self._press("Select", 20)
-            self.page = (self.page + 1) % 3
-        return self.page == page
+            self._press("Select", 24)
+            self.page = (self.page + 1) % 3          # (re-read from the game on the next turn round)
+        return self.current_page() == page
 
     def _move_to(self, tx: int, ty: int) -> bool:
         """Greedy cursor walk to key (tx, ty), re-reading the live cursor each press."""
@@ -123,6 +133,20 @@ class NamingDriver:
         self.m.tick(60)
         return not self.active()
 
+    def clear(self) -> bool:
+        """Backspace until the box is empty. True when it is."""
+        for _ in range(MAX_NAME + 2):
+            if not self.text():
+                return True
+            self._press("B", 14)
+        return not self.text()
+
+    def abort(self) -> bool:
+        """Leave the screen WITHOUT a name (empty box + OK = the game keeps the default / species name). The way out when typing failed, so a catch
+        never strands the battle on a half-typed keyboard. True once the screen has closed."""
+        self.clear()
+        return self.finish()
+
     # ── skill ───────────────────────────────────────────────────────────────
     def enter_name(self, name: str, max_len: int = MAX_NAME) -> str:
         name = (name or "").strip()[:max_len]
@@ -136,11 +160,7 @@ class NamingDriver:
         if not self._buffer_ok():
             return "Couldn't read the name box (unexpected memory layout) — leaving it for B/Start."
         self.page = UPPER
-        # Clear anything already typed (a default/previous name).
-        for _ in range(MAX_NAME):
-            if not self.text():
-                break
-            self._press("B", 14)
+        self.clear()                                       # anything already typed (a default / previous name)
         for ch in name:
             if not self.type_char(ch):
                 return f"Typed {self.text()!r} but couldn't enter {ch!r}; stopping before confirming."
