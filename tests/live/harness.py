@@ -36,6 +36,44 @@ class Live:
                 return
         raise AssertionError("Items pocket is full")
 
+    def give_key_item(self, item_id: int) -> None:
+        """Put a key item (Silph Scope, Poké Flute, Secret Key, …) in the first free Key Items slot. Quantities are XOR'd like the Items pocket."""
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        k16 = self.r._encryption_key() & 0xFFFF
+        for i in range(Addr.KEY_ITEMS_SLOTS):
+            base = sb1 + Addr.KEY_ITEMS_OFFSET + 4 * i
+            if self.m.read16(base) == item_id:
+                return
+            if self.m.read16(base) == 0:
+                self.m.write16(base, item_id)
+                self.m.write16(base + 2, 1 ^ k16)
+                return
+        raise AssertionError("Key Items pocket is full")
+
+    def fly_to(self, town: str, badges: int = 0b1111111, flags=(), key_items=()) -> None:
+        """Stage: give the lead Fly, the badges, the visited flag of `town` (and any extra flags / key items), then fly there."""
+        import json
+        from agent.skills.hm import FLY_SPOTS
+        self.patch_mon(0, moves=[33, 19, 0, 0], pps=[35, 15, 0, 0])
+        self.set_badges(badges)
+        self.set_flag(FLY_SPOTS[town.lower()][2])
+        for f in flags:
+            self.set_flag(f)
+        for k in key_items:
+            self.give_key_item(k)
+        out = self.c._execute("fly_to", json.dumps({"town": town.split()[0]}))
+        assert tuple(self.r.read_current_map()) == FLY_SPOTS[town.lower()][0], out
+        self.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])        # back to real attacks (Razor Leaf / Vine Whip / Tackle)
+        self.heal_hp()
+
+    def defeat_all_trainers(self) -> None:
+        """Stage: mark every trainer (flags 0x500..0x7E6) as already beaten — for tests about NAVIGATION, where a fight on the way is noise
+        (a defeated trainer just repeats his post-battle line; line-of-sight trainers no longer start fights)."""
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        for n in range(0x500, 0x7E7):
+            a = sb1 + Addr.FLAGS_OFFSET + (n >> 3)
+            self.m.write8(a, self.m.read8(a) | (1 << (n & 7)))
+
     def set_money(self, yen: int) -> None:
         sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
         self.m.write32(sb1 + Addr.MONEY_OFFSET, yen ^ self.r._encryption_key())
@@ -88,6 +126,16 @@ class Live:
         m.write8(b + 29, chk >> 8)
         if level:
             m.write8(b + 0x54, level)
+
+    def boost_party(self, hp: int = 400, stat: int = 220) -> None:
+        """Stage: raise every party member's stored battle stats (HP, Atk, Def, Spe, SpA, SpD) and refill HP, so a test about a long dungeon is not
+        decided by a fixture party that is 10-20 levels under the trainers (the level and exp are left alone: the exp text stays consistent)."""
+        for slot in range(len(self.r.read_party())):
+            b = Addr.PARTY_DATA + 100 * slot
+            self.m.write16(b + 0x56, hp)
+            self.m.write16(b + 0x58, hp)
+            for off in (0x5A, 0x5C, 0x5E, 0x60, 0x62):
+                self.m.write16(b + off, stat)
 
     def wild_battle(self, tries: int = 600) -> bool:
         """Stand on grass and wander until a wild battle starts."""

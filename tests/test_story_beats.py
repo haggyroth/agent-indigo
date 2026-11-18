@@ -72,7 +72,7 @@ def test_story_line_names_the_next_required_beat_and_how_to_run_it():
     line = sb.story_line(st)
     assert line.startswith("STORY NEXT: Silph Scope") and "quest('rocket_hideout')" in line and "also open: tea" in line
     st = sb.evaluate(checker(milestones=["delivered_oaks_parcel"], badges=[0, 1, 2, 3], flags=[0x234, 0x237, 0x2A6], items=[sb.SS_TICKET, sb.SILPH_SCOPE]))
-    assert "Pokémon Tower" in sb.story_line(st) and "quest('pokemon_tower') for the plan" in sb.story_line(st)       # guide-only beat
+    assert "Pokémon Tower" in sb.story_line(st) and "quest('pokemon_tower')" in sb.story_line(st)               # a scripted beat: just run it
     done = sb.evaluate(lambda spec: True)
     assert sb.story_line(done) == ""
 
@@ -109,6 +109,7 @@ class FakeReader:
     def read_badges(self): return bin(self.mask).count("1"), self.mask
     def read_current_map(self): return self.map
     def read_party(self): return [SimpleNamespace(move_ids=self.moves, species_name="X", level=30)]
+    def detect_context(self): return SimpleNamespace(name="OVERWORLD")
 
 
 def client(reader, milestones=("delivered_oaks_parcel",)):
@@ -128,11 +129,16 @@ def test_quest_lists_the_chain_with_the_next_beats_marked():
 
 
 def test_a_guide_only_beat_prints_a_state_aware_plan_not_an_error():
+    out = client(FakeReader(**AFTER_ERIKA))._quest_tool("sabrina")
+    assert out.startswith("No script for this one yet") and "Not yet" in out and "quest('silph_co')" in out and "teleport-pad" in out
+    after_silph = dict(AFTER_ERIKA, flags={0x234, 0x237, 0x2A6, 0x250})
+    out = client(FakeReader(**after_silph))._quest_tool("sabrina")
+    assert "Not yet" not in out and "Alakazam" in out
+
+
+def test_a_scripted_beat_runs_its_script_and_says_what_it_needs_first():
     out = client(FakeReader(**AFTER_ERIKA))._quest_tool("pokemon_tower")
-    assert out.startswith("No script for this one yet") and "Not yet" in out and "quest('rocket_hideout')" in out
-    after_scope = dict(AFTER_ERIKA, items=[sb.SS_TICKET, sb.SILPH_SCOPE])
-    out = client(FakeReader(**after_scope))._quest_tool("tower")
-    assert "Not yet" not in out and "Mr. Fuji" in out and "Marowak" in out
+    assert "Silph Scope" in out and "quest('rocket_hideout')" in out                       # needs the scope: the script refuses with the fix
 
 
 def test_a_finished_beat_says_so_and_an_unknown_name_lists_the_chain():

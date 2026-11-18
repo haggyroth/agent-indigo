@@ -913,7 +913,8 @@ def test_tea_quest_then_the_saffron_gate_guard_lets_you_in(live):
     live.set_badges(0b1111)                       # the fixture predates Erika: with the Rainbow Badge the Hideout and the Tea are open
     listing = c._execute("quest", "{}")
     assert "▶ tea" in listing and "▶ rocket_hideout" in listing and "… pokemon_tower" in listing, listing
-    assert "No script for this one yet" in c._execute("quest", json.dumps({"name": "pokemon_tower"}))
+    assert "No script for this one yet" in c._execute("quest", json.dumps({"name": "silph_co"}))          # (a beat still without a script)
+    assert "Silph Scope" in c._execute("quest", json.dumps({"name": "pokemon_tower"}))                    # the Tower's script says what it needs
     out = ""
     for _ in range(6):
         live.heal_hp()
@@ -935,3 +936,131 @@ def test_tea_quest_then_the_saffron_gate_guard_lets_you_in(live):
             break
     assert tuple(live.r.read_current_map()) == (3, 10), "never got into Saffron City"
     assert 369 not in live.r.read_key_items() and live.r.read_flag(0x2A6)           # the guard drank it; the flag stays
+
+
+def test_lavender_story_tower_flute_snorlax_end_to_end(live):
+    """quest('pokemon_tower') → quest('poke_flute') → quest('snorlax') on the real ROM, staged by flying to Lavender with the Silph Scope: the
+    tower's 7 floors (ghost wilds, the rival's trigger on 2F, the 6F Marowak ghost, the three Grunts on 7F), Fuji's warp to his house, the flute,
+    then Route 12: the gate house that cuts the north half off, the long walk south and the Snorlax prompt (YES) and fight."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))                  # the fixture is indoors; Fly needs the open air
+    live.fly_to("lavender town", key_items=(359,))                                      # Silph Scope in the bag
+
+    def run(name, done, rounds=30):
+        out = ""
+        for _ in range(rounds):
+            live.heal_hp()
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._auto_fight()
+                continue
+            out = c._execute("quest", json.dumps({"name": name, "auto_trainers": True}))
+            if done():
+                break
+        return out
+    out = run("pokemon_tower", lambda: live.r.read_flag(0x23C))
+    assert live.r.read_flag(0x23C), out                                                 # FLAG_RESCUED_MR_FUJI
+    out = run("poke_flute", lambda: live.r.read_flag(0x23D), rounds=6)
+    assert live.r.read_flag(0x23D) and 350 in live.r.read_key_items(), out              # the Poké Flute
+    out = run("snorlax", lambda: live.r.read_flag(0x253))
+    assert live.r.read_flag(0x253), out                                                  # FLAG_WOKE_UP_ROUTE_12_SNORLAX
+    assert "already awake" in c._execute("quest", json.dumps({"name": "snorlax"})) or "already done" in c._execute("quest", json.dumps({"name": "snorlax"}))
+
+
+def test_pokemon_mansion_quest_gets_the_secret_key(live):
+    """quest('pokemon_mansion') on the real ROM, staged by flying to Cinnabar: the global statue switch (pressed from the tile SOUTH of a statue,
+    facing up), the directional stairs (stand on the tile, hold their button), the 3F hole down to 1F, the stairs to B1F and two more presses —
+    all planned by knowledge.mansion_route from decomp data (tools/gen_mansion.py) — then the Secret Key at B1F (5,7)."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("cinnabar island")
+    out = ""
+    for _ in range(40):
+        live.heal_hp()
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "pokemon_mansion", "auto_trainers": True}))
+        if 351 in live.r.read_key_items():
+            break
+    assert 351 in live.r.read_key_items(), out                                  # ITEM_SECRET_KEY
+    assert out.startswith("Got the Secret Key")
+
+
+def _staged_gym(live, town, beaten, approach, gym_map, flags=(), key_items=()):
+    """Fly to `town`, mark every trainer beaten (so the test is about NAVIGATION: a fight on the way is noise), go_to the gym and call challenge_leader()
+    until the player stands on the Leader's approach tile. Returns the last message."""
+    live.load("celadon_gym_door")
+    live.c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to(town, flags=flags, key_items=key_items)
+    c = live.c
+    old = list(c.ltm.data.get("gyms_beaten", []))
+    c.ltm.data["gyms_beaten"] = beaten
+    try:
+        live.defeat_all_trainers()
+        c._execute("go_to", json.dumps({"destination": "Gym", "force": True}))
+        assert tuple(live.r.read_current_map()) == gym_map, "never got into the gym"
+        out = ""
+        for _ in range(6):
+            out = c._execute("challenge_leader", "{}")
+            if tuple(live.r.read_player_pos()) == approach:
+                break
+        assert tuple(live.r.read_player_pos()) == approach, out
+        return out
+    finally:
+        c.ltm.data["gyms_beaten"] = old
+
+
+def test_giovanni_gym_spinner_maze_reaches_the_leader(live):
+    """Viridian Gym: arrow tiles slide the player (find_path_spin in walk_to)."""
+    _staged_gym(live, "viridian city", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina", "Blaine"], (2, 3), (5, 1))
+
+
+def test_koga_gym_invisible_walls_reach_the_leader(live):
+    """Fuchsia Gym: the invisible walls are real collisions, so the live grid already has them."""
+    _staged_gym(live, "fuchsia city", ["Brock", "Misty", "Lt. Surge", "Erika"], (7, 14), (11, 3))
+
+
+def test_sabrina_gym_teleport_pads_reach_the_leader(live):
+    """Saffron Gym: 30 pads, each teleporting to a partner pad (knowledge.gym_pads plans the chain; walk_to must not cross a pad by accident).
+    The Rockets are gone (FLAG_HIDE_SAFFRON_ROCKETS) so the city's gym door is open."""
+    _staged_gym(live, "saffron city", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga"], (14, 12), (14, 3), flags=(0x3E,))
+
+
+def test_blaine_gym_quiz_doors_reach_the_leader(live):
+    """Cinnabar Gym: six quiz machines (YES / NO per the decomp, pressed from the tile south of the machine). The gym door unlocks at map load when
+    the Secret Key's hide flag (0x1A8) is set."""
+    _staged_gym(live, "cinnabar island", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina"], (5, 5), (12, 0), flags=(0x1A8,), key_items=(351,))
+
+
+def test_silph_co_quest_clears_the_building(live):
+    """quest('silph_co') on the real ROM, staged by flying to Saffron: the floors are solved by knowledge.silph_route (stairs, teleport pads, card-key
+    doors), the Card Key comes from the 5F item ball, the worker on 7F gives the Lapras, Giovanni's scene starts on 11F and the President hands over
+    the Master Ball."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("saffron city", flags=(0x23C, 0x2A6))                  # Fuji rescued: the Rocket guard at the Silph door falls asleep
+    out = ""
+    for _ in range(80):
+        live.boost_party()                                       # the fixture party is far under the Rockets / rival / Giovanni
+        live.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "silph_co", "auto_trainers": True}))
+        if live.r.read_flag(0x250) and live.r.read_flag(0x246):
+            break
+    assert 355 in live.r.read_key_items(), out                                  # the Card Key
+    assert live.r.read_flag(0x246), out                                         # FLAG_GOT_LAPRAS_FROM_SILPH
+    assert live.r.read_flag(0x250), out                                         # FLAG_GOT_MASTER_BALL_FROM_SILPH

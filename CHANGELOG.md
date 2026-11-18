@@ -5,6 +5,41 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('silph_co')`: the Card Key, the Lapras, Giovanni and the Master Ball
+- Silph Co. is 11 floors joined by stairs and teleport pads, with 20 card-key doors. `tools/gen_silph.py` turns the decomp's map collision, warps and the
+  `Close<N>FDoor<K>` scripts (the doors are closed on map load while their `FLAG_SILPH_<N>F_DOOR_<K>` is clear) into `knowledge/silph_data.py`;
+  `knowledge/silph_route.py` searches floor × tile, with a shut door costing an "unlock" (face it, press A, needs the Card Key).
+- `agent/skills/silph.py` executes the plan's first action and re-plans, in order: the Card Key (5F item ball) → the Lapras worker on 7F (NO to the
+  nickname) → Giovanni (stepping on 11F (5,15)/(6,15) starts the scene) → the President's Master Ball. Resumable like the other quests.
+- Silph Co.'s door is guarded by a Rocket until Mr. Fuji is rescued (`FLAG_RESCUED_MR_FUJI`): the beat now needs `pokemon_tower`. Verified end to end on the
+  real ROM (Card Key → Lapras with the rival's 7F trigger → Giovanni → Master Ball); the live test boosts the fixture party's stats (`live.boost_party()`).
+
+### Added — the puzzle gyms reach their Leader (verified on the real ROM: Viridian, Fuchsia, Saffron, Cinnabar)
+- `challenge_leader()` now solves what stood between the model and the last four Leaders:
+  - **Saffron / Sabrina**: 30 teleport pads, each warping to a partner pad of the same map. `knowledge/gym_pads.py` (decomp data + a BFS where a step onto
+    a pad is a teleport edge) plans the chain; `walk_to` takes an avoid-set so a walk never crosses a pad by accident.
+  - **Cinnabar / Blaine**: six quiz machines (correct answers from the decomp: YES NO NO NO YES NO, pressed from the tile south of the machine). The rules
+    are five fixed A presses; pressing A while the QUESTION prints skips to its end and the next A takes the default YES ("Bad call").
+  - **Viridian / Giovanni** (spinner maze) and **Fuchsia / Koga** (invisible walls = real collisions) needed nothing new: `find_path_spin` and the live grid.
+- Test staging: `live.defeat_all_trainers()` (flags 0x500..0x7E6) for navigation-only tests.
+
+### Added — `quest('pokemon_mansion')`: the Secret Key (verified end to end on the real ROM)
+- The Mansion's barriers hang on ONE global statue switch (`FLAG_POKEMON_MANSION_SWITCH_STATE` 0x26C): `tools/gen_mansion.py` turns the decomp's
+  `PressSwitch_<floor>` scripts, map collision and warps into `knowledge/mansion_data.py`; `knowledge/mansion_route.py` solves floors × switch state
+  by search; the driver executes the plan's first action, re-reads the real state and re-plans (a trainer or a dropped input costs one re-plan).
+- Things the live ROM taught: statues are pressed from the tile SOUTH of the statue facing up (`BG_EVENT_PLAYER_FACING_NORTH`); only warp tiles
+  with a door / stairs / arrow / fall behaviour fire (the other warp events are LANDING spots — stepping on 2F (27,17) does nothing); stairs are
+  directional (stand on the tile and hold its button — `walk_to` would "nudge" off it); 3F's holes drop you to 1F.
+- `go_to` to Cinnabar after flying there no longer demands Surf (`FLAG_VISITED_CINNABAR` meets the gate).
+
+### Added — scripts for the Lavender story: `quest('pokemon_tower')`, `quest('poke_flute')`, `quest('snorlax')` (verified end to end on the real ROM)
+- **Pokémon Tower**: the climb to 7F (ghost wilds and Channelers are handed to the model like any quest battle; the rival's 2F trigger and the
+  6F Marowak ghost play out), the three Grunts' sight-line fights, then Mr. Fuji at (11,4) — he sets `FLAG_RESCUED_MR_FUJI` and warps you to his
+  house. Needs the Silph Scope.
+- **Poké Flute**: Fuji at (3,3) in the Volunteer Pokémon House. **Snorlax**: Route 12 is cut in two by a gate house (in at (14,15), out at the
+  south door (5,11)); then the long walk to (14,69), the Poké Flute prompt (YES) and the level-30 fight (`FLAG_WOKE_UP_ROUTE_12_SNORLAX`).
+- Test staging: `live.fly_to(town, flags=, key_items=)` and `live.give_key_item(id)` in the live harness.
+
 ### Added — the whole main story as a guided chain, start to Elite Four
 - **`knowledge/story_beats.py`**: ~30 ordered beats (Oak's Parcel → … → Victory Road) each with where / what must come first / how it is DONE
   (flags, key items, badges and milestones, verified against the pokefirered decomp) / numbered steps. `quest()` lists the chain

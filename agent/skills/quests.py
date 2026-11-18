@@ -94,7 +94,9 @@ class QuestMixin:
             return f"quest('{beat.key}') needs quest('{missing[0]}') first."
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
                 "strength": self._get_strength, "coin_case": self._get_coin_case,
-                "rocket_hideout": self._get_silph_scope, "tea": self._get_tea}[beat.driver](auto_trainers)
+                "rocket_hideout": self._get_silph_scope, "tea": self._get_tea, "pokemon_tower": self._get_pokemon_tower,
+                "poke_flute": self._get_poke_flute, "snorlax": self._get_snorlax,
+                "pokemon_mansion": self._get_secret_key, "silph_co": self._get_silph_co}[beat.driver](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:

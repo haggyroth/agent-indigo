@@ -94,6 +94,7 @@ Pokemon_LeafGreen.gba
    ├── game/tilemap_reader.py   ROM tile passability, warps, connections (navigation)
    ├── game/pathfinding.py      A* grid pathfinding + door_centers + find_path_spin (arrow-tile slides: Rocket Hideout, Silph Co.) (pure, testable)
    ├── game/viewer.py           Optional pygame window (SHOW_WINDOW)
+   ├── agent/skills/silph.py    quest('silph_co'): Card Key → Lapras → Giovanni → Master Ball over knowledge/silph_route.py (floors × tiles, stairs, pads, card-key doors)
    ├── agent/skills/hideout.py  quest('rocket_hideout'): Game Corner poster → 4 floors (spinner maze, Lift Key, elevator) → Giovanni → Silph Scope
    ├── agent/lm_studio_client.py OpenAI-compat client (local OR cloud), tool calling +
    │                            the nav/battle skills (walk_to/go_to/go_to_map/use_move)
