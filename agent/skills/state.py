@@ -44,6 +44,8 @@ class SkillState:
     _sealed_grass = lazy(set)     # maps whose only grass is walled off (a Cut-tree pocket) and the party cannot Cut: skip them
     _edge_fail = lazy(dict)       # {(map, direction): n} seamless-edge crossings that failed
     _avoid_maps = ()              # maps travel must not route through (the Safari Zone quest keeps clear of its own exit)
+    _vr_floor = None              # Victory Road: the floor whose boulders _vr_known describes (the cave reloads them on every entry)
+    _vr_known = lazy(set)         # Victory Road: remembered boulder tiles (the game only reports objects near the camera)
 
     # ── overworld: grind / heal / shop ──────────────────────────────────────────────────────────
     _grind_run = None            # the grind session in progress (None = none); abandoned by any other travel tool

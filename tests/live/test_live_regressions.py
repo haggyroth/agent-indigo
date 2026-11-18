@@ -1064,3 +1064,30 @@ def test_silph_co_quest_clears_the_building(live):
     assert 355 in live.r.read_key_items(), out                                  # the Card Key
     assert live.r.read_flag(0x246), out                                         # FLAG_GOT_LAPRAS_FROM_SILPH
     assert live.r.read_flag(0x250), out                                         # FLAG_GOT_MASTER_BALL_FROM_SILPH
+
+
+def test_victory_road_quest_reaches_indigo_plateau(live):
+    """quest('victory_road') on the real ROM, staged by flying to Viridian with all eight badges, Surf + Strength on the lead and a level-60 lead
+    (the fixture party is 10-30 levels under the cave's wild Pokémon): go_to carries it through Route 22's rival, Route 23's badge guards and the
+    river; inside, knowledge.vr_route plans the three floors — 1F's switch boulder (19 pushes), 2F's west switch, the boulder dropped down 3F's hole
+    to 2F's second switch, the 3F side room (a double battle) and 2F's east exit — and go_to walks Route 23's north half to Indigo Plateau."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("viridian city", badges=0xFF)
+    live.strong_lead()
+    out = ""
+    for _ in range(60):
+        if live.r.detect_context().name != "IN_BATTLE":
+            live.boost_party()                                                       # between battles only: a level-up recomputes the stats
+            live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])          # Razor Leaf, Surf, Strength, Vine Whip
+        else:
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "victory_road", "auto_trainers": True}))
+        if live.r.read_flag(0x899):
+            break
+    assert live.r.read_flag(0x899), out                                          # FLAG_VISITED_INDIGO_PLATEAU

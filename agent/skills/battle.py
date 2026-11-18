@@ -793,6 +793,9 @@ class BattleMixin:
         alive = [(i, p) for i, p in enumerate(party) if p.current_hp > 0]
         if not alive:
             return None
+        from game.constants import Addr
+        if self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_DOUBLE:      # two battlers are out (party slots 1-2 at the start): bring in someone on the bench
+            alive = [(i, p) for i, p in alive if i >= 2] or alive
         i, _p = max(alive, key=lambda ip: (ip[1].current_hp / max(ip[1].max_hp, 1), ip[1].level))
         return self._switch_pokemon(str(i + 1))
 

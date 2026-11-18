@@ -116,9 +116,9 @@ BEATS: tuple[Beat, ...] = (
          steps=("Fly or walk back to Viridian City. The Gym is closed until you hold the other seven badges.",
                 "It is a spinner-tile maze; challenge_leader() plans the slides. Water / Grass / Ice beat his Ground team.")),
     Beat("victory_road", "Route 22 → Route 23 → Victory Road → Indigo Plateau", "Viridian City → Route 22 / 23 → Victory Road → Indigo Plateau",
-         needs=("giovanni",), done=(("flag", 0x899),),                      # FLAG_VISITED_INDIGO_PLATEAU (the Fly-town flag)
+         needs=("giovanni",), driver="victory_road", done=(("flag", 0x899),),                      # FLAG_VISITED_INDIGO_PLATEAU (the Fly-town flag)
          steps=("Route 22 (west of Viridian): your rival fights you at the entrance. Route 23: the badge checkpoints check them in order — all eight.",
-                "Victory Road (3 floors) needs Strength for its boulders (use_hm('strength'), then walk into the boulder); Surf is not needed. Bring Revives and Max Potions — "
+                "Victory Road (3 floors) needs Strength for its boulders (use_hm('strength'), then walk into the boulder); Route 23's middle is a river — Surf crosses it (go_to does that). Bring Revives and Max Potions — "
                 "its trainers and wild Pokémon are L36-45.",
                 "Indigo Plateau: heal and save at the Pokémon Center, stock Full Restores / Revives, then talk to the Elite Four's door. Aim for L50+ across the team."),
          tip="After this there is only the Elite Four (Lorelei, Bruno, Agatha, Lance) and your rival as Champion."),

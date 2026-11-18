@@ -49,7 +49,12 @@ def forced_party_screen(mgba, reader) -> bool:
         return False
     if mgba.read8(Addr.BATTLE_OUTCOME) != 0:
         return False
-    return reader.read_active_battle_species() != 0 and reader.read_active_battle_hp() == 0
+    if reader.read_active_battle_species() != 0 and reader.read_active_battle_hp() == 0:
+        return True
+    if mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_DOUBLE:        # a double battle: the SECOND of our battlers (gBattleMons[2]) may be the one down
+        second = Addr.BATTLE_MON0_SPECIES + 2 * 0x58
+        return mgba.read16(second) != 0 and mgba.read16(second + 0x28) == 0
+    return False
 
 
 def _healthy_roster(reader) -> str:
