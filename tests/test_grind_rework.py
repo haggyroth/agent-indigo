@@ -242,3 +242,15 @@ def test_a_nearly_fainted_lead_is_told_to_switch_to_a_fit_teammate():
     assert low_hp_switch_hint(party, 0, cur=12, mx=16, foe_level=4) == ""                      # healthy enough: no nag
     assert low_hp_switch_hint([mon(3, 1, hp=3)], 0, cur=3, mx=16) == ""                        # nobody to switch to
     assert low_hp_switch_hint(party, 0, cur=0, mx=16) == ""                                    # already fainted
+
+
+def test_a_level_target_grind_is_refused_when_no_open_grass_gives_xp(monkeypatch):
+    """Watched run: grind(42) at L38 spent ~700 s on Route 7/8 (wild L17-22): the ace gained nothing. Refused up front now."""
+    w = FakeWorld([mon(32, 1), mon(38, 2)])
+    c = grind_client(w)
+    w.read_current_map = lambda: (3, 6)
+    c._best_open_grass = lambda here, level, avoid=(): ((3, 26), [])            # Route 8: wild L18-22
+    out = c._grind(42, True, None)
+    assert "can't get your L38" in out and "Route 8" in out and c._grind_run is None
+    c._best_open_grass = lambda here, level, avoid=(): ((3, 42), [])            # Route 23: wild L32-44 → worth it
+    assert "can't get your" not in c._grind(42, True, None)

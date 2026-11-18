@@ -94,8 +94,11 @@ def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=
     tgt = next_gym_target(gyms_beaten)
     top_level = max((p.level for p in party), default=0)
     if tgt and top_level < tgt[1]:
+        how = (f"grind({tgt[1]}) first" if top_level < 30 else
+               "wild grass gives an ace this strong almost no XP: balance the weaker members with grind() (no level) and level the "
+               "ace on trainers / dungeons (grind(N) is refused when no open grass reaches that level)")
         needs.append(Need("should", "level", f"{tgt[0]}'s gym is next (ace L{GYM_ACE_LEVEL.get(tgt[0], '?')}): "
-                                             f"your best is L{top_level} — grind({tgt[1]}) first"))
+                                             f"your best is L{top_level} — {how}"))
     if not blocking(needs):
         from knowledge.team import gaps
         for g in gaps(party, boxes, gyms_beaten)[:2]:

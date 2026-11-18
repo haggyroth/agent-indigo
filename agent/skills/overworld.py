@@ -431,6 +431,15 @@ class OverworldMixin:
                 spent += got * unit
         self._close_buy_menu()
         if not bought:
+            cand = set()
+            for ln in plan["lines"]:                   # what this store sells that fills the plan (the item itself or its substitute)
+                cand |= ({ln["item_id"]} | set(self._SHOP_SUBSTITUTES.get(ln["item_id"], ()))) & sold
+            cheapest = min((ITEM_PRICES[i] for i in cand if ITEM_PRICES.get(i)), default=0)
+            if cheapest and money < cheapest:
+                # remembered: the READINESS "shop()" need stays quiet until the money grows (a run made 13 pointless trips at ¥600)
+                self.ltm.data["shop_broke_at"] = money
+                return (f"At the Mart but bought nothing: you have ¥{money} and the cheapest thing it sells that you need costs "
+                        f"¥{cheapest}. Earn more first (trainer battles pay) — shop() will not be suggested again until you have more.")
             return ("At the Mart but bought nothing (this mart doesn't sell the "
                     "recommended items, or you couldn't afford them).")
         msg = f"Bought {', '.join(bought)} (¥{spent}). Money left: ¥{self.reader.read_money()}."
@@ -801,6 +810,35 @@ class OverworldMixin:
     _GRIND_AUTO_DEFAULT = 12          # boring fights a balancing grind() session autopilots per call when auto_battles is omitted
     _GRIND_AUTO_MARGIN = 2            # an auto_battles fight needs a foe at most (active level + this)
 
+    _GRIND_FUTILE_GAP = 12            # a level-target grind is futile when the best OPEN grass tops out this far below the Pokémon
+
+    def _best_open_grass(self, here, level: int, avoid=()):
+        """(goal_map, steps) of the best-fitting grass map for `level` whose way in is not story-gated, or None."""
+        from knowledge.grind_routes import best_grass
+        avoid = {tuple(a[:2]) for a in avoid}
+        for _ in range(16):
+            found = best_grass(tuple(here[:2]), level, avoid=avoid)
+            if found is None:
+                return None
+            if not self._grass_route_gated(tuple(here[:2]), found[0]):
+                return found
+            avoid.add(tuple(found[0][:2]))
+        return None
+
+    def _grind_futile(self, best: int, target: int) -> str:
+        """'' normally; else why grinding the best Pokémon (L`best`) toward L`target` cannot work: a watched run called grind(42) at
+        L38 and spent ~700 s of wild fights at L17-22 with the ace gaining nothing (XP scales with the foe's level)."""
+        from knowledge.encounters import LAND_LEVELS
+        found = self._best_open_grass(self.reader.read_current_map(), best, avoid=self._sealed_grass)
+        row = LAND_LEVELS.get(tuple(found[0][:2])) if found else None
+        if not row or row[2] >= best - self._GRIND_FUTILE_GAP:
+            return ""
+        name = MAP_NAMES.get(tuple(found[0][:2]), "the best open route")
+        return (f"grind({target}) can't get your L{best} Pokémon there: the best grass you can reach is {name} (wild L{row[0]}–{row[2]}), "
+                f"and a kill that far below L{best} gives almost no XP. Don't grind on it. Trainer fights, dungeons and the next story "
+                "step give far more; use team_report to judge whether the team already answers the next gym, and balance the weaker "
+                "members with grind() (no level), which trains them where it pays.")
+
     def _grind_level(self, party, lag) -> int:
         """The level of the Pokémon being trained: the lowest lagging member, else the best (target-level mode)."""
         if lag:
@@ -923,6 +961,10 @@ class OverworldMixin:
             elif max(p.level for p in party) >= target_level:
                 return (f"Your best Pokémon is already L{max(p.level for p in party)} (target L{target_level}) "
                         "— no need to grind.")
+            else:
+                futile = self._grind_futile(max(p.level for p in party), target_level)
+                if futile:
+                    return futile
             run = self._grind_run = {
                 "key": key, "balance": balance, "target": target_level, "floor": floor, "catch": bool(catch),
                 "start": {p.species_id: p.level for p in party}, "battles": 0, "heals": 0, "ace_fought": 0,
