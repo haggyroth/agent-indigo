@@ -129,11 +129,11 @@ def test_quest_lists_the_chain_with_the_next_beats_marked():
 
 
 def test_a_guide_only_beat_prints_a_state_aware_plan_not_an_error():
-    out = client(FakeReader(**AFTER_ERIKA))._quest_tool("silph_co")
-    assert out.startswith("No script for this one yet") and "Not yet" in out and "quest('tea')" in out and "Card Key" in out
-    after_tea = dict(AFTER_ERIKA, flags={0x234, 0x237, 0x2A6})
-    out = client(FakeReader(**after_tea))._quest_tool("silph")
-    assert "Not yet" not in out and "Master Ball" in out
+    out = client(FakeReader(**AFTER_ERIKA))._quest_tool("sabrina")
+    assert out.startswith("No script for this one yet") and "Not yet" in out and "quest('silph_co')" in out and "teleport-pad" in out
+    after_silph = dict(AFTER_ERIKA, flags={0x234, 0x237, 0x2A6, 0x250})
+    out = client(FakeReader(**after_silph))._quest_tool("sabrina")
+    assert "Not yet" not in out and "Alakazam" in out
 
 
 def test_a_scripted_beat_runs_its_script_and_says_what_it_needs_first():

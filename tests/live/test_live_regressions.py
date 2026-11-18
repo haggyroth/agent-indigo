@@ -1038,3 +1038,29 @@ def test_blaine_gym_quiz_doors_reach_the_leader(live):
     """Cinnabar Gym: six quiz machines (YES / NO per the decomp, pressed from the tile south of the machine). The gym door unlocks at map load when
     the Secret Key's hide flag (0x1A8) is set."""
     _staged_gym(live, "cinnabar island", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina"], (5, 5), (12, 0), flags=(0x1A8,), key_items=(351,))
+
+
+def test_silph_co_quest_clears_the_building(live):
+    """quest('silph_co') on the real ROM, staged by flying to Saffron: the floors are solved by knowledge.silph_route (stairs, teleport pads, card-key
+    doors), the Card Key comes from the 5F item ball, the worker on 7F gives the Lapras, Giovanni's scene starts on 11F and the President hands over
+    the Master Ball."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("saffron city", flags=(0x23C, 0x2A6))                  # Fuji rescued: the Rocket guard at the Silph door falls asleep
+    out = ""
+    for _ in range(80):
+        live.boost_party()                                       # the fixture party is far under the Rockets / rival / Giovanni
+        live.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "silph_co", "auto_trainers": True}))
+        if live.r.read_flag(0x250) and live.r.read_flag(0x246):
+            break
+    assert 355 in live.r.read_key_items(), out                                  # the Card Key
+    assert live.r.read_flag(0x246), out                                         # FLAG_GOT_LAPRAS_FROM_SILPH
+    assert live.r.read_flag(0x250), out                                         # FLAG_GOT_MASTER_BALL_FROM_SILPH

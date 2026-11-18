@@ -127,6 +127,16 @@ class Live:
         if level:
             m.write8(b + 0x54, level)
 
+    def boost_party(self, hp: int = 400, stat: int = 220) -> None:
+        """Stage: raise every party member's stored battle stats (HP, Atk, Def, Spe, SpA, SpD) and refill HP, so a test about a long dungeon is not
+        decided by a fixture party that is 10-20 levels under the trainers (the level and exp are left alone: the exp text stays consistent)."""
+        for slot in range(len(self.r.read_party())):
+            b = Addr.PARTY_DATA + 100 * slot
+            self.m.write16(b + 0x56, hp)
+            self.m.write16(b + 0x58, hp)
+            for off in (0x5A, 0x5C, 0x5E, 0x60, 0x62):
+                self.m.write16(b + off, stat)
+
     def wild_battle(self, tries: int = 600) -> bool:
         """Stand on grass and wander until a wild battle starts."""
         if not self.c._relocate_to_grass():

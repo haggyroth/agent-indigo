@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('silph_co')`: the Card Key, the Lapras, Giovanni and the Master Ball
+- Silph Co. is 11 floors joined by stairs and teleport pads, with 20 card-key doors. `tools/gen_silph.py` turns the decomp's map collision, warps and the
+  `Close<N>FDoor<K>` scripts (the doors are closed on map load while their `FLAG_SILPH_<N>F_DOOR_<K>` is clear) into `knowledge/silph_data.py`;
+  `knowledge/silph_route.py` searches floor × tile, with a shut door costing an "unlock" (face it, press A, needs the Card Key).
+- `agent/skills/silph.py` executes the plan's first action and re-plans, in order: the Card Key (5F item ball) → the Lapras worker on 7F (NO to the
+  nickname) → Giovanni (stepping on 11F (5,15)/(6,15) starts the scene) → the President's Master Ball. Resumable like the other quests.
+- Silph Co.'s door is guarded by a Rocket until Mr. Fuji is rescued (`FLAG_RESCUED_MR_FUJI`): the beat now needs `pokemon_tower`. Verified end to end on the
+  real ROM (Card Key → Lapras with the rival's 7F trigger → Giovanni → Master Ball); the live test boosts the fixture party's stats (`live.boost_party()`).
+
 ### Added — the puzzle gyms reach their Leader (verified on the real ROM: Viridian, Fuchsia, Saffron, Cinnabar)
 - `challenge_leader()` now solves what stood between the model and the last four Leaders:
   - **Saffron / Sabrina**: 30 teleport pads, each warping to a partner pad of the same map. `knowledge/gym_pads.py` (decomp data + a BFS where a step onto
