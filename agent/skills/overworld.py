@@ -6,6 +6,14 @@ from agent.skills.base import log_once
 from knowledge.navigation import MAP_NAMES
 
 
+def _safe_call(fn, default=None):
+    try:
+        return fn()
+    except Exception:
+        log_once("overworld._reachable_tiles", "overworld._reachable_tiles: tolerated failure (continuing with a default)")
+        return default
+
+
 class OverworldMixin:
 
 
@@ -431,14 +439,46 @@ class OverworldMixin:
                 return False
         return False
 
+    def _reachable_tiles(self) -> set | None:
+        """Tiles the player can walk to from here on this map (flood fill over the passable grid; a Cut tree counts as
+        open only when the party can Cut — walk_to then cuts it). None when the grid is unavailable."""
+        self.tilemap.refresh()
+        grid, w, h = self.tilemap.passable_grid(surf=self._surfing())
+        if grid is None:
+            return None
+        trees = self._cut_tree_tiles(w, h)
+        shut = set() if self._can_use_cut() else trees        # NPCs move and can be engaged: only an uncuttable tree seals grass
+        start = tuple(self.reader.read_player_pos())
+        seen, todo = {start}, [start]
+        while todo:
+            x, y = todo.pop()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (x + dx, y + dy)
+                if n in seen or not (0 <= n[0] < w and 0 <= n[1] < h) or n in shut:
+                    continue
+                if grid[n[1]][n[0]] or n in trees:
+                    seen.add(n)
+                    todo.append(n)
+        return seen
+
     def _nearest_grass(self) -> tuple[int, int] | None:
-        """Closest tall-grass tile to the player on the current map (Manhattan), or
-        None if the map has no grass. Uses the metatile-behavior reader so grind can
+        """Closest REACHABLE tall-grass tile to the player on the current map (Manhattan), or None if the map has no grass — or
+        only grass walled off behind Cut trees we cannot cut (Route 8's fenced pocket: heading for it by distance alone sent the
+        run ping-ponging between the two trees and off to Route 10 and back). Uses the metatile-behavior reader so grind can
         route the player onto a real patch instead of guessing from encounters."""
         self.tilemap.refresh()
         tiles = self.tilemap.grass_tiles()
         if not tiles:
             return None
+        here = self.reader.read_current_map()
+        reach = _safe_call(self._reachable_tiles)
+        if reach is not None:
+            usable = [t for t in tiles if t in reach]
+            if not usable:
+                self._sealed_grass.add(here)
+                return None
+            self._sealed_grass.discard(here)
+            tiles = usable
         px, py = self.reader.read_player_pos()
         return min(tiles, key=lambda t: abs(t[0] - px) + abs(t[1] - py))
 
@@ -452,7 +492,7 @@ class OverworldMixin:
         bank, mid = self.reader.read_current_map()
         # Routes whose way in already beat us twice are off the list for the whole session.
         losses = self._trainer_losses
-        avoid: set = {m for m, n in losses.items() if n >= 2}
+        avoid: set = {m for m, n in losses.items() if n >= 2} | set(self._sealed_grass)   # + grass walled off behind Cut trees
         for _attempt in range(3):
             found = None
             for _probe in range(16):                       # skip grass behind a gate (Brock, a ticket…) without spending an attempt
@@ -519,7 +559,12 @@ class OverworldMixin:
         # Off grass — route back onto the patch (walk_to is ledge-aware).
         target = self._nearest_grass()
         if target is not None:
-            self._walk_to(*target)
+            res = self._walk_to(*target)
+            if "Cut tree blocks" in res:               # the pocket is walled off and we cannot Cut (the trees only load up close)
+                self._sealed_grass.add(self.reader.read_current_map())
+                st["stuck"] = max(st["stuck"], 24)
+        elif self.reader.read_current_map() in self._sealed_grass:
+            st["stuck"] = max(st["stuck"], 24)      # this map's grass is walled off: relocate now, not after 25 idle ticks
         st["stuck"] += 1
         # Can't reach any grass on this map — try a deterministic relocation first.
         if st["stuck"] >= 25:
@@ -644,7 +689,7 @@ class OverworldMixin:
             return "Healed, but no tall grass is reachable from here — go_to a grassy route, then grind() again."
         return None
 
-    def _grind(self, target_level: int = 0, catch: bool = True, auto_battles: int = 0) -> str:
+    def _grind(self, target_level: int = 0, catch: bool = True, auto_battles: int | None = None) -> str:
         """See _grind_inner. A session is resumable across calls (self._grind_run); the strongest Pokémon is put back
         in front when the session ENDS (done / stopped / interrupted), not between encounters handed to the model."""
         try:
@@ -727,6 +772,7 @@ class OverworldMixin:
 
     # ── grind(): resumable sessions that hand encounters to the model ─────────────────────────────
     _GRIND_MAX_BATTLES = 150          # encounters (handed over or automatic) one session may take before it reports
+    _GRIND_AUTO_DEFAULT = 12          # boring fights a balancing grind() session autopilots per call when auto_battles is omitted
     _GRIND_AUTO_MARGIN = 2            # an auto_battles fight needs a foe at most (active level + this)
 
     def _grind_level(self, party, lag) -> int:
@@ -807,7 +853,7 @@ class OverworldMixin:
         return (f"{head} started at {where} while grinding.{verdict}{knows} {who} Battle {run['battles']}; "
                 f"when it is over call {again} to continue.")
 
-    def _grind_inner(self, target_level: int = 0, catch: bool = True, auto_battles: int = 0) -> str:
+    def _grind_inner(self, target_level: int = 0, catch: bool = True, auto_battles: int | None = None) -> str:
         """Level up by fighting wild Pokémon in tall grass. grind() walks/paces on grass (healing at a Pokémon Center
         itself when HP or attack PP runs low) until an encounter, then ENDS THE CALL so the model fights it like any
         other battle (use_move / items / catch / flee); the model then calls grind() again — the session (floor,
@@ -856,7 +902,10 @@ class OverworldMixin:
                 "start": {p.species_id: p.level for p in party}, "battles": 0, "heals": 0, "ace_fought": 0,
                 "lvl": 0, "fit_moves": 0, "stuck": 0, "reloc": 0}
         run["catch"] = bool(catch)
-        run["auto_left"] = max(0, int(auto_battles or 0))
+        # A BALANCING session (grind() with no level: train the weakest) plays its boring wild fights itself unless told
+        # otherwise — a watched run spent ~30 s and ~60k tokens of LLM turns per L13 Spearow, so the trainees gained about
+        # one level in 15 minutes while the ace, fed by the forced trainer fights on the way, ended up twice their level.
+        run["auto_left"] = max(0, int(auto_battles)) if auto_battles is not None else (self._GRIND_AUTO_DEFAULT if run["balance"] else 0)
         again = "grind()" if balance else f"grind({target_level})"
         st = run
 

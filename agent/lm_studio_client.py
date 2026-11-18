@@ -452,8 +452,9 @@ class AgentClient(SkillBase, SkillState, GameCornerMixin, PCMixin, PartyMixin, Q
             case "enter_name":
                 return self._enter_name(str(args["name"]))
             case "grind":
+                ab = args.get("auto_battles")              # None = not given: balancing sessions default to autopilot
                 return self._grind(int(args.get("level", 0) or 0), bool(args.get("catch", True)),
-                                   int(args.get("auto_battles", 0) or 0))
+                                   None if ab is None else int(ab or 0))
             case "train_party":
                 return self._train_party()
             case "read_game_state":

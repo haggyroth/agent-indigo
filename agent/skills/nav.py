@@ -59,6 +59,44 @@ class NavMixin:
 
     _MOVE_DELTA = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
 
+    def _cut_tree_tiles(self, w: int, h: int) -> set:
+        """Cut trees on THIS map (loaded object events with the tree graphic). They are objects, so _npc_tiles lists them too —
+        which made walk_to treat a tree like a talkable NPC and ping-pong between two of them (Route 8's fenced grass)."""
+        from game.constants import Addr
+        try:
+            return {(x, y) for x, y in self.reader.read_objects_by_gfx([Addr.OBJ_GFX_CUT_TREE]) if 0 <= x < w and 0 <= y < h}
+        except Exception:
+            return set()
+
+    def _cut_through(self, start, goal, grid, w, h, npcs, blocked, trees) -> str:
+        """The only route to `goal` runs THROUGH Cut tree(s)? '' = no (not a tree problem), 'needs_cut' = yes but we cannot Cut,
+        'cut' = we walked up to the first tree on that route and cut it (the caller replans)."""
+        from game.pathfinding import find_path
+        if not trees:
+            return ""
+        others = npcs - trees
+
+        def passable(x, y):
+            return (x, y) == goal or (x, y) in trees or (grid[y][x] and (x, y) not in others and (x, y) not in blocked)
+        path = find_path(start, goal, passable, w, h)          # no ledge hops: every move is exactly one tile
+        if not path:
+            return ""
+        x, y = start
+        for mv in path:
+            dx, dy = self._MOVE_DELTA[mv]
+            if (x + dx, y + dy) in trees:
+                break
+            x, y = x + dx, y + dy
+        else:
+            return ""                                           # the route needs no tree after all
+        if not self._can_use_cut():
+            return "needs_cut"
+        if (x, y) != tuple(self.reader.read_player_pos()):
+            self._walk_to(x, y)                                 # the tile in front of the tree (tree-free by construction)
+            if tuple(self.reader.read_player_pos()) != (x, y):
+                return ""
+        return "cut" if self._use_hm("cut").startswith("Used Cut") else ""
+
     def _press_on_tile(self, stand: tuple, face: str, yesno: bool = False) -> bool:
         """Walk to `stand`, face `face`, press A, then clear the result (a 'press the switch?' YES/NO,
         or just text)."""
@@ -228,6 +266,7 @@ class NavMixin:
         npc_tried = False                       # already engaged a blocking NPC this call
         surf_tried = False                      # already tried to start Surfing this call
         puzzle_tries = 0                        # card-key door / mansion switch uses this call
+        cut_tries = 0                           # Cut trees opened this call
         for _attempt in range(16):
             self.tilemap.refresh()
             grid, w, h = self.tilemap.passable_grid(surf=self._surfing())
@@ -306,6 +345,16 @@ class NavMixin:
                         if self._surfing():
                             continue
                         return res
+                trees = self._cut_tree_tiles(w, h)
+                if trees and cut_tries < 3:
+                    cr = self._cut_through((px, py), (tx, ty), grid, w, h, npcs, blocked, trees)
+                    if cr == "cut":
+                        cut_tries += 1
+                        continue
+                    if cr == "needs_cut":
+                        return (f"No walkable path from ({px},{py}) to ({tx},{ty}) — a Cut tree blocks the only way and nobody "
+                                "in the party can Cut yet (HM01 + the Cascade Badge). Choose another target.")
+                npcs = npcs - trees                     # a tree is not a talkable NPC: never "engage" it
                 if puzzle_tries < 1 and not self._in_puzzle and self._solve_puzzle_tiles(
                         (px, py), (tx, ty), grid, w, h, npcs, blocked):
                     puzzle_tries += 1
