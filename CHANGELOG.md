@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `forget_move`: the Move Deleter in Fuchsia City (#273)
+- HM moves can't be forgotten at the normal prompt, so a party with four HM moves was stuck. `forget_move(pokemon, move)` travels to the Move Deleter (Fuchsia
+  City house 3, now `go_to("Move Deleter's House")`), drives his dialogue → the party screen → the summary screen → "forgotten completely?" and confirms the
+  move is gone. It keeps the party's last copy of an HM (Cut / Surf / Strength / Flash / Fly) unless `force=true`, and says so for an unknown move or a Pokémon's
+  last move. `teach_move`'s "HM move — can't be forgotten" now points at it.
+- Two traps found live and guarded: the summary screen passes through a loading callback (0x08135C0D) where an A acts on row 0 — the driver waits unless the field
+  callback is up — and SUMMARY_MOVE_CURSOR is stale until the first key. The driver also stops the moment a move other than the target disappears (an
+  earlier draft deleted Cut, Surf and Strength this way).
+- Not yet: "HM slave" planning (keeping HMs on a dedicated party member / PC-swap logic).
+
 ### Added — `shop(sell=true)`: sell treasure at a Poké Mart (#270, first part)
 - The Mart driver could only buy. `shop(sell=true)` now sells every spare treasure in the bag (Nugget ¥5000, Star Piece ¥4900, Big Pearl ¥3750, Big Mushroom, Stardust,
   Pearl, Tiny Mushroom), or `item` / `quantity` of a named item. Stones, vitamins / Rare Candy, healing and status items, Repels, Escape Rope and Poké Balls are protected

@@ -1223,3 +1223,25 @@ def test_shop_sell_turns_treasure_into_money_and_keeps_the_potions(live):
     assert {i: live.r.count_item(i) for i in held} == held
     assert "Not selling" in c._execute("shop", json.dumps({"sell": True, "item": "antidote"}))
     assert "Nothing spare" in c._execute("shop", json.dumps({"sell": True}))
+
+
+def test_forget_move_deletes_an_hm_move_at_the_fuchsia_move_deleter(live):
+    """forget_move on the real ROM (#273): the Move Deleter removes an HM move that the normal forget prompt refuses. Staged by flying to Fuchsia with a
+    Pokémon that knows Cut / Surf / Strength / Tackle; the last Cut in the party is protected, and an unknown move is reported."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("fuchsia city")
+    live.patch_mon(1, moves=[15, 57, 70, 33], pps=[30, 15, 15, 35])
+    assert "only one who knows Cut" in c._execute("forget_move", json.dumps({"pokemon": "2", "move": "Cut"}))
+    assert "doesn't know" in c._execute("forget_move", json.dumps({"pokemon": "2", "move": "Fly"}))
+    out = c._execute("forget_move", json.dumps({"pokemon": "2", "move": "Tackle"}))
+    assert "forgot Tackle" in out, out
+    assert "Tackle" not in live.r.read_party()[1].move_names
+    out = c._execute("forget_move", json.dumps({"pokemon": "2", "move": "Cut", "force": True}))        # an HM move: only the Deleter can
+    assert "forgot Cut" in out, out
+    assert [m for m in live.r.read_party()[1].move_names if m] == ["Surf", "Strength"], live.r.read_party()[1].move_names     # nothing else went with it
+    assert tuple(live.r.read_current_map()) == (11, 9) and live.r.detect_context().name == "OVERWORLD"
