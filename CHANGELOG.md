@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('flash')` and `quest('fly')` (#268)
+- **`quest('flash')`** (verified live): travels to the Route 2 east building, talks to Prof. Oak's Aide and takes HM05 once 10 species are SEEN (it says how many you have
+  seen when short). New map names `Route 2 East Building` / `Route 16 House` for `go_to`. A shared `_gift_errand` does travel + talk + advance until the flag is set.
+- **`quest('fly')`** says what is missing before it travels: the Poké Flute, then the **sleeping Snorlax** — the house is on Route 16's far WEST end, behind it (Celadon's
+  exit lands on the east end); the issue's "needs Cut" was wrong. Once the Snorlax is gone (`FLAG_HIDE_ROUTE_16_SNORLAX` 0x080) it runs the same errand (HM02, 0x238).
+- **Not working yet**: the walk to that house. `go_to`'s strict region graph treats Route 16's Cut tree at (41,11) as a wall, falls back to the region-blind graph and
+  plans a direct door (10,5) that skips the gatehouse (27,13)→(20,13) both halves need. Waking the Snorlax itself is #272.
+
 ### Added — money targets, supply checks and earning advice for the story beats (#270, #271)
 - **Supplies** (`knowledge/beat_readiness.py`): each beat now also wants a number of HP items and Revives in the bag (Victory Road 10 + 3, the League 12 + 4…).
   `quest('<beat>')`'s warn-once gate names the shortfall ("2 Potions / Restores in the bag (10 recommended)"), and the plan and the `quest()` listing show the

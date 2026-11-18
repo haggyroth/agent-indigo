@@ -77,6 +77,8 @@ MAP_NAMES: dict[tuple[int, int], str] = {
     (10, 17): "Celadon Restaurant",
     (11, 7): "Warden's House",
     (11, 9): "Move Deleter's House",
+    (15, 2): "Route 2 East Building",
+    (25, 0): "Route 16 House",
     (1, 64): "Safari Zone (East)",
     (1, 65): "Safari Zone (North)",
     (1, 66): "Safari Zone (West)",

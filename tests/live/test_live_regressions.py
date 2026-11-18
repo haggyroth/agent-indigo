@@ -1368,3 +1368,29 @@ def test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town(live)
     assert main.drive_into_gameplay(live.m, live.r)
     assert tuple(live.r.read_current_map()) == (3, 0)                                    # Pallet Town
     assert live.r.read_flag(0x82C) and live.r.read_badges()[0] == 8 and len(live.r.read_party()) == 6
+
+
+def test_flash_and_fly_quests_collect_the_hms(live):
+    """quest('flash') and quest('fly') on the real ROM (#268): the Route 2 east building's Aide gives HM05 once 10 species are seen (the fixture has seen 52),
+    and quest('fly') says what is missing: the Poké Flute, then the sleeping Snorlax that blocks Route 16's west end where the house is. (The walk to the house
+    once the Snorlax is gone is NOT covered: go_to's region graph treats Route 16's Cut tree as a wall and falls back to a route that skips the gatehouse.)"""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    out = c._execute("quest", json.dumps({"name": "fly"}))
+    assert "Poké Flute" in out and not live.r.read_flag(0x238), out                       # no flute yet
+    live.fly_to("celadon city", flags=(0x23D,), key_items=(350,))
+    out = c._execute("quest", json.dumps({"name": "fly"}))
+    assert "sleeping Snorlax" in out and not live.r.read_flag(0x238), out                 # flute, but the Snorlax still blocks the west
+    live.fly_to("viridian city", badges=0xFF)
+    live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])                       # Cut: Route 2's east building is past a tree
+    for _ in range(8):
+        out = c._execute("quest", json.dumps({"name": "flash", "auto_trainers": True}))
+        if live.r.read_flag(0x23B):
+            break
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+    assert live.r.read_flag(0x23B), out                                                   # FLAG_GOT_HM05
