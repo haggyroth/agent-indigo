@@ -14,8 +14,8 @@ HM_BADGE = {"Cut": (15, 1), "Fly": (19, 2), "Strength": (70, 3), "Surf": (57, 4)
 
 @dataclass(frozen=True)
 class Req:
-    kind: str            # "key_item" | "hm" | "badges" | "flag"
-    value: object        # item id | HM name | badge count | world-map flag
+    kind: str            # "key_item" | "hm" | "badges" | "flag" | "level"
+    value: object        # item id | HM name | badge count | world-map flag | the party's best level
     hint: str
     alt_flag: int | None = None   # satisfied if this system flag is set (e.g. already visited)
 
@@ -28,7 +28,14 @@ _PEWTER_HINT = ("Pewter City's east side is closed until Brock is beaten: the Gy
                 "Follow me!') and walks you to the gym door again and again, so heading east just loops. Win the Boulder Badge first: "
                 "go_to('gym'), heal(), save_state(), then challenge_leader().")
 
+_RIVAL_HINT = ("Your rival ambushes you at Cerulean's north exit on the way to Route 24 (Pidgeotto L17, Abra L16, Rattata L15 and a starter L18 that "
+               "counters yours) and you must WIN — a loss sends you to the Center and he is waiting again. Don't grind on Route 24 or Route 25 and don't "
+               "send an autopilot there: raise your best Pokémon to L21 first (grind on Route 4 / Route 3 / Route 2, not north), heal(), save_state(), then "
+               "walk north yourself (walk_to / go_to_map('Up') from Cerulean) and fight him by hand with use_move / switch_pokemon (Fire beats a Grass "
+               "starter's counter, Flying hits Grass).")
+
 MAP_GATES: dict[tuple[int, int], list[Req]] = {
+    (3, 43): [Req("level", 21, _RIVAL_HINT, alt_flag=0x29B)],     # Route 24: Cerulean's rival ambush; FLAG_GOT_FAME_CHECKER is set when that scene ends
     (3, 21): [Req("badges", 1, _PEWTER_HINT)],           # Route 3, Pewter's east exit (checked against the GAME's badge byte, not memory)
     (9, 6): [Req("hm", "Cut", "Vermilion Gym's door is blocked by a Cut tree: get HM01 Cut from the captain "
                  "of the S.S. Anne (board at Vermilion's harbor with the SS Ticket), teach it "

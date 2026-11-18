@@ -41,6 +41,8 @@ class SkillState:
     _balance_warned = None       # …and the lopsided-team warning
     _trainer_losses = lazy(dict)  # {map: n} lost trainer battles per map (a mandatory trainer beating an under-levelled team)
     _walk_avoid = None            # tiles walk_to must not cross (set around a gym's teleport-pad walk)
+    _lost_goals = lazy(dict)      # {grass map: the party's best level when a trainer on the way to it beat us} — skipped until we are 3 levels stronger
+    _gate_why = ""                # the last reason a grass route was skipped (a story gate / a lost trainer), told to the model if grind() then fails
     _sealed_grass = lazy(set)     # maps whose only grass is walled off (a Cut-tree pocket) and the party cannot Cut: skip them
     _edge_fail = lazy(dict)       # {(map, direction): n} seamless-edge crossings that failed
     _avoid_maps = ()              # maps travel must not route through (the Safari Zone quest keeps clear of its own exit)

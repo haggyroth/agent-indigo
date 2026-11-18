@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — grind() kept walking into Cerulean's rival ambush (a watched run)
+- With the ace at L17-19 and the rest of the team far behind, `grind()` relocated to Route 24 (the grass that fit the trainees), whose only way in is
+  Cerulean's north exit — where the rival ambushes you (Pidgeotto L17, Abra L16, Rattata L15 and a starter L18 that counters yours). The relocation's
+  autopilot fought him, lost, healed, and tried again, while the model was told "no tall grass is reachable" / "Couldn't reach tall grass" and believed it
+  was grinding. Three causes, three fixes:
+  - **A gate for the ambush**: `knowledge/gates.py` has a new `level` requirement; Route 24 needs the party's best at L21 until the scene is over
+    (`FLAG_GOT_FAME_CHECKER`). `go_to` and `grind` honour it like every other gate, and the hint says how to fight him by hand.
+  - **Truthful messages**: when grind skips the nearest grass (a gate, or a trainer that beat us) the failure message now says why.
+  - **Lost routes are remembered**: a grass route whose way in beat us is skipped across `grind()` calls until the best Pokémon is 3 levels higher
+    (it used to be forgotten each call), and a travel-battle loss is recorded where the trainer stood, not at the Pokémon Center after the blackout.
+
 ### Added — `quest('victory_road')`: Viridian → Route 22 → Route 23 → Victory Road → Indigo Plateau (verified end to end on the real ROM)
 - The road to the cave is plain `go_to` (Route 22's rival, Route 23's eight badge guards, the Surf crossing — Route 23's middle is a river, the old text said
   Surf wasn't needed). Inside, `knowledge/boulder_puzzle.py` is a push-based Strength-boulder solver (one search state = boulders + pressed switches + the

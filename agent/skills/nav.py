@@ -613,6 +613,7 @@ class NavMixin:
             # didn't finish on autopilot (tough trainer / a forced switch after a faint),
             # or a scraped-through win that left the lead low. Trainers pay 1.5× XP, so when a teammate is
             # lagging it starts the fight and is tagged out for a finisher (see _train_fight).
+            fought_at = self.reader.read_current_map()       # a blackout moves us to a Center: remember where the trainer stood
             lag = [(i, p) for i, p in self._lagging_mons() if p.current_hp > 0 and p.max_hp
                    and p.current_hp / p.max_hp >= 0.7]
             if lag and not self._has_must_need():
@@ -626,7 +627,7 @@ class NavMixin:
                 # Remember WHERE we lost: a mandatory trainer on the way (the rival at Cerulean's north exit,
                 # Route 22) beats an under-levelled team every time, and a retry loop of
                 # lose → Pokémon Center → walk back → lose again helps nobody.
-                here = self.reader.read_current_map()
+                here = fought_at
                 losses = self._trainer_losses
                 losses[here] = losses.get(here, 0) + 1
                 if losses[here] >= 2:
@@ -739,6 +740,8 @@ class NavMixin:
                 return int(req.value) in self.reader.read_key_items()
             if req.kind == "badges":
                 return self.reader.read_badges()[0] >= int(req.value)
+            if req.kind == "level":
+                return max((p.level for p in self.reader.read_party()), default=0) >= int(req.value)
             if req.kind == "hm":
                 move_id, bit = HM_BADGE[req.value]
                 return self._party_knows(move_id) and bool(self.reader.read_badges()[1] >> bit & 1)

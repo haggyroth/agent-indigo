@@ -254,3 +254,50 @@ def test_a_level_target_grind_is_refused_when_no_open_grass_gives_xp(monkeypatch
     assert "can't get your L38" in out and "Route 8" in out and c._grind_run is None
     c._best_open_grass = lambda here, level, avoid=(): ((3, 42), [])            # Route 23: wild L32-44 → worth it
     assert "can't get your" not in c._grind(42, True, None)
+
+
+# ── a watched run: grind() walked into Cerulean's rival ambush again and again ──────────────────────────────────────────────────
+def _cerulean_client(best_level, flags=(), party_levels=None):
+    pytest.importorskip("openai")
+    from agent.lm_studio_client import AgentClient
+    c = AgentClient.__new__(AgentClient)
+    levels = party_levels or [best_level, 8, 7]
+    c.reader = NS(read_player_pos=lambda: (22, 20), read_badges=lambda: (1, 1), read_key_items=lambda: [265],
+                  read_flag=lambda f: f in flags, read_current_map=lambda: (3, 3),
+                  read_party=lambda: [NS(level=lv, current_hp=10, max_hp=10) for lv in levels])
+    return c
+
+
+def test_route_24_is_gated_by_the_rival_until_the_best_pokemon_is_21_or_the_scene_is_done():
+    assert _cerulean_client(19)._grass_route_gated((3, 3), (3, 43))                  # the ace is L19: the rival (L18 starter, 4 Pokémon) would win again
+    assert not _cerulean_client(21)._grass_route_gated((3, 3), (3, 43))
+    assert not _cerulean_client(10, flags={0x29B})._grass_route_gated((3, 3), (3, 43))       # FLAG_GOT_FAME_CHECKER: the scene is over
+
+
+def test_a_failed_grind_says_why_the_nearest_grass_was_skipped_once():
+    c = _cerulean_client(19)
+    assert c._grass_route_gated((3, 3), (3, 43))
+    why = c._why_no_grass()
+    assert "rival" in why and "L21" in why and "walk north yourself" in why
+    assert c._why_no_grass() == ""                                                      # told once, not on every later message
+
+
+def test_gate_ok_level_compares_the_best_party_member():
+    from knowledge.gates import Req
+    req = Req("level", 21, "x")
+    assert not _cerulean_client(20)._gate_ok(req) and _cerulean_client(21)._gate_ok(req)
+    assert _cerulean_client(5, flags={0x29B})._gate_ok(Req("level", 21, "x", alt_flag=0x29B))
+
+
+def test_a_route_that_beat_us_is_skipped_until_we_are_three_levels_stronger(monkeypatch):
+    import knowledge.grind_routes as gr
+    seen = []
+    monkeypatch.setattr(gr, "best_grass", lambda start, level, exclude_current=False, avoid=(): seen.append(set(avoid)) or None)
+    c = _cerulean_client(19)
+    c._lost_goals = {(3, 43): 19}
+    assert c._relocate_to_grass() is False
+    assert (3, 43) in seen[-1]                                                          # still L19: not worth another loss
+    c = _cerulean_client(22)
+    c._lost_goals = {(3, 43): 19}
+    c._relocate_to_grass()
+    assert (3, 43) not in seen[-1]                                                      # 3 levels stronger: it may try again
