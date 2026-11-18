@@ -224,6 +224,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `pc` | overworld | action, pokemon?, box_pokemon?, detail?, force? | The Pokémon PC (box storage).  action='list' shows what is stored (reads memory, works anywhere; detail=true adds box:slot, types, moves, HM ability and a quality grade — use it to pick who to withdraw). |
 | `reorder_party` | overworld | first, second? | Out of battle, swap two party members (Start → POKéMON → SWITCH, driven for you) — or, with `second` omitted, make `first` your LEAD (slot 1, fights first; a fainted one can't lead). |
 | `teach_move` | overworld | tm, pokemon?, forget?, confirm? | Teach a TM/HM to a party Pokémon via the TM Case. |
+| `forget_move` | overworld | pokemon, move, force? | Delete a move at the Move Deleter in Fuchsia (travels there): the only way to remove an HM move. |
 | `fly_to` | overworld | town | Fly to a visited town (needs a Pokémon that knows Fly + the Thunder Badge, outdoors): Pallet, Viridian, Pewter, Cerulean, Lavender, Vermilion, Celadon, Fuchsia, Cinnabar, Saffron, Indigo Plateau. |
 | `use_hm` | overworld | move | Use a field move: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut (nearest tree), Rock Smash, Strength (then walk into the boulder), Flash (lights a cave). |
 | `open_menu` | overworld | menu | Open a Start-menu entry and land on its screen: Pokemon, Bag, Pokedex, Player, Save, Option or Exit. |
@@ -242,7 +243,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 36 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 37 tools in total.
 <!-- TOOLS:END -->
 
 The opponent is identified from memory (`gEnemyParty`), so there is no

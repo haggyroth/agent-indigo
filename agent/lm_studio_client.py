@@ -19,6 +19,7 @@ from agent import events
 from agent.skills.base import SkillBase
 from agent.skills.gamecorner import GameCornerMixin
 from agent.skills.selling import SellMixin
+from agent.skills.deleter import MoveDeleterMixin
 from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.errands import ErrandsMixin
@@ -42,7 +43,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, SkillState, SellMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -363,7 +364,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, GameCornerMixin, PCMixin, Pa
 
     _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
                                  "quest", "pc", "pick_up_items",
-                                 "use_hm", "teach_move", "load_state"})
+                                 "use_hm", "teach_move", "forget_move", "load_state"})
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
@@ -416,6 +417,8 @@ class AgentClient(SkillBase, SkillState, SellMixin, GameCornerMixin, PCMixin, Pa
             case "teach_move":
                 return self._teach_move(str(args["tm"]), str(args.get("pokemon", "") or ""),
                                         str(args.get("forget", "") or ""), bool(args.get("confirm", False)))
+            case "forget_move":
+                return self._forget_move(str(args["pokemon"]), str(args["move"]), bool(args.get("force", False)))
             case "fly_to":
                 return self._fly_to(str(args["town"]))
             case "use_hm":

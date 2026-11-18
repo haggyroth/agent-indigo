@@ -100,7 +100,8 @@ class TMHMMixin:
                     return False, f"{who} doesn't know {forget!r} (moves: {', '.join(before)})."
                 if before[forget_idx] in HM_MOVE_NAMES:
                     self._menus.close_menus()
-                    return False, f"{forget} is an HM move — it can't be forgotten."
+                    return False, (f"{forget} is an HM move — it can't be forgotten here. Only the Move Deleter in Fuchsia City can remove it: "
+                                   f"forget_move('{who}', '{forget}').")
             else:
                 forget_idx = pick_forget(before, move, MOVE_POWER)
 

@@ -93,10 +93,10 @@ TOOLS = [
                        "Potions and cures with the money you have. The MART line in the observation shows the plan. With "
                        "`item`, buy that specific thing instead from the nearest clerk who sells it — a TM ('TM28' or 'Dig'), "
                        "a stone, a vitamin (Protein…), an X-item, Super Repel… (the Celadon Dept. Store sells TMs, stones, "
-                       "vitamins and X-items). With `sell`: sell instead — every spare treasure in the bag (Nugget ¥5000, Star Piece, "
-                       "Big Pearl…) or the named `item`; healing items, stones, vitamins and balls are never sold.",
+                       "vitamins and X-items). With `sell`: sell spare treasure (Nugget, Star Piece, Pearl…) or the "
+                       "named `item`; healing items, stones, vitamins and balls are never sold.",
         "parameters": {"type": "object", "properties": {
-            "sell": {"type": "boolean", "description": "true = SELL (treasure, or the item named) instead of buying"},
+            "sell": {"type": "boolean", "description": "true = sell instead of buy"},
             "item": {"type": "string", "description": "optional: one item to buy (or sell), e.g. 'TM28', 'Fire Stone', 'X Attack', 'Nugget'"},
             "quantity": {"type": "integer", "description": "how many (default 1; limited by your money)"}}},
     }},
@@ -240,6 +240,16 @@ TOOLS = [
             "forget": {"type": "string", "description": "optional move to replace when full"},
             "confirm": {"type": "boolean", "description": "commit without naming a move to forget (the default pick)"},
         }, "required": ["tm"]},
+    }},
+    {"type": "function", "function": {
+        "name": "forget_move",
+        "description": "Delete a move at the Move Deleter in Fuchsia (travels there): the only way to remove an HM move. Keeps the "
+                       "party's last copy of an HM unless force=true.",
+        "parameters": {"type": "object", "properties": {
+            "pokemon": {"type": "string", "description": "species or slot"},
+            "move": {"type": "string"},
+            "force": {"type": "boolean"},
+        }, "required": ["pokemon", "move"]},
     }},
     {"type": "function", "function": {
         "name": "fly_to",
