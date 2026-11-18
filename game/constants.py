@@ -183,6 +183,11 @@ class Addr:
     NAMING_CURSOR_X    = 0x0202066A
     NAMING_CURSOR_Y    = 0x0202066C
     BATTLE_YESNO_CURSOR = 0x02023E83
+    # gBattlescriptCurrInstr, and the address of the `yesnobox` command in the trainer's "<X> is about to use <Y>! Will you change POKéMON?" script
+    # (BattleScript_FaintedMonTryChoose, found by scanning the US v1.0 ROM for printstring 282 / setbyte gBattleCommunication 0 / yesnobox). While the
+    # pointer sits there the Yes/No box is up: A = YES (opens an optional party screen = a free switch), B = NO. Only exists in Battle Style SHIFT.
+    BATTLE_SCRIPT_PTR   = 0x02023D74
+    SCRIPT_SHIFT_PROMPT = 0x081D872B
     SCREEN_FADE     = 0x03000F9C   # u8: 1 while a menu is on screen OR mid-fade; clears when the menu closes
     SCRIPT_RAM      = 0x03000EB0   # script-engine block; byte[0] != 0 = map script running
     # Field-menu flag. Non-zero for EVERY field menu (Start, Bag, Party, Trainer

@@ -5,6 +5,20 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Battle Style SHIFT: a free switch after a trainer's Pokémon faints (watched run: the ace out-levelled the team by 8+)
+- The agent now pins the game's **Battle Style** option to SHIFT (`BATTLE_STYLE=shift` default, `set` or empty to leave it; `game/options.py` writes SaveBlock2
+  every step). With SHIFT the game asks "Will you change POKéMON?" before a trainer's next Pokémon comes out — a switch that costs **no turn**.
+- `use_move` / `advance_dialog` stop at that box **once** and tell the model: "FREE SWITCH: … Bananas (L22) trails — switch_pokemon('Bananas')", naming the
+  strongest healthy laggard when the mon on the field is at the top level. `switch_pokemon` then answers YES, picks the mon and returns "FREE switch";
+  any other action answers NO. The box is recognised by the battle script pointer (`gBattlescriptCurrInstr` 0x02023D74 sitting on the `yesnobox` at 0x081D872B).
+  Autopilot fights (go_to / grind / hideout) still decline it. New `LeafGreenReader.read_enemy_party()` counts what the trainer has left.
+
+### Fixed — grind() shuttled Route 11 <-> Route 9: the Cut planner ignored ledges (a watched run)
+- Route 9's grass sits east of a Cut tree **and** behind a one-way ledge. `_cut_through` planned without ledge hops, so it found no route, never cut the tree and
+  `walk_to` answered "No walkable path" while `_reachable_tiles` (which hops ledges) said the grass was reachable — so `grind` relocated to Route 9 across the
+  whole map, gave up, and was sent back to Route 11, six times in a row. `_cut_through` now plans with ledges and elevation like `walk_to`, and a
+  "No walkable path" on the grass target counts as a strike in `_failed_grass` (two strikes drop the route for the session).
+
 ### Fixed — grind() stranded at Route 4, a 100-minute Route 21 loop, a silent quest, stale walk_to bounds (two watched runs)
 - **Route 21 loop**: `grind(20)` from Pallet picked Route 21 (open water, wild L17-28) 14 times in a row, each call pacing Pallet for 100 game-minutes.
   Both Route 21 maps are now gated behind Surf, and a grass route that `go_to` failed to reach twice (`_failed_grass`) is dropped for the session.

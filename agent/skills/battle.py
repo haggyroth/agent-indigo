@@ -373,6 +373,36 @@ class BattleMixin:
             self.mgba.tick(6)
         return self._battle_bag_open()
 
+    def _shift_prompt_live(self) -> bool:
+        """The trainer's 'Will you change POKéMON?' Yes/No box (Battle Style SHIFT) is up: the battle script sits on that `yesnobox`."""
+        from game.constants import Addr
+        from game.state import GameContext
+        return (self.mgba.read32(Addr.BATTLE_SCRIPT_PTR) == Addr.SCRIPT_SHIFT_PROMPT
+                and self.reader.detect_context() == GameContext.IN_BATTLE)
+
+    def _decline_shift_prompt(self) -> None:
+        """Answer NO (B) to the 'Will you change POKéMON?' box and let the next foe come out."""
+        for _ in range(6):
+            if not self._shift_prompt_live():
+                break
+            self.mgba.hold("B", 20)
+            self.mgba.tick(20)
+        self._shift_offered = False
+
+    def _shift_offer(self) -> str:
+        """The model-facing text for that box ('' = nothing worth offering): who could be sent in, free of charge."""
+        from knowledge.battle import shift_switch_offer
+        try:
+            party = self.reader.read_party()
+            active = self.reader.read_active_battle_species()
+            idx = next((i for i, p in enumerate(party) if p.species_id == active), -1)
+            foe = self.reader.read_enemy_lead()
+            left = sum(1 for m in self.reader.read_enemy_party() if m.current_hp > 0)
+            return shift_switch_offer(party, idx, left, (foe.level or 0) if foe else 0)
+        except Exception:
+            log_once("battle._shift_offer", "battle._shift_offer: tolerated failure (declining the switch)")
+            return ""
+
     def _battle_advance(self) -> None:
         """One 'advance' input in battle: A for text / to open FIGHT, but B when a full-screen menu is up.
         (The trainer's 'Will you switch POKéMON?' defaults to YES: A there opens the party screen; B backs
@@ -380,6 +410,9 @@ class BattleMixin:
         action menu whose controller value varies by turn moves its cursor to BAG/POKéMON and the next A
         opens the wrong thing."""
         from game.constants import Addr
+        if self._shift_prompt_live():            # A would answer YES and open the party screen
+            self._decline_shift_prompt()
+            return
         if self.mgba.read32(Addr.GMAIN_CALLBACK2) in Addr.FULLSCREEN_MENU_CB2:
             self._battle_press("B")
             return
@@ -413,6 +446,12 @@ class BattleMixin:
             learn = self._maybe_drive_learn()
             if learn:
                 return learn
+            if self._shift_prompt_live():        # Battle Style SHIFT: put the free switch to the model ONCE; its next action answers the box
+                if not self._shift_offered and (offer := self._shift_offer()):
+                    self._shift_offered = True
+                    return offer
+                self._decline_shift_prompt()
+                continue
             foe = self.reader.read_enemy_lead()
             foe_down = bool(foe and foe.max_hp and foe.current_hp == 0)
             # The controller value reads CHOOSE_ACTION even while the victory / next-send-out text
@@ -902,10 +941,11 @@ class BattleMixin:
         forced = forced_party_screen(self.mgba, self.reader)
         if not forced and self.reader.detect_context() != GameContext.IN_BATTLE:
             return "switch_pokemon is only for battles."
+        shift = not forced and self._shift_prompt_live()           # the trainer's 'Will you change POKéMON?' box: YES opens the party screen, free of charge
         party = self.reader.read_party()
         if len(party) < 2:
             return "You only have one Pokémon — nothing to switch to. Catch a team first."
-        if not forced and self._battle_trapped():
+        if not forced and not shift and self._battle_trapped():
             return self._trapped_message("switch")
         slot, err = self._pick_party(target, party)
         if slot is None:
@@ -926,7 +966,20 @@ class BattleMixin:
                 self.mgba.tap("B")
                 self._wait_idle()
                 self.mgba.tick(20)
-        if not forced and not self._open_party_menu():
+        if shift:
+            self._shift_offered = False
+            for _ in range(4):                    # YES (the cursor starts there) → the optional party screen
+                self.mgba.hold("A", 20)
+                for _ in range(12):
+                    self.mgba.tick(10)
+                    if self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_PARTY_MENU:
+                        break
+                if self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_PARTY_MENU:
+                    break
+            if self.mgba.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_PARTY_MENU:
+                self._decline_shift_prompt()
+                return "Couldn't open the free-switch party screen — the trainer's Pokémon comes out; use_move to carry on."
+        elif not forced and not self._open_party_menu():
             return "Couldn't open the party menu — try switch_pokemon again."
         self._wait_idle()
         self.mgba.tick(30)                        # let the party screen settle
@@ -975,7 +1028,8 @@ class BattleMixin:
                     Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, Addr.CTRL_CHOOSE_MOVE, *Addr.SAFARI_MENU):
                 break
             self._battle_press("A")
-        return f"Switched in {mon.species_name} (L{mon.level}). It's now your active Pokémon."
+        free = " It was a FREE switch (Battle Style SHIFT): no turn was spent." if shift else ""
+        return f"Switched in {mon.species_name} (L{mon.level}). It's now your active Pokémon.{free}"
 
     def _use_item(self, item: str) -> str:
         """Use a Bag item on your ACTIVE Pokémon during battle — a Potion to heal, an
