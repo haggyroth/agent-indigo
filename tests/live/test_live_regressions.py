@@ -1394,3 +1394,46 @@ def test_flash_and_fly_quests_collect_the_hms(live):
         if live.r.detect_context().name == "IN_BATTLE":
             c._auto_fight()
     assert live.r.read_flag(0x23B), out                                                   # FLAG_GOT_HM05
+
+
+def test_early_gift_quests_dig_hitmon_and_magikarp(live):
+    """quest('dig') / quest('hitmon') / quest('magikarp') on the real ROM (#278): the Cerulean thief gives TM28 back after a battle, the Fighting Dojo's master
+    is beaten and Hitmonchan taken (a one-time choice; the party is full so it goes to the PC box, the 'nickname?' box is declined), and the Route 4 salesman
+    sells a Magikarp for ¥500 (reached from Pewter: from Cerulean's side of Route 4 go_to stalls at the east end)."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+
+    def run(name, flag, tries=8):
+        for _ in range(tries):
+            out = c._execute("quest", json.dumps({"name": name, "auto_trainers": True}))
+            if live.r.read_flag(flag):
+                return out
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._auto_fight()
+        return out
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("cerulean city", badges=0xFF)
+    live.strong_lead(level=60)
+    live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])
+    for f in (0x23F, 0x03B, 0x663):                                    # TM28 not yet returned; the grunt present and unbeaten
+        live.set_flag(f, False)
+    count = live.r.count_item
+    live.r.count_item = lambda i: 0 if i == 316 else count(i)          # the fixture already carries a TM28
+    assert live.r.read_flag(0x23F) is False
+    out = run("dig", 0x23F)
+    live.r.count_item = count
+    assert live.r.read_flag(0x23F), out
+    live.fly_to("saffron city", badges=0xFF, flags=(0x2A6, 0x23C, 0x250))
+    live.strong_lead(level=60)
+    live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])
+    out = run("hitmon", 0x278, 10)
+    assert live.r.read_flag(0x278) and "Hitmonchan" in out, out
+    c._execute("go_to", json.dumps({"destination": "Saffron City", "force": True}))        # out of the Dojo: Fly works outdoors only
+    live.fly_to("pewter city", badges=0xFF)
+    live.set_money(2000)
+    money = live.r.read_money()
+    out = run("magikarp", 0x249)
+    assert live.r.read_flag(0x249) and live.r.read_money() == money - 500, out
