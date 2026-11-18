@@ -81,3 +81,21 @@ def test_cut_through_plans_with_ledges_so_a_tree_before_a_ledge_hop_still_gets_c
     c._use_hm = lambda what: (cuts.append(what), "Used Cut")[1]
     assert c._cut_through((0, 1), (5, 1), grid, 6, 3, set(), set(), trees) == "cut"
     assert cuts == ["cut"]
+
+
+# ── the automatic free switch ─────────────────────────────────────────────────────────────────────────
+from knowledge.party import pick_shift_trainee   # noqa: E402
+
+
+def test_the_ace_hands_the_free_switch_to_the_strongest_healthy_laggard_the_foes_cannot_crush():
+    party = [mon(31, "Ivysaur"), mon(22, "Mankey"), mon(21, "Pidgey"), mon(12, "Rattata"), mon(23, "Pikachu", hp=10)]
+    assert pick_shift_trainee(party, 0, [18, 24]) == 1            # Mankey L22: Pikachu is hurt, the L12 would face an L24
+    assert pick_shift_trainee(party, 0, [40]) is None             # a boss ace: nobody trailing can stand up to it
+    assert pick_shift_trainee(party, 0, []) == 1                  # nothing known about the foes: still fine
+
+
+def test_no_auto_switch_when_the_field_mon_already_trails_or_the_team_is_even():
+    party = [mon(31, "Ivysaur"), mon(22, "Mankey"), mon(21, "Pidgey")]
+    assert pick_shift_trainee(party, 1, [20]) is None             # Mankey is the laggard already: leave it fighting
+    assert pick_shift_trainee([mon(30), mon(28), mon(27)], 0, [20]) is None
+    assert pick_shift_trainee(party, 9, [20]) is None
