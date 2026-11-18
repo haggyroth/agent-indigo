@@ -124,3 +124,22 @@ def low_hp_switch_hint(party, active_idx: int, cur: int, mx: int, foe_level: int
     me, mate = party[active_idx], party[pick]
     return (f"⚠ {me.nickname or me.species_name} is at {cur}/{mx} HP and the next hit may faint it (no XP and a Center trip): "
             f"switch_pokemon('{mate.nickname or mate.species_name}') now, or use a Potion.")
+
+
+TRAINEE_SLACK = 4        # a trainee may face a foe up to this many levels above its own
+
+
+def pick_shift_trainee(party, active_idx: int, foe_levels_left=()):
+    """Index of the teammate to send in on a FREE switch (Battle Style SHIFT) so the ace stops taking every trainer's XP, or None to leave it.
+    Only when the Pokémon on the field is NOT itself lagging (it is the ace or close), and a lagging teammate (> BALANCE_GAP under the top)
+    is healthy (>= 60% HP) and not outclassed by the trainer's remaining Pokémon (its level + TRAINEE_SLACK >= the highest left). The
+    strongest such teammate is picked: the likeliest to win. Pure."""
+    if not 0 <= active_idx < len(party):
+        return None
+    lag = {i for i, _p in lagging_mons(party)}
+    if active_idx in lag:
+        return None
+    toughest = max(foe_levels_left, default=0)
+    fit = [(i, p) for i, p in enumerate(party)
+           if i in lag and p.max_hp and p.current_hp > 0 and p.current_hp / p.max_hp >= 0.6 and p.level + TRAINEE_SLACK >= toughest]
+    return max(fit, key=lambda ip: (ip[1].level, -ip[0]))[0] if fit else None
