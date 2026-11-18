@@ -301,3 +301,11 @@ def test_a_route_that_beat_us_is_skipped_until_we_are_three_levels_stronger(monk
     c._lost_goals = {(3, 43): 19}
     c._relocate_to_grass()
     assert (3, 43) not in seen[-1]                                                      # 3 levels stronger: it may try again
+
+
+def test_route_21_is_gated_behind_surf():
+    """A watched run called grind(20) from Pallet and spent 14 x 100 game-minutes walking toward Route 21, which is open water."""
+    from knowledge.gates import unmet_gates
+    from knowledge.map_graph import route_to
+    unmet = unmet_gates(route_to((3, 0), (3, 39)), lambda req: False)
+    assert unmet and unmet[0][1].value == "Surf"

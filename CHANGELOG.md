@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — grind() stranded at Route 4, a 100-minute Route 21 loop, a silent quest, stale walk_to bounds (two watched runs)
+- **Route 21 loop**: `grind(20)` from Pallet picked Route 21 (open water, wild L17-28) 14 times in a row, each call pacing Pallet for 100 game-minutes.
+  Both Route 21 maps are now gated behind Surf, and a grass route that `go_to` failed to reach twice (`_failed_grass`) is dropped for the session.
+- **Route 4 pocket**: healing at Route 4's Mt. Moon Pokémon Center exits into a west pocket one step from Route 3, but `NO_WALK` (meant for the Cerulean-side
+  ledges) said Route 3 / Route 2 / Viridian Forest were unreachable, so `grind` walked the party round to Route 22 (wild L2-5, almost no XP). `NO_WALK` is
+  now region-aware (`ok_regions`), and `grind`'s relocation skips any route `NO_WALK` rules out instead of trying it. `_reachable_tiles` also hops ledges like `walk_to`.
+- **Misleading hint**: "Why the closest grass was skipped" showed whichever gate was seen last (the SS Ticket one). The reasons now reset per search, name the
+  route ("Route 24: …"), and list up to three.
+- **`walk_to` bounds check** used the previous map's size when called after a tool that changed maps in the same step (`(10,10)` "outside" a 15x10 Center while in Vermilion); it now refreshes first.
+- **`quest('ss_ticket')`** looped 12× in 0.03 s and said only "Didn't reach Bill's Sea Cottage yet" when `go_to` made no progress (e.g. the rival gate); it now returns `go_to`'s reason.
+
 ### Fixed — grind() kept walking into Cerulean's rival ambush (a watched run)
 - With the ace at L17-19 and the rest of the team far behind, `grind()` relocated to Route 24 (the grass that fit the trainees), whose only way in is
   Cerulean's north exit — where the rival ambushes you (Pidgeotto L17, Abra L16, Rattata L15 and a starter L18 that counters yours). The relocation's

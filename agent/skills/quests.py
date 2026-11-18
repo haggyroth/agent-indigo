@@ -315,6 +315,7 @@ class QuestMixin:
         for _ in range(12):
             if self.reader.read_current_map() == COTTAGE:
                 break
+            before = (tuple(self.reader.read_current_map()), tuple(self.reader.read_player_pos()))
             out = self._go_to("Bill's Sea Cottage", mode="yield", auto_trainers=auto_trainers,
                               resume_call="quest('ss_ticket')")
             if self.reader.read_current_map() == COTTAGE:
@@ -328,6 +329,8 @@ class QuestMixin:
                 continue
             if "Blocked" in out or "gated" in out:
                 return f"Can't reach Bill's Sea Cottage: {out}"
+            if before == (tuple(self.reader.read_current_map()), tuple(self.reader.read_player_pos())):
+                return f"Can't reach Bill's Sea Cottage — no progress: {out}"       # a watched run looped 12x here in 0.03 s and told the model nothing
         if self.reader.read_current_map() != COTTAGE:
             return "Didn't reach Bill's Sea Cottage yet — call quest('ss_ticket') again to continue (it resumes)."
 

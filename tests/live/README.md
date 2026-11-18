@@ -14,6 +14,7 @@ python -m pytest tests/live -v          # needs: built binding, ROM, fixtures in
 | `threemon.ss1` | Viridian City, party Bulbasaur L8 / Pikachu L5 / Caterpie L5 |
 | `disabled.ss1` | mid-battle, the lead's Tackle is Disabled (found via `gDisableStructs` 0x02023E0C) |
 | `post_misty.ss1` | Route 24 (north of Cerulean), Misty beaten, Ivysaur L26, no SS Ticket yet |
+| `route3_weak_team.ss1` | Route 3 east end, 1 badge, Ivysaur L17 with five L11-12 teammates (run checkpoint) |
 | `vermilion.ss1` | Vermilion City (arrived via the Underground Path), Ivysaur L30, SS Ticket held, no Cut yet |
 | `forced.ss1` | mid-battle, the active mon fainted → forced party screen |
 | `route8.ss1` | Route 8 (east end, (71,9)), Venusaur knows Cut, Cascade Badge — the fenced tall-grass pocket sealed by two Cut trees |

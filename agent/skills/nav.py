@@ -251,6 +251,7 @@ class NavMixin:
     def _walk_to_tool(self, tx: int, ty: int) -> str:
         """The model-facing walk_to: reject a tile outside the current map with the real size instead of handing a
         nonsense goal to A* (internal callers use _walk_to directly — they may aim at edge/warp tiles)."""
+        self.tilemap.refresh()              # the cache only follows map changes between agent steps; a tool called right after another that left a building has the old size
         w, h = getattr(self.tilemap, "_width", None), getattr(self.tilemap, "_height", None)
         if w and h and not (0 <= tx < w and 0 <= ty < h):
             return (f"({tx},{ty}) is outside this map — valid tiles are x 0-{w - 1}, y 0-{h - 1}. "
@@ -932,7 +933,7 @@ class NavMixin:
             return self._stop("unknown_destination", target_name)   # error message
 
         # Some trips have NO walking route (knowledge.travel_rules.NO_WALK, e.g. Cerulean back west of Route 4).
-        why_not = no_walk_reason(self.reader.read_current_map(), target_map)
+        why_not = no_walk_reason(self.reader.read_current_map(), target_map, self.reader.read_player_pos())
         if why_not:
             return self._stop("no_walk", f"There is no walking route to {target_name} from here: {why_not}. "
                                          f"{self._no_walk_advice(target_name)}")
