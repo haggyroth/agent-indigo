@@ -127,6 +127,12 @@ class Live:
         if level:
             m.write8(b + 0x54, level)
 
+    def strong_lead(self, level: int = 60, exp: int = 211060) -> None:
+        """Stage: make the lead (the fixture's Venusaur, Medium-Slow growth) a level-60 with a consistent exp total, so a long dungeon of L40+ wild
+        Pokémon cannot out-level it — and, because it stays well under L61, no level-up recomputes the stats that boost_party() raised."""
+        self.patch_mon(0, level=level, exp=exp)
+        self.boost_party()
+
     def boost_party(self, hp: int = 400, stat: int = 220) -> None:
         """Stage: raise every party member's stored battle stats (HP, Atk, Def, Spe, SpA, SpD) and refill HP, so a test about a long dungeon is not
         decided by a fixture party that is 10-20 levels under the trainers (the level and exp are left alone: the exp text stays consistent)."""

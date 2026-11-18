@@ -5,6 +5,20 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('victory_road')`: Viridian → Route 22 → Route 23 → Victory Road → Indigo Plateau (verified end to end on the real ROM)
+- The road to the cave is plain `go_to` (Route 22's rival, Route 23's eight badge guards, the Surf crossing — Route 23's middle is a river, the old text said
+  Surf wasn't needed). Inside, `knowledge/boulder_puzzle.py` is a push-based Strength-boulder solver (one search state = boulders + pressed switches + the
+  region the player can walk) and `knowledge/vr_route.py` plans the cave's order of play from decomp data (`tools/gen_victory_road.py`):
+  1F's switch boulder (19 pushes) → 2F's west switch → 3F: drop the boulder down the hole (it reveals 2F's second boulder) and follow it → 2F's second
+  switch → the 3F side room → 2F's east exit at (48,12) → `go_to` Indigo Plateau (`FLAG_VISITED_INDIGO_PLATEAU`).
+- Things the live ROM taught: the cave is split into elevation levels (a step between two non-zero levels is refused — and so is a push, since the push is a
+  step into the boulder's tile); arrow warps (the 1F entrance, the 2F exit) only fire with their arrow held, so a stand ON one is a manual step and never a
+  `walk_to` destination; every floor load puts its boulders back (pressed switches stay pressed; Route 23's transition resets the lot); the game only reports
+  objects near the camera, so the driver remembers boulders; 2F's (33,19) boulder is hidden until the 3F one falls.
+- Double battles: Victory Road 3F's Ray & Tyra open with a party screen the old code treated as a stray menu (B cannot cancel it). `forced_party_screen` now
+  looks at our second battler in a double battle, and `_send_next_mon` brings in a benched Pokémon.
+- Test staging: `live.strong_lead()` / `live.boost_party()` (the fixture party is far under the cave's L40+ wilds).
+
 ### Changed — hardened nickname driver, with a varied pool of ideas
 - `knowledge/nicknames.py`: a pool of 211 typeable, ≤10-character names that have nothing to do with the species (dad jokes, food, pets, titles, objects,
   places: "Zap Daddy", "Hobbes", "Waffles", "Sir Wiggle"…), `suggest()` (a fresh draw that skips names already on the team), `pick()` and `usable()`.
