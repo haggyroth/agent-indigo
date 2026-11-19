@@ -7,6 +7,15 @@ the binding, ROM or fixtures are missing, so CI (no ROM) simply skips them.
 python -m pytest tests/live -v          # needs: built binding, ROM, fixtures in saves/live/
 ```
 
+One command with a preflight (is the ROM / every fixture / the binding there?), a summary, and an optional commit-status attestation for pull requests (#279; background and the options
+considered in [docs/live-ci.md](../../docs/live-ci.md)):
+
+```bash
+python tools/live_suite.py                                          # everything
+python tools/live_suite.py -k articuno                              # a subset (never attested)
+python tools/live_suite.py --changed origin/main --post-status      # only if the diff touches guarded code; then publish the `live-suite` status for HEAD
+```
+
 ## Fixtures (`saves/live/`, gitignored — ROM-derived)
 | file | what it is |
 |---|---|

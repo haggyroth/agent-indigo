@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the live suite runs as a gate, and its first full run found a regression (#279)
+- `tools/live_suite.py`: one command for the real-ROM suite — preflight (ROM, `work.sav`, every fixture a test loads, the binding), summary, `--changed BASE` (only when the diff touches guarded code), `--post-status` (publishes
+  the `live-suite` commit status for HEAD; full runs only). `.github/workflows/live-gate.yml` keeps that status `success` ("not needed") or `pending` ("run the live suite") on every pull request. `docs/live-ci.md` weighs the options
+  (self-hosted runner, local attestation, building the ROM from the public decomp in CI — whose SHA-1 matches the retail ROM) and what is left for the owner to decide (making `live-suite` a required check; the decomp-build route).
+- **Fixed what the first full run found:** a Victory Road regression from the Articuno PR (Surf started from the wrong shores first; the old nearest-first search is back, elevation-3 shores are a second pass), a stale tea-test assertion,
+  test-order leaks (the live harness now resets skill state and long-term memory on every fixture load) and two luck-dependent tests. 78/78 in about 31 minutes.
+
 ### Added — `quest('new_game')`: the model can start the game from the title screen (#260)
 - `START_NEW_GAME=true` boots the ROM to the title with no save loaded; `quest('new_game')` (alias of the `parcel` beat, which had no driver) then plays everything up to the Pokédex: the controls pages and Oak's speech, BOY/GIRL, the
   player's and the rival's names on the keyboard, the bedroom, Oak's "Hey! Wait!" intercept at Route 1, the lab, the starter, the rival's battle (handed to the model like any trainer fight), Viridian's Mart (the clerk's forced scene

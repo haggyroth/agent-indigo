@@ -20,9 +20,14 @@ class Live:
         assert self.m.load_state_file(str(path)), f"could not load {path}"
         self.m.tick(30)
         self.heal_hp()
-        self.c._grind_run = None            # a grind session from an earlier test must not leak its floor/level
-        self.c._training_swapped = False
-        self.c._trip = None
+        # Hermetic per test (#279): the runtime is shared by the whole session, so skill state and long-term memory from an earlier test leaked into later ones (a "Brock beaten" entry in
+        # ltm sent quest('brock') on to Misty's gym; a once-only warning already given hid the next test's first reply). Reset every declared field to its class default.
+        from agent.skills.state import SkillState
+        for attr in [n for n in list(vars(self.c)) if hasattr(SkillState, n)]:
+            delattr(self.c, attr)
+        import copy
+        from memory.long_term import DEFAULTS
+        self.rt.ltm.data = copy.deepcopy(DEFAULTS)
 
     def give_item(self, item_id: int, qty: int = 1) -> None:
         """Put `qty` of `item_id` in the first free Items-pocket slot (quantities are XOR'd with the save key)."""
