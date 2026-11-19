@@ -18,6 +18,7 @@ python -m pytest tests/live -v          # needs: built binding, ROM, fixtures in
 | `league_door.ss1` | Indigo Plateau Pokémon Center 1F, 8 badges, a boosted L70 lead (made by the elite_four live test's staging; used by the `elite_four` eval scenario) |
 | `league_agatha.ss1` | Agatha's room just entered (Lorelei and Bruno beaten), a boosted L70 team — for the League loss-path test |
 | `league_champion.ss1` | The Champion's room just entered, a boosted L70 team — for the Hall of Fame / credits test |
+| `post_hof.ss1` | **Post-game**: Pallet Town after the Hall of Fame, the credits and the soft reset (`FLAG_SYS_GAME_CLEAR` set, 8 badges, a boosted L72 lead + five teammates, Seagallop scene `VAR_MAP_SCENE_VERMILION_CITY` = 3). Written as a side-effect of `test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town` — the start of the Sevii / Mewtwo / roaming-beast work (#261-#265) |
 | `route3_weak_team.ss1` | Route 3 east end, 1 badge, Ivysaur L17 with five L11-12 teammates (run checkpoint) |
 | `vermilion.ss1` | Vermilion City (arrived via the Underground Path), Ivysaur L30, SS Ticket held, no Cut yet |
 | `forced.ss1` | mid-battle, the active mon fainted → forced party screen |
