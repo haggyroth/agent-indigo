@@ -411,7 +411,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             case "team_report":
                 from knowledge.team import team_report
                 return team_report(self.reader.read_party(), self.reader.read_boxes(),
-                                   self.ltm.data.get("gyms_beaten", []), self._money_note())
+                                   self.ltm.data.get("gyms_beaten", []), "\n".join(n for n in (self._money_note(), self._dex_note()) if n))
             case "pc":
                 return self._pc_tool(str(args.get("action", "") or ""), str(args.get("pokemon", "") or ""),
                                      str(args.get("box_pokemon", "") or ""), bool(args.get("detail", False)),

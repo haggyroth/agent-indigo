@@ -1658,3 +1658,17 @@ def test_quest_brock_travels_to_the_gym_and_challenges_the_leader(live):
             break
     assert live.r.read_badges()[1] & 1, out
     assert "already done" in c._execute("quest", json.dumps({"name": "brock"}))
+
+
+def test_team_report_carries_the_dex_plan_line(live):
+    """team_report (#266) ends with the Pokédex line: the caught count from the game's own dex bits and the easiest next catches with where / how."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    live.set_dex(19)
+    out = live.c._execute("team_report", json.dumps({}))
+    line = next(ln for ln in out.splitlines() if ln.startswith("DEX:"))
+    assert line.startswith("DEX: 19/151 caught. Easiest next: ") and "wild:" in line, line
+    live.set_dex(151)
+    assert "DEX: all 151 Kanto species caught." in live.c._execute("team_report", json.dumps({}))

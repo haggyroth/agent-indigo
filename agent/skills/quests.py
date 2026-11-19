@@ -70,6 +70,16 @@ class QuestMixin:
         out["rocket_hideout"] = self._has_silph_scope() and tuple(self.reader.read_current_map()) not in HIDEOUT_MAPS
         return out
 
+    def _dex_note(self) -> str:
+        """The DEX line for team_report (knowledge.dex_plan): the count and the easiest next catches ('' when unreadable)."""
+        from knowledge.dex_plan import dex_line
+        try:
+            owned = self.reader.read_dex_owned_ids()
+            return dex_line(owned) if owned else ""
+        except Exception:
+            log_once("quests._dex_note", "quests._dex_note: tolerated failure (no dex line)")
+            return ""
+
     def _bag_or_none(self):
         """{item id: count} for the readiness supply check, or None when the bag cannot be read (the levels are then checked alone)."""
         try:

@@ -564,6 +564,14 @@ class LeafGreenReader:
             return min(bits, self.KANTO_DEX)
         return count(Addr.DEX_OWNED_OFFSET), count(Addr.DEX_SEEN_OFFSET)
 
+    def read_dex_owned_ids(self) -> set:
+        """The set of Kanto species ids (1-151) registered as CAUGHT."""
+        sb2 = self.client.read32(Addr.SAVEBLOCK2_PTR)
+        if not self._valid_ewram_ptr(sb2):
+            return set()
+        raw = self.client.read_range(sb2 + Addr.DEX_OWNED_OFFSET, 19)
+        return {n + 1 for n in range(self.KANTO_DEX) if raw[n >> 3] >> (n & 7) & 1}
+
     def read_dex_owned(self, species_id: int) -> bool | None:
         """Is this species already registered as CAUGHT in the Pokédex? (Kanto species: internal id == national
         number for 1-151.) None when unreadable or outside Kanto."""
