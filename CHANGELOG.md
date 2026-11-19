@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('articuno')`: the Seafoam Islands boulder puzzle (#264, second bird)
+- `tools/gen_seafoam.py` → `knowledge/seafoam_data.py` (decomp): B3F's collision/elevation, the two fall holes, the four boulders and their hide flags, B4F's reveal flags and the stopped-current flag.
+  `knowledge/seafoam_route.py` plans the pushes with the Victory Road solver (`solve(drop=True)`): any two B3F boulders sent through the holes reveal both boulders on B4F, and re-entering B4F swaps in the calm
+  layout (`LAYOUT_SEAFOAM_ISLANDS_B4F_CURRENT_STOPPED`). The upper floors' boulder chain is NOT needed: B3F's boulder room is reached on foot (west door or B4F's ladder).
+- `agent/skills/legends.py`: travel to B3F, push (one tile per push — a 20-frame press shoved the boulder two tiles and wedged one in the alcove), walk the holes/ladders-avoiding route, go down to B4F,
+  surf to the platform, and hand the L50 Articuno fight to the model under the one-shot protocol. Shared `_engage_legend` with Zapdos; the beat sits before Sabrina and needs Surf + Strength.
+- **Surf from the right tile**: the game offers Surf only from elevation-3 land, and Seafoam B4F's floor is elevation 4 almost everywhere (the prompt never appeared; `use_hm('surf')` gave up after six shores). `_surf` now tries elevation-3 shores first, and walking to a shore no longer re-enters the Surf search (it recursed).
+- Verified live from Fuchsia: Route 19/20 → the cave → both boulders down → the current stops → Articuno in front of the model. Not done: Moltres (Sevii, post-game).
+
 ### Added — `quest('zapdos')`, and the router crosses water between regions of one map (#264, first bird)
 - `agent/skills/legends.py`: `go_to('Power Plant')`, walk up to Zapdos (5,11), A through "Gyaoo!", and hand the L50 fight to the model under the one-shot protocol (state saved in slot 9). The
   beat sits before Sabrina in the chain and needs Surf; it is done by `FLAG_FOUGHT_ZAPDOS`. The driver waits for the battle intro to finish loading `gEnemyParty` before it reads the foe (it used to

@@ -1749,3 +1749,46 @@ def test_zapdos_quest_surfs_to_the_power_plant_and_hands_the_one_shot_battle_to_
     t = NS(run=NS(), map_key=(1, 95), reader=live.r)
     text = _one_shot(t, foe, list(names), list(pp))
     assert "ONE-SHOT: Zapdos" in text and "load_state(9)" in text and t.run.one_shot_saved == (145, (1, 95)), text
+
+
+def test_articuno_quest_drops_the_b3f_boulders_stops_the_current_and_hands_over_the_fight(live):
+    """quest('articuno') on the real ROM (#264): from Fuchsia it surfs Route 19/20, walks the Seafoam floors to B3F's boulder room, pushes two boulders through the holes (B4F's reveal
+    flags clear), re-enters B4F where the current has stopped, surfs to the platform and starts the L50 Articuno fight under the one-shot protocol."""
+    import pytest
+    from types import SimpleNamespace as NS
+    from agent.observation import _one_shot
+    from knowledge import seafoam_data as sd
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    for _ in range(6):
+        c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 6):
+            break
+    live.fly_to("fuchsia city")
+    live.patch_mon(0, moves=[57, 70, 75, 22], pps=[15, 15, 25, 25])        # Surf, Strength, Razor Leaf, Vine Whip
+    live.strong_lead(60)
+    live.give_item(2, 5)
+    live.give_item(84, 30)
+    foe, trace = None, []
+    for _ in range(200):
+        if live.r.detect_context().name != "IN_BATTLE":
+            c._execute("use_item", json.dumps({"item": "Max Repel"}))
+        out = c._execute("quest", json.dumps({"name": "articuno", "auto_trainers": False}))
+        trace.append((tuple(live.r.read_current_map()), tuple(live.r.read_player_pos()), str(out)[:90]))
+        if len(trace) > 12 and len({t[:2] for t in trace[-6:]}) == 1:
+            break                                                            # the same spot six calls running: stuck, fail with the trace instead of grinding on
+        if live.r.detect_context().name == "IN_BATTLE":
+            foe = live.r.read_enemy_lead()
+            if foe and foe.species_id == 144:
+                break
+            c._auto_fight()
+    assert foe and foe.species_id == 144 and foe.current_hp == foe.max_hp, f"the Articuno fight was not handed to the model; last steps: {trace[-4:]}"
+    assert tuple(live.r.read_current_map()) == (1, 87) and live.r.read_flag(sd.STOPPED_FLAG_B4F)
+    _ids, names, pp = live.r.read_active_battle_moves()
+    t = NS(run=NS(), map_key=(1, 87), reader=live.r)
+    text = _one_shot(t, foe, list(names), list(pp))
+    assert "ONE-SHOT: Articuno" in text and "load_state(9)" in text and t.run.one_shot_saved == (144, (1, 87)), text
