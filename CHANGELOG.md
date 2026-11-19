@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the Pokédex completion plan: a `DEX:` line in `team_report` (#266, first part)
+- `tools/gen_dex_sources.py` → `knowledge/dex_sources.py` (from the decomp): `EVOLVES_FROM` (72 Kanto evolutions with level / stone / trade / friendship) and the seven in-game `TRADES` (Mr. Mime for Abra, Jynx for
+  Poliwhirl, Farfetch'd, Lickitung, Electrode, Tangela, Seel — with the place). `knowledge/dex_plan.py` adds the curated one-offs (starters, Game Corner prizes, the Dojo Hitmons, Magikarp, Lapras,
+  Eevee, the fossils, Snorlax, the legends) and ranks the missing species: wild (lowest-level spot first) → an evolution of something you own → a trade you can make → gifts/prizes → version exclusives.
+- `team_report` ends with `DEX: 19/151 caught. Easiest next: Metapod — wild: Viridian Forest (grass L4-6); …`, with the quest that does it when there is one (`[quest('hitmon')]`). The status line shows `dex N/151`.
+  `LeafGreenReader.read_dex_owned_ids()` reads the owned bits.
+- Not done: completion targets (Kanto 150 / reachable / National), the National Dex scene, gating-aware sources, drivers for Eevee / fossils / the NPC trades.
+
 ### Added — the eight Gym beats are runnable: `quest('brock')` … `quest('giovanni')` (#260)
 - `agent/skills/gymquest.py`: go_to the town, go_to('Gym'), then `challenge_leader` (its heal / save / lopsided-team warning stay there); a trainer on the way or the Leader ends the call as a
   battle for the model, and the same call resumes. A locked gym says what comes first ("Not yet — … first Silph Co.") instead of walking up to the guard. Verified live: from Pewter,

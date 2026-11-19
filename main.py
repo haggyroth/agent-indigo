@@ -126,11 +126,12 @@ def _status_line(state, ltm, client, reader, step: int, t_start: float) -> str:
         bag = reader.read_bag()
         balls = sum(bag.get(b, 0) for b in (1, 2, 3, 4))
         money = reader.read_money()
+        dex = reader.read_pokedex()[0]
     except Exception:
         log_once("main._status_line", "main._status_line: tolerated failure (continuing with a default)")
-        party, balls, money = "?", "?", "?"
+        party, balls, money, dex = "?", "?", "?", "?"
     mins = (time.time() - t_start) / 60
-    return (f"STATUS step {step} · badges {ltm.data['badges_earned']}/8 · [{party}] · ¥{money} · balls {balls} · "
+    return (f"STATUS step {step} · badges {ltm.data['badges_earned']}/8 · [{party}] · ¥{money} · balls {balls} · dex {dex}/151 · "
             f"LLM {client.llm_calls} calls / {client.total_tokens // 1000}k tok · {mins:.0f} min wall")
 
 
