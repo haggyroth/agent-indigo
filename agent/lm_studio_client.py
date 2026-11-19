@@ -23,6 +23,7 @@ from agent.skills.deleter import MoveDeleterMixin
 from agent.skills.league import LeagueMixin
 from agent.skills.fishing import FishingMixin
 from agent.skills.bike import BikeMixin
+from agent.skills.tutor import TutorMixin
 from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.errands import ErrandsMixin
@@ -46,7 +47,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -367,7 +368,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
 
     _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
                                  "quest", "pc", "pick_up_items",
-                                 "use_hm", "teach_move", "forget_move", "fish", "load_state"})
+                                 "use_hm", "teach_move", "forget_move", "fish", "tutor", "load_state"})
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
@@ -420,6 +421,8 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             case "teach_move":
                 return self._teach_move(str(args["tm"]), str(args.get("pokemon", "") or ""),
                                         str(args.get("forget", "") or ""), bool(args.get("confirm", False)))
+            case "tutor":
+                return self._tutor(str(args["move"]), str(args.get("pokemon", "") or ""), str(args.get("forget", "") or ""))
             case "fish":
                 return self._fish(int(args.get("casts", 3) or 3))
             case "forget_move":

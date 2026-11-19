@@ -252,6 +252,12 @@ TOOLS = [
         }, "required": ["pokemon", "move"]},
     }},
     {"type": "function", "function": {
+        "name": "tutor",
+        "description": "Learn a move from its Kanto tutor (free, once each; travels there): Counter, Softboiled, Seismic Toss, Rock Slide, Thunder Wave, Double-Edge, Substitute… `pokemon` optional.",
+        "parameters": {"type": "object", "properties": {
+            "move": {"type": "string"}, "pokemon": {"type": "string"}, "forget": {"type": "string"}}, "required": ["move"]},
+    }},
+    {"type": "function", "function": {
         "name": "fish",
         "description": "Cast your best rod at the nearest water (walks to a shore) up to `casts` times; a wild Pokémon on the hook becomes a battle. Needs a rod: quest('old_rod').",
         "parameters": {"type": "object", "properties": {"casts": {"type": "integer"}}},
