@@ -122,11 +122,25 @@ class NewGameMixin:
             self.mgba.tick(40)
         return None
 
+    def _ng_battle(self, msg: str) -> str:
+        """The rival's fight in Oak's lab opens with ~35 text boxes (his challenge, both send-outs, Oak's battle tutorial, whose own menus the move-menu check never recognises). Play them
+        through here — the fight is a tutorial against a lone L5 and Oak lets you lose it — instead of handing the model a battle that every use_move call fails on."""
+        if self.reader.detect_context() != GameContext.IN_BATTLE or tuple(self.reader.read_current_map()) != LAB:
+            return msg
+        out = self._battle_settle(max_steps=200)
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return msg + f"\n(The battle intro and Oak's tutorial were played through — {out})"
+        return "Your rival's first battle (Oak's tutorial fight) is over. Call quest('new_game') again to carry on with Oak's parcel."
+
     def _get_new_game(self, auto_trainers: bool = False) -> str:
         call = "quest('new_game')"
         o = parse_options(self._quest_opts)
         if self.reader.detect_context() == GameContext.IN_BATTLE:
-            return "You're in a battle — finish it first."
+            if tuple(self.reader.read_current_map()) != LAB:
+                return "You're in a battle — finish it first."
+            msg = self._ng_battle("You're in the rival's battle in Oak's lab.")          # resumed in the middle of the tutorial fight: play it out
+            if self.reader.detect_context() == GameContext.IN_BATTLE:
+                return msg
         if not self._in_world():
             if (msg := self._ng_intro(o)):
                 return msg
@@ -148,7 +162,7 @@ class NewGameMixin:
         # Oak's parcel: the Viridian Mart clerk hands it over the moment you walk in (a forced scene), then Oak wants it. Leaving the lab starts the rival's battle (handed to the model).
         if OAKS_PARCEL not in self.reader.read_key_items():
             if (msg := self._hideout_travel("Viridian Mart", MART, call, auto_trainers)):
-                return msg
+                return self._ng_battle(msg)
             for _ in range(10):                                       # the clerk's scene: text, then the parcel
                 if OAKS_PARCEL in self.reader.read_key_items() and self.reader.detect_context() == GameContext.OVERWORLD:
                     break
@@ -157,7 +171,7 @@ class NewGameMixin:
             if OAKS_PARCEL not in self.reader.read_key_items():
                 return f"The Viridian Mart clerk didn't hand over Oak's Parcel — walk inside, talk to the clerk at (2,3), then call {call} again."
         if (msg := self._hideout_travel("Oak's Lab", LAB, call, auto_trainers)):
-            return msg
+            return self._ng_battle(msg)
         for _ in range(6):                                            # Oak (6,3): talking to him with the parcel plays the Pokédex scene
             if self.reader.read_flag(FLAG_POKEDEX):
                 break
