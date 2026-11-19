@@ -70,6 +70,17 @@ class QuestMixin:
         out["rocket_hideout"] = self._has_silph_scope() and tuple(self.reader.read_current_map()) not in HIDEOUT_MAPS
         return out
 
+    def _tm_shop_note(self) -> str:
+        """The TM SHOP line for team_report: the Celadon Dept. Store TMs worth buying for this team, with price ('' when none help / unreadable)."""
+        from knowledge.tm_plan import line
+        from knowledge.tmhm import TMHM
+        try:
+            owned = [TMHM[i][0] for i, _q in self.reader.read_tmhm_pocket() if i in TMHM]
+            return line(self.reader.read_party(), owned, self.reader.read_money())
+        except Exception:
+            log_once("quests._tm_shop_note", "quests._tm_shop_note: tolerated failure (no TM shop line)")
+            return ""
+
     def _dex_note(self) -> str:
         """The DEX line for team_report (knowledge.dex_plan): the count and the easiest next catches ('' when unreadable)."""
         from knowledge.dex_plan import dex_line

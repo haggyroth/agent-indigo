@@ -225,6 +225,8 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `reorder_party` | overworld | first, second? | Out of battle, swap two party members (Start → POKéMON → SWITCH, driven for you) — or, with `second` omitted, make `first` your LEAD (slot 1, fights first; a fainted one can't lead). |
 | `teach_move` | overworld | tm, pokemon?, forget?, confirm? | Teach a TM/HM to a party Pokémon via the TM Case. |
 | `forget_move` | overworld | pokemon, move, force? | Delete a move at the Move Deleter in Fuchsia (travels there): the only way to remove an HM move. |
+| `rename_pokemon` | overworld | pokemon, nickname | Change a Pokémon's nickname at the Name Rater in Lavender Town (travels there). |
+| `daycare` | overworld | action, pokemon? | Route 5 Day Care (travels there): action='deposit' leaves one Pokémon (it gains 1 exp per step you walk; another must be able to fight); 'withdraw' takes it back for ¥100 + ¥100 per level gained. |
 | `tutor` | overworld | move, pokemon?, forget? | Learn a move from its Kanto tutor (free, once each; travels there): Counter, Softboiled, Seismic Toss, Rock Slide, Thunder Wave, Double-Edge, Substitute… `pokemon` optional. |
 | `fish` | overworld | casts? | Cast your best rod at the nearest water (walks to a shore) up to `casts` times; a wild Pokémon on the hook becomes a battle. |
 | `fly_to` | overworld | town | Fly to a visited town (needs a Pokémon that knows Fly + the Thunder Badge, outdoors): Pallet, Viridian, Pewter, Cerulean, Lavender, Vermilion, Celadon, Fuchsia, Cinnabar, Saffron, Indigo Plateau. |
@@ -245,7 +247,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 39 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 41 tools in total.
 <!-- TOOLS:END -->
 
 The opponent is identified from memory (`gEnemyParty`), so there is no
