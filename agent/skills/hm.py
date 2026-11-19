@@ -243,10 +243,17 @@ class HMMixin:
                                        ("Right", (1, 0)), ("Left", (-1, 0))):
                     ti = t.read_tile(x + dx, y + dy)
                     if ti is not None and ti.is_water and t.metatile_behavior(x + dx, y + dy) != 0x13:
-                        spots.append((abs(x - px) + abs(y - py), (x, y), face))
+                        here = t.read_tile(x, y)
+                        # The game only offers Surf from elevation-3 land (IsPlayerFacingSurfableFishableWater): Seafoam B4F's raised floor (elevation 4) faces water everywhere
+                        # but the prompt never appears there — only a few elevation-3 tiles do. Try those first.
+                        spots.append((0 if here is not None and here.elevation == 3 else 1, abs(x - px) + abs(y - py), (x, y), face))
                         break
-        for _d, (sx, sy), face in sorted(spots)[:6]:
-            self._walk_to(sx, sy)
+        for _lvl, _d, (sx, sy), face in sorted(spots)[:6]:
+            self._surf_search = True                 # walking to a shore must not itself try to start Surf (it would recurse into this search)
+            try:
+                self._walk_to(sx, sy)
+            finally:
+                self._surf_search = False
             if self.reader.read_player_pos() != (sx, sy):
                 continue
             for _ in range(3):

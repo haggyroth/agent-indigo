@@ -143,7 +143,7 @@ class QuestMixin:
                 "flash": self._get_flash, "fly": self._get_fly, "dig": self._get_dig, "hitmon": self._get_hitmon,
                 "magikarp": self._get_magikarp, "itemfinder": self._get_itemfinder, "exp_share": self._get_exp_share,
                 "old_rod": lambda a: self._get_rod("old", a), "good_rod": lambda a: self._get_rod("good", a),
-                "super_rod": lambda a: self._get_rod("super", a), "bike": self._get_bike, "zapdos": self._get_zapdos,
+                "super_rod": lambda a: self._get_rod("super", a), "bike": self._get_bike, "zapdos": self._get_zapdos, "articuno": self._get_articuno,
                 **{g: (lambda a, g=g: self._get_gym(g, a)) for g in ("brock", "misty", "surge", "erika", "koga", "sabrina", "blaine", "giovanni")}}[beat.driver](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────

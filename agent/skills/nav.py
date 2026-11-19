@@ -383,7 +383,7 @@ class NavMixin:
                 # If the ONLY thing in the way is an NPC standing in a chokepoint (a
                 # trainer in Mt. Moon's 2-wide B2F corridor), go talk to it / fight it
                 # rather than reporting the target unreachable forever.
-                if (not self._surfing() and not surf_tried and self._party_knows(57)):
+                if (not self._surfing() and not surf_tried and not self._surf_search and self._party_knows(57)):
                     surf_tried = True
                     sg, _w, _h = self.tilemap.passable_grid(surf=True)
                     if sg is not None and find_path((px, py), (tx, ty), lambda x, y: sg[y][x], w, h):
