@@ -74,6 +74,20 @@ class Live:
             a = sb1 + Addr.FLAGS_OFFSET + (n >> 3)
             self.m.write8(a, self.m.read8(a) | (1 << (n & 7)))
 
+    def set_dex(self, caught: int, seen: int | None = None) -> None:
+        """Stage: make the Pokédex hold species 1..`caught` as CAUGHT and 1..`seen` (default: the same) as seen. The game counts a species as caught only when its
+        owned bit AND all three seen arrays agree (SaveBlock2 owned + seen, SaveBlock1 seen1 + seen2), so all four are written."""
+        seen = caught if seen is None else max(seen, caught)
+        sb1, sb2 = self.m.read32(Addr.SAVEBLOCK1_PTR), self.m.read32(Addr.SAVEBLOCK2_PTR)
+
+        def fill(base, n):
+            for i in range(52):
+                bits = sum(1 << b for b in range(8) if i * 8 + b < n)
+                self.m.write8(base + i, bits)
+        fill(sb2 + Addr.DEX_OWNED_OFFSET, caught)
+        for base in (sb2 + Addr.DEX_SEEN_OFFSET, sb1 + 0x5F8, sb1 + 0x3A18):
+            fill(base, seen)
+
     def set_money(self, yen: int) -> None:
         sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
         self.m.write32(sb1 + Addr.MONEY_OFFSET, yen ^ self.r._encryption_key())

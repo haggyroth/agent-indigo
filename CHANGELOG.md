@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Oak's Aide rewards and hidden items (#275, #276)
+- **`quest('itemfinder')` / `quest('exp_share')`** (verified live): the Route 11 gatehouse (2F) aide gives the Itemfinder for **30 species caught**, the Route 15 one the Exp. Share
+  for **50** (`knowledge/aides.py`); when short the quest says how many more to catch, and the Exp. Share is handed to the Pokémon that lags (`holder_for` + `give_item`).
+  An `OAK'S AIDE:` observation line appears when a reward is claimable (or within 3 species). New optional beats `itemfinder`, `exp_share`; maps named for `go_to`.
+- **Fixed — `quest('flash')` counted SEEN species** (#291): every aide script compares `VAR_0x8006`, which `GetPokedexCount` fills with the CAUGHT count, so Flash wants 10 caught.
+- **Hidden items** (`knowledge/hidden_items.py`): `pick_up_items` now also walks to the worthwhile hidden items `area_facts` knows on the current map (PP Up, Rare Candy, vitamins,
+  Max Revive / Full Restore, Ether / Elixir, Nuggets / Pearls / Star Piece / Stardust / Big Mushroom, stones, strong balls, TMs — not Potions or berries): beside the tile, FACE it, A.
+  The Itemfinder is not needed once the tile is known. Collected (or empty) tiles are remembered in `ltm` (`hidden_taken`), unreachable ones are retried later.
+- **Two bugs found live**: facing a WALKABLE tile — a tap steps onto it and A there does nothing — so the driver reads the player's facing (`read_player_facing`) and turns with a
+  3-frame hold; and the game counts a species caught only when its owned bit and all three seen arrays agree (`live.set_dex` stages all four).
+
 ### Fixed — Cut trees in the region graph; Route 16's Fly house is reachable; the Poké Flute gate is narrower; Route 4's Magikarp house says why not (#293)
 - **Cut-tree links** (`tools/gen_regions.py` → `BLOCKER_LINKS` in `knowledge/map_regions.py`): the generator still treats Cut trees / rocks as walls, but now also records the
   two regions each one separates. `route_to` tries a second strict search with those links (a `("cut", far-side tile, node)` step; `go_to` walks to the tile and `walk_to`

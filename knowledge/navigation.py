@@ -79,6 +79,8 @@ MAP_NAMES: dict[tuple[int, int], str] = {
     (11, 9): "Move Deleter's House",
     (15, 2): "Route 2 East Building",
     (14, 2): "Saffron Dojo",
+    (22, 1): "Route 11 East Gate 2F",
+    (24, 1): "Route 15 West Gate 2F",
     (16, 0): "Route 4 Magikarp House",
     (25, 0): "Route 16 House",
     (1, 64): "Safari Zone (East)",
