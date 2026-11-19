@@ -102,7 +102,7 @@ class QuestMixin:
     def _quest_tool(self, name: str = "", auto_trainers: bool = False) -> str:
         """quest(name?) — the story chain (knowledge.story_beats). No name lists every beat from the Pokédex to the Elite Four with
         ✔ done / ▶ next / … blocked; a name runs its script when it has one (ss_ticket, cut, coin_case, rocket_hideout, tea, surf,
-        strength) or prints the state-aware plan (pokemon_tower, poke_flute, snorlax, silph_co, pokemon_mansion, the gyms, …)."""
+        strength, the eight gyms…) or prints the state-aware plan (only the game start, `parcel`, is guide-only now)."""
         from knowledge import story_beats as sb
         status = self._story()
         if not str(name or "").strip():
@@ -114,6 +114,8 @@ class QuestMixin:
             return f"{beat.title}: already done."
         if not beat.driver:
             return "No script for this one yet — here is the plan:\n" + sb.plan(beat, status)
+        if beat.driver in ("brock", "misty", "surge", "erika", "koga", "sabrina", "blaine", "giovanni") and status.get(beat.key) == "blocked":
+            return "Not yet — " + sb.plan(beat, status)                     # a locked Gym: say what comes first instead of walking up to the guard
         legacy_needs = {"cut": ("ss_ticket",)}
         missing = [n for n in legacy_needs.get(beat.key, ()) if status.get(n) != "done"]
         if missing:
@@ -131,7 +133,8 @@ class QuestMixin:
                 "flash": self._get_flash, "fly": self._get_fly, "dig": self._get_dig, "hitmon": self._get_hitmon,
                 "magikarp": self._get_magikarp, "itemfinder": self._get_itemfinder, "exp_share": self._get_exp_share,
                 "old_rod": lambda a: self._get_rod("old", a), "good_rod": lambda a: self._get_rod("good", a),
-                "super_rod": lambda a: self._get_rod("super", a), "bike": self._get_bike}[beat.driver](auto_trainers)
+                "super_rod": lambda a: self._get_rod("super", a), "bike": self._get_bike,
+                **{g: (lambda a, g=g: self._get_gym(g, a)) for g in ("brock", "misty", "surge", "erika", "koga", "sabrina", "blaine", "giovanni")}}[beat.driver](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:

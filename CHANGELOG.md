@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the eight Gym beats are runnable: `quest('brock')` … `quest('giovanni')` (#260)
+- `agent/skills/gymquest.py`: go_to the town, go_to('Gym'), then `challenge_leader` (its heal / save / lopsided-team warning stay there); a trainer on the way or the Leader ends the call as a
+  battle for the model, and the same call resumes. A locked gym says what comes first ("Not yet — … first Silph Co.") instead of walking up to the guard. Verified live: from Pewter,
+  `quest('brock')` walked in, warned once, fought the Camper and Brock and took the Boulder Badge.
+- **Fixed**: the `parcel` beat counted only a `delivered_oaks_parcel` milestone, so a run from a post-parcel save (no milestone) had every gym beat blocked. `FLAG_SYS_POKEDEX_GET` (0x829) now counts.
+- New `full_chain` eval scenario (post-parcel save → `hall_of_fame`), for running by hand. `quest()`'s listing now has a runnable script for every beat except the game start (`parcel`).
+
 ### Added — move tutors: `tutor(move, pokemon?, forget?)` (#274, mainland)
 - **`tools/gen_tutors.py` → `knowledge/tutors.py`** (from the decomp): the 15 tutor moves, every species' tutor learnset (bit = tutor index) and the 12 mainland tutors — Route 4 (Mega Punch /
   Kick), Celadon (Softboiled), Dept. Store 3F (Counter), Cinnabar Lab (Metronome), Fuchsia (Substitute), Pewter Museum (Seismic Toss, ¥50 at the door), Rock Tunnel B1F (Rock Slide), Silph Co. 2F

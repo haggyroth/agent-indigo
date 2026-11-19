@@ -113,6 +113,18 @@ SCENARIOS += [
               "Passes when FLAG_SYS_GAME_CLEAR sets the hall_of_fame milestone.",
     ),
 ]
+SCENARIOS += [
+    Scenario(
+        name="full_chain",
+        goal=goals.has_milestone("hall_of_fame"),
+        max_steps=40000,
+        max_wall_s=3 * 86400,
+        start_save=DEFAULT_SAVE,
+        notes="The whole story from the standard post-parcel save: every gym beat is runnable (quest('brock') … quest('giovanni')), then quest('victory_road') and "
+              "quest('elite_four'); the goal is the hall_of_fame milestone (FLAG_SYS_GAME_CLEAR). Days of wall time with a real model — run it by hand "
+              "(python -m evals full_chain), never in CI; it exists so a regression anywhere in the chain shows up end to end.",
+    ),
+]
 
 
 def by_name(name: str) -> Optional[Scenario]:

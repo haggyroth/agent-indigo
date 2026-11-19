@@ -1621,3 +1621,40 @@ def test_move_tutor_teaches_substitute_into_a_free_slot_and_over_a_forgotten_mov
     pidgeotto = next(p for p in live.r.read_party() if p.species_name == "Pidgeotto")
     assert "learned Substitute" in out and "forgetting" in out, out
     assert "Substitute" in pidgeotto.move_names and len([m for m in pidgeotto.move_names if m]) == 4
+
+
+def test_quest_brock_travels_to_the_gym_and_challenges_the_leader(live):
+    """quest('brock') on the real ROM (#260): from Pewter City it walks into the Gym, gives the once-only lopsided-team warning, then challenges the Gym trainer and Brock (the
+    fights are played by the test like the model would) — and the badge flips the beat to done. The parcel counts as delivered from FLAG_SYS_POKEDEX_GET (a save from after the
+    parcel has no milestone, which used to block every gym beat)."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    for _ in range(6):
+        c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 6):
+            break
+    live.fly_to("pewter city", badges=0xFF)
+    live.set_badges(0)
+    for f in (0x500 + 414, 0x4B0, 0x500 + 142, 0x820):             # Brock and the Camper not yet beaten; FLAG_DEFEATED_BROCK and FLAG_BADGE01_GET clear
+        live.set_flag(f, False)
+    live.strong_lead(level=30, exp=27000)
+    live.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])
+    assert c._story()["brock"] == "next"
+    first = c._execute("quest", json.dumps({"name": "brock"}))
+    assert tuple(live.r.read_current_map()) == (6, 2) and "lopsided" in first, first
+    out = ""
+    for _ in range(14):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        live.boost_party()
+        out = c._execute("quest", json.dumps({"name": "brock"}))
+        if live.r.read_badges()[1] & 1:
+            break
+    assert live.r.read_badges()[1] & 1, out
+    assert "already done" in c._execute("quest", json.dumps({"name": "brock"}))
