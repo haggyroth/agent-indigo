@@ -1265,7 +1265,13 @@ class BattleMixin:
 
     def _auto_fight(self) -> None:
         """Fight the current battle to the end with the best damaging move each turn."""
+        from game.constants import Addr
         from game.state import GameContext
+        from knowledge.one_shot import is_one_shot
+        foe = self.reader.read_enemy_lead() if self.reader.detect_context() == GameContext.IN_BATTLE else None
+        if foe and foe.max_hp and foe.current_hp > 0 and is_one_shot(foe.species_id) \
+                and not self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
+            return                             # a Snorlax / a legend: the autopilot would knock it out — leave it to the model (callers hand a battle that is still on to it)
         potions_used: list = []
         for _ in range(24):
             if self._send_next_mon():          # lead fainted: the game forces a replacement

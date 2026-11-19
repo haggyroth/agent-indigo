@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — one-shot encounters: Snorlax and the legends are caught, never knocked out (#272, the protocol)
+- `knowledge/one_shot.py`: Snorlax, Articuno, Zapdos, Moltres and Mewtwo appear once. The battle observation now shows **ONE-SHOT: …** instead of the generic wild-battle line: the battle-start state is
+  **auto-saved to slot 9** (once per encounter) — `load_state(9)` retries if it faints or flees — weaken it with the *gentlest* damaging move (named), stop at the red bar, status it, then
+  `catch()` with the Master Ball (legends) or an Ultra Ball; no balls means reload and shop.
+- **The autopilot no longer plays these fights**: `_auto_fight` returns at once for a wild one-shot foe and `quest('snorlax')` never passes its fight to it (it used to knock the Snorlax out). After the
+  fight the quest says whether you actually caught it. Verified live on Route 12: the fight reaches the model, the protocol and slot-9 save are there, and a hit followed by `load_state(9)` restores full HP.
+- Not done: the Route 16 Snorlax script (it ties into the Cycling Road / bike routing, #269), a "chip safely" damage estimate, and scripting the three birds' own encounters.
+
 ### Added — the Pokédex completion plan: a `DEX:` line in `team_report` (#266, first part)
 - `tools/gen_dex_sources.py` → `knowledge/dex_sources.py` (from the decomp): `EVOLVES_FROM` (72 Kanto evolutions with level / stone / trade / friendship) and the seven in-game `TRADES` (Mr. Mime for Abra, Jynx for
   Poliwhirl, Farfetch'd, Lickitung, Electrode, Tangela, Seel — with the place). `knowledge/dex_plan.py` adds the curated one-offs (starters, Game Corner prizes, the Dojo Hitmons, Magikarp, Lapras,

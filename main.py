@@ -352,6 +352,7 @@ class _RunState:
     stuck_ticks: int = 0
     step_count: int = 0
     consecutive_errors: int = 0
+    one_shot_saved: Optional[tuple] = None   # (species, map) of the Snorlax / legend whose battle-start state is already in slot 9
 
 
 # gBattleOutcome label (agent.events.battle_outcome_label) -> the LTM counter it bumps. A fled, caught or drawn

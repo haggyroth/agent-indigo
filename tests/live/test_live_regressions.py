@@ -1672,3 +1672,41 @@ def test_team_report_carries_the_dex_plan_line(live):
     assert line.startswith("DEX: 19/151 caught. Easiest next: ") and "wild:" in line, line
     live.set_dex(151)
     assert "DEX: all 151 Kanto species caught." in live.c._execute("team_report", json.dumps({}))
+
+
+def test_snorlax_is_a_one_shot_the_model_plays_with_a_saved_state(live):
+    """quest('snorlax') on the real ROM (#272): the Route 12 Snorlax fight is NOT played by the autopilot (it would knock it out); the battle is handed to the model with the
+    ONE-SHOT protocol (gentlest move, never KO) and the battle-start state saved in slot 9 — hitting it and load_state(9) restores its full HP."""
+    import pytest
+    from types import SimpleNamespace as NS
+    from agent.observation import _one_shot
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    for _ in range(6):
+        c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 6):
+            break
+    live.fly_to("lavender town", flags=(0x23C, 0x23D), key_items=(350,))
+    live.give_item(2, 5)
+    foe = None
+    for _ in range(14):
+        c._execute("quest", json.dumps({"name": "snorlax", "auto_trainers": False}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            foe = live.r.read_enemy_lead()
+            if foe and foe.species_id == 143:
+                break
+            c._auto_fight()                                              # the Route 12 trainers on the way
+    assert foe and foe.species_id == 143 and foe.current_hp == foe.max_hp, "the Snorlax fight was not handed to the model"
+    _ids, names, pp = live.r.read_active_battle_moves()
+    t = NS(run=NS(), map_key=tuple(live.r.read_current_map()), reader=live.r)
+    text = _one_shot(t, foe, list(names), list(pp))
+    assert "ONE-SHOT: Snorlax" in text and "load_state(9)" in text and t.run.one_shot_saved == (143, (3, 30)), text
+    c._use_move(next(n for n in names if n))
+    assert live.r.read_enemy_lead().current_hp < foe.max_hp
+    assert live.m.load_state(9)
+    live.m.tick(30)
+    assert live.r.read_enemy_lead().current_hp == foe.max_hp and live.r.detect_context().name == "IN_BATTLE"
