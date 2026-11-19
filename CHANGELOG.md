@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — a new game starts with a blank journal
+- `START_NEW_GAME=true` used to keep `logs/progress.json`: its `delivered_oaks_parcel` milestone made `quest('new_game')` answer "already done" at the title screen. A new game now backs the journal up
+  (`progress.json.pre-newgame-<time>.bak`) and starts from the defaults (`LongTermMemory.start_fresh`).
+
 ### Fixed — the opening of the game: what a watched new-game run got wrong
 A run from the title screen took the parcel from the Viridian Mart clerk and then never delivered it. The log showed why:
 - **No cue to deliver it.** The `STORY NEXT` line was only shown after the first badge. It now shows before the Pokédex too, with an `OAK'S PARCEL is in your bag — take it to Prof. Oak: quest('parcel')` line (and an

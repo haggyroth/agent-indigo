@@ -303,6 +303,9 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
 
     tilemap = TilemapReader(mgba)
     ltm     = LongTermMemory(path=ltm_path)
+    if new_game and backend == "native":
+        backup = ltm.start_fresh()                  # stale milestones would make quest('new_game') say "already done" at the title
+        say("[yellow]New game: the journal starts blank" + (f" (the old one is saved as {backup.name})" if backup else "") + "[/]")
     client  = AgentClient(mgba, reader, ltm)
     stm     = ShortTermMemory()
     journal = BattleJournal(path=journal_path)

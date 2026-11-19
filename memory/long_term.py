@@ -136,6 +136,22 @@ class LongTermMemory:
         self.save()
         return True
 
+    def start_fresh(self) -> Path | None:
+        """A NEW GAME starts with a blank journal: a progress.json left over from an earlier run still lists milestones (delivered_oaks_parcel, beat_brock…) that the story chain reads as
+        'done', so quest('new_game') would answer "already done" at the title screen. Backs the old file up next to it (progress.json.pre-newgame-<time>.bak) and resets to DEFAULTS.
+        Returns the backup path (None when there was nothing to back up)."""
+        backup = None
+        if self.path.exists():
+            backup = self.path.with_name(f"{self.path.name}.pre-newgame-{datetime.now().strftime('%Y%m%d-%H%M%S')}.bak")
+            try:
+                os.replace(self.path, backup)
+            except OSError:
+                logger.warning("could not back up %s before a new game; overwriting it", self.path.name)
+                backup = None
+        self.data = copy.deepcopy(DEFAULTS)
+        self.save()
+        return backup
+
     def new_session(self):
         self.data["session_count"] += 1
         self.save()
