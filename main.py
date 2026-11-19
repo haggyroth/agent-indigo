@@ -1,6 +1,6 @@
 from agent.skills.base import log_once
 from datetime import datetime
-from config import (RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
+from config import (START_NEW_GAME, RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, BATTLE_STYLE, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
                     LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
 from game.memory_reader import LeafGreenReader
@@ -232,6 +232,8 @@ def drive_into_gameplay(mgba, reader, attempts: int = 4) -> bool:
 def build_runtime(*, backend: str = MGBA_BACKEND,
                   start_save: str = START_FROM_SAVE,
                   start_state: str = START_FROM_STATE,
+                  new_game: bool = START_NEW_GAME,
+                  rom_path: str = "",
                   ltm_path: Optional[str] = None,
                   journal_path: Optional[str] = None,
                   fresh_session: bool = True,
@@ -250,7 +252,7 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
         console.rule("[bold green]Pokemon LeafGreen LLM Agent")
     if backend == "native":
         from game.mgba_core import NativeMGBAClient
-        mgba = NativeMGBAClient()
+        mgba = NativeMGBAClient(rom_path or None)
     else:
         from game.mgba_client import MGBAClient
         mgba = MGBAClient()
@@ -273,7 +275,11 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
 
     # Optionally load an mGBA save STATE directly — instant, no title/Continue/
     # recap. Takes precedence over start_save (native only).
-    if start_state and backend == "native":
+    if new_game and backend == "native":
+        mgba.reset()
+        mgba.run_frames(600)                  # the boot logos: the game then sits on the title screen, waiting for quest('new_game')
+        say("[green]New game: booted to the title screen (no save loaded)[/]")
+    elif start_state and backend == "native":
         if mgba.load_state_file(start_state):
             mgba.tick(30)   # let post-load fade/flags settle before first read
             s = reader.read_state()

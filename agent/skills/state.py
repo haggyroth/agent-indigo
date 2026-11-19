@@ -42,6 +42,7 @@ class SkillState:
     _balance_warned = None       # …and the lopsided-team warning
     _trainer_losses = lazy(dict)  # {map: n} lost trainer battles per map (a mandatory trainer beating an under-levelled team)
     _surf_search = 0              # >0 while _surf's second pass (the elevation-3 shores) walks to a shore: walk_to must not start Surf itself then (it would recurse into the search)
+    _quest_opts = ()              # the words after the quest name in quest('new_game squirtle name=KYLE') — read by the driver that was dispatched
     _walk_avoid = None            # tiles walk_to must not cross (set around a gym's teleport-pad walk)
     _lost_goals = lazy(dict)      # {grass map: the party's best level when a trainer on the way to it beat us} — skipped until we are 3 levels stronger
     _gate_why = ""                # the last reason a grass route was skipped (a story gate / a lost trainer), told to the model if grind() then fails
