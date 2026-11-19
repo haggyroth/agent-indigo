@@ -1599,3 +1599,25 @@ def test_fish_hooks_a_wild_pokemon_and_the_bicycle_mounts_and_dismounts(live):
     px, py = live.r.read_player_pos()
     c._walk_to(px, py + 1) if False else c._walk_to(px - 1, py)                          # any adjacent walk: it must dismount first
     assert not live.r.is_biking()
+
+
+def test_move_tutor_teaches_substitute_into_a_free_slot_and_over_a_forgotten_move(live):
+    """tutor('Substitute') on the real ROM (#274): the Fuchsia City tutor (a Bug Catcher at (15,11)) — talk, YES, YES, the party screen, and for a Pokémon with four moves the
+    summary screen to forget one. Free slot: Venusaur just learns it; full moveset: Pidgeotto replaces a status move (not an HM, not its last attack). The lesson is one-time."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("fuchsia city", badges=0xFF)
+    live.defeat_all_trainers()
+    out = c._execute("tutor", json.dumps({"move": "Substitute", "pokemon": "Venusaur"}))
+    assert "learned Substitute" in out and live.r.read_flag(0x2C8), out
+    assert "Substitute" in live.r.read_party()[0].move_names
+    assert "already taught Substitute" in c._execute("tutor", json.dumps({"move": "Substitute"}))                # one-time
+    live.set_flag(0x2C8, False)                                                                                    # second Pokémon, the full-moveset path
+    out = c._execute("tutor", json.dumps({"move": "Substitute", "pokemon": "Pidgeotto"}))
+    pidgeotto = next(p for p in live.r.read_party() if p.species_name == "Pidgeotto")
+    assert "learned Substitute" in out and "forgetting" in out, out
+    assert "Substitute" in pidgeotto.move_names and len([m for m in pidgeotto.move_names if m]) == 4

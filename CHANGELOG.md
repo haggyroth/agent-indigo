@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — move tutors: `tutor(move, pokemon?, forget?)` (#274, mainland)
+- **`tools/gen_tutors.py` → `knowledge/tutors.py`** (from the decomp): the 15 tutor moves, every species' tutor learnset (bit = tutor index) and the 12 mainland tutors — Route 4 (Mega Punch /
+  Kick), Celadon (Softboiled), Dept. Store 3F (Counter), Cinnabar Lab (Metronome), Fuchsia (Substitute), Pewter Museum (Seismic Toss, ¥50 at the door), Rock Tunnel B1F (Rock Slide), Silph Co. 2F
+  (Thunder Wave), Victory Road 2F (Double-Edge), Viridian (Dream Eater), Saffron Copycat's house (Mimic — needs a Poké Doll) — with map, NPC tile and the one-time `FLAG_TUTOR_*`.
+- **`tutor`** (new tool): resolves the move loosely, picks the highest-level capable party member (or the named one; says who can't), travels, walks up to the NPC, and drives talk → YES → YES →
+  the party screen → (a full moveset) the summary screen to forget a safe move. Verified live at Fuchsia: Venusaur into a free slot, Pidgeotto over Sand Attack; the lesson is one-time.
+- **Bugs found live**: a Yes/No box can sit ON the party screen ("forget a move to learn X?") and must be answered before the cursor logic; and `_approach_adjacent` planned on the previous map's
+  cached grid right after a warp/fly inside one agent step (it now refreshes first).
+- Overworld token cap 4450 → 4500, "everything" cap 5100 → 5300 for the new tool.
+- Not done: Sevii tutors, sourcing the Poké Doll for Mimic, paying the Museum fee on the way to the Seismic Toss tutor, and "which tutor moves are worth it for this team" suggestions in `team_report`.
+
 ### Added — fishing rods, the Bicycle and the Running Shoes flag (#269, first part)
 - **Acquisition quests** (all verified live): `quest('old_rod')` (Vermilion house 1), `quest('good_rod')` (Fuchsia house 2), `quest('super_rod')` (Route 12's fishing house; reached
   from Fuchsia through Routes 15/12) — "Do you like to fish?" → YES; `quest('bike')` — the Pokémon Fan Club chairman's story gives the Bike Voucher, the Cerulean Bike Shop swaps it for the

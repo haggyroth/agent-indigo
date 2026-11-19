@@ -461,6 +461,7 @@ class NavMixin:
         next to a solid object (item ball) so we can face it and press A. Already-
         adjacent is success. Tries the nearest reachable neighbour. Returns whether
         we ended up adjacent."""
+        self.tilemap.refresh()              # the cached grid is the previous map's after a warp inside the same agent step
         grid, w, h = self.tilemap.passable_grid()
         if not grid:
             return False
