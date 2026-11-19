@@ -7,7 +7,7 @@ All notable changes to this project are documented here. Format loosely follows
 
 ### Fixed — four problems from a watched new-game run
 - **`heal()` hung in a trainer battle.** Its trip to the Center auto-fought a trainer with a hurt party (`mode="flee"`): two Pokémon fainted and the watchdog stopped it ("no progress for 3.4 min of game time"), twice. With a
-  must-heal need, a trainer on a heal trip (or grind's relocation) now goes to the model like any encounter — "switch to a healthy Pokémon or use a Potion" — and `heal()` resumes the trip. Healthy parties still auto-fight.
+  must-heal need, a trainer on a heal trip now goes to the model like any encounter — "switch to a healthy Pokémon or use a Potion" — and `heal()` resumes the trip. Healthy parties still auto-fight.
 - **Stale moves and empty PP.** `use_move` with a move the Pokémon no longer has (Bulbasaur replaced Tackle) or one at 0 PP now lists the moves it really has WITH their PP ("usable now: Sleep Powder (PP 15)…", or "Struggle is
   all that's left" when everything is empty). The model had called `Tackle` / `Vine Whip` again and again.
 - **Over-long nicknames.** `catch(nickname=…)` with more than 10 characters is shortened (whole words while ≥ 5 characters survive: "Beaky Blinders" → "Beaky") and the reply says so, instead of throwing no ball and

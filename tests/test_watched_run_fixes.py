@@ -62,3 +62,18 @@ def test_a_healthy_party_still_auto_fights_a_travel_trainer_in_flee_mode():
     c.reader = NS(read_current_map=lambda: (3, 21), read_party=lambda: [NS(current_hp=20, max_hp=20, hp_percent=1.0)], detect_context=lambda: GameContext.OVERWORLD)
     c._trainer_losses = {}
     assert c._handle_travel_battle("Pokemon Center", mode="flee") is None and fought == [1]
+
+
+def test_only_heal_hands_the_trainer_over_gym_puzzles_and_grind_keep_the_autopilot():
+    """The Vermilion gym's trash-can walk (and grind's relocation) also travel in "flee" mode with a possibly hurt party and need the autopilot: only heal() passes call="heal()"."""
+    from game.constants import Addr
+    c = client()
+    fought = []
+    c.mgba = NS(read32=lambda a: Addr.BATTLE_TYPE_TRAINER if a == Addr.BATTLE_TYPE_FLAGS else 0, read8=lambda a: 0)
+    c._has_must_need = lambda: True                                   # a hurt party
+    c._lagging_mons = lambda: []
+    c._auto_fight = lambda: fought.append(1)
+    c._yield_encounter = lambda *a, **k: pytest.fail("a gym puzzle / grind trip must not hand the trainer to the model")
+    c.reader = NS(read_current_map=lambda: (6, 1), read_party=lambda: [NS(current_hp=20, max_hp=20, hp_percent=1.0)], detect_context=lambda: GameContext.OVERWORLD)
+    c._trainer_losses = {}
+    assert c._handle_travel_battle("the puzzle tile", mode="flee") is None and fought == [1]
