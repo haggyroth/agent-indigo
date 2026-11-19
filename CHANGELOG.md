@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — a new game starts with a blank journal
+- `START_NEW_GAME=true` used to keep `logs/progress.json`: its `delivered_oaks_parcel` milestone made `quest('new_game')` answer "already done" at the title screen. A new game now backs the journal up
+  (`progress.json.pre-newgame-<time>.bak`) and starts from the defaults (`LongTermMemory.start_fresh`).
+
 ### Added — the live suite runs as a gate, and its first full run found a regression (#279)
 - `tools/live_suite.py`: one command for the real-ROM suite — preflight (ROM, `work.sav`, every fixture a test loads, the binding), summary, `--changed BASE` (only when the diff touches guarded code), `--post-status` (publishes
   the `live-suite` commit status for HEAD; full runs only). `.github/workflows/live-gate.yml` keeps that status `success` ("not needed") or `pending` ("run the live suite") on every pull request. `docs/live-ci.md` weighs the options
