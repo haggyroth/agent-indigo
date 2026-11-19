@@ -51,8 +51,14 @@ def save_note(badges: int, battles: int, saved_badges, saved_battles: int) -> st
     return ""
 
 
+FLAG_POKEDEX = 0x829            # FLAG_SYS_POKEDEX_GET: Oak has the parcel — the first phase of the game (the starter, the rival, the parcel run) is over
+
+
 def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=(), dex=None, tms=None,
-           boxes=None, save_due: str = "") -> list[Need]:
+           boxes=None, save_due: str = "", pokedex: bool = True) -> list[Need]:
+    """What to sort out before travelling on. `pokedex=False` is the opening (before Oak's Pokédex): the Viridian Mart sells nothing, Oak hands out the first Poké Balls, Brock is far away and
+    the road north is shut — so the only advice is to heal. (A watched new-game run read "shop(), catch more, grind(13) first" at the Mart, shopped fruitlessly a dozen times and then
+    grinded on Route 22 instead of taking the parcel to Oak.)"""
     needs: list[Need] = []
     if not party:
         return needs
@@ -75,6 +81,8 @@ def assess(party, balls: int = 0, potions: int = 0, money: int = 0, gyms_beaten=
     if why:
         needs.append(Need("must", "heal", "heal() at a Pokémon Center (HP and PP): " + "; ".join(why)))
 
+    if not pokedex:
+        return needs
     if (balls < MIN_BALLS or potions < MIN_POTIONS) and money >= 500:
         short = [f"{n} ({have}/{want})" for n, have, want in
                  (("Poké Balls", balls, MIN_BALLS), ("Potions", potions, MIN_POTIONS)) if have < want]

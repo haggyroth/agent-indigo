@@ -422,10 +422,20 @@ class OverworldMixin:
         cur = tuple(self.reader.read_current_map())
         return MAP_KIND.get(cur) == "mart" or any((b, m) == cur for b, m, *_rest in SHOPS)
 
+    def _viridian_mart_closed(self) -> str:
+        """'' normally. Inside Viridian's Mart before Oak's Pokédex the clerk only has the parcel for you — there is no buy menu (a watched run called shop() a dozen times)."""
+        from knowledge.readiness import FLAG_POKEDEX
+        if tuple(self.reader.read_current_map()) == (5, 3) and not self.reader.read_flag(FLAG_POKEDEX):
+            return ("The Viridian Mart clerk doesn't sell anything yet: he only hands over Oak's Parcel until Prof. Oak has it. Take the parcel to Oak (Pallet Town's lab): quest('parcel'). "
+                    "Oak gives you the first Poké Balls; shop() works at the next Mart.")
+        return ""
+
     def _shop(self, item: str = "", quantity: int = 1) -> str:
         """Restock at the Poké Mart per the badge-gated purchase policy: travel to a
         Mart if needed, open the buy menu, buy the affordable par-level list of items
         this mart sells, and leave. With `item`, buy that specific item instead (_shop_for)."""
+        if (msg := self._viridian_mart_closed()):
+            return msg
         if str(item or "").strip():
             return self._shop_for(str(item), quantity)
         from knowledge.shopping import compute_shopping_list, ITEM_NAMES, ITEM_PRICES

@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — the opening of the game: what a watched new-game run got wrong
+A run from the title screen took the parcel from the Viridian Mart clerk and then never delivered it. The log showed why:
+- **No cue to deliver it.** The `STORY NEXT` line was only shown after the first badge. It now shows before the Pokédex too, with an `OAK'S PARCEL is in your bag — take it to Prof. Oak: quest('parcel')` line (and an
+  `OPENING:` line while the parcel is still to fetch).
+- **Nudges that sent it the wrong way.** READINESS said "shop(), catch more, Brock's gym is next — grind(13) first", the Mart said "call shop()" and `go_to` appended "Before the next leg: shop()". Until Oak has the Pokédex the
+  Viridian Mart sells nothing (the model called `shop()` a dozen times), Oak gives the first Poké Balls and the road north is shut — so `readiness.assess(pokedex=False)` advises only a heal, the Mart hint is hidden and
+  `shop()` there answers why ("the clerk only hands over Oak's parcel").
+- **The rival's first battle.** It opens with ~35 text boxes, including Oak's battle tutorial, whose menus the move-menu check never recognises: `use_move` answered "the battle menu did not respond" three times.
+  The new-game driver now plays that intro and tutorial through (and `use_move` / `advance_dialog` wait longer: 60 / 150 steps instead of 20 / 60) and tells the model when it is its turn.
+
 ### Added — the live suite runs as a gate, and its first full run found a regression (#279)
 - `tools/live_suite.py`: one command for the real-ROM suite — preflight (ROM, `work.sav`, every fixture a test loads, the binding), summary, `--changed BASE` (only when the diff touches guarded code), `--post-status` (publishes
   the `live-suite` commit status for HEAD; full runs only). `.github/workflows/live-gate.yml` keeps that status `success` ("not needed") or `pending` ("run the live suite") on every pull request. `docs/live-ci.md` weighs the options

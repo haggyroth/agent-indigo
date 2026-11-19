@@ -140,7 +140,7 @@ class BattleMixin:
         forced_msg = ("Your Pokémon fainted — the game is forcing a replacement. Call "
                       "switch_pokemon('<name or slot>'). Healthy: {}.")
         refused = 0
-        for _ in range(20):
+        for _ in range(60):                 # the rival's first fight plays Oak's battle tutorial (~35 text boxes) before the action menu: 20 was not enough
             if forced_party_screen(self.mgba, self.reader):
                 return forced_msg.format(_healthy_roster(self.reader))
             if self.reader.detect_context() != GameContext.IN_BATTLE:
@@ -445,7 +445,7 @@ class BattleMixin:
         self.mgba.write8(Addr.ACTION_CURSOR, 0)
         self._battle_press("A")
 
-    def _battle_settle(self, max_steps: int = 60) -> str:
+    def _battle_settle(self, max_steps: int = 150) -> str:
         """Drive battle text forward to the next DECISION point and say what it is. This is what
         advance_dialog does in a battle: the model used to call it ~190 times through a gym
         trainer's faint/send-out/win text because it just answered "a battle started" and pressed

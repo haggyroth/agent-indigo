@@ -833,7 +833,7 @@ class NavMixin:
 
     def _readiness(self):
         """knowledge.readiness needs for the current party/bag/money/gym progress ([] on any read hiccup)."""
-        from knowledge.readiness import assess
+        from knowledge.readiness import FLAG_POKEDEX, assess
         try:
             bag = self.reader.read_bag()
             balls = sum(bag.get(b, 0) for b in (1, 2, 3, 4))
@@ -843,7 +843,7 @@ class NavMixin:
             except Exception:
                 tms = None
             return assess(self.reader.read_party(), balls, pots, self.reader.read_money(),
-                          self.ltm.data.get("gyms_beaten", []), tms=tms)
+                          self.ltm.data.get("gyms_beaten", []), tms=tms, pokedex=bool(self.reader.read_flag(FLAG_POKEDEX)))
         except Exception:
             return []
 

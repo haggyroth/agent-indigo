@@ -35,7 +35,7 @@ from knowledge.mon_quality import assess as assess_iv, hidden_power
 from knowledge.move_semantics import catch_setup_hint
 from knowledge.navigation import DIRECTION_BUTTON, MAP_NAMES, get_travel_direction, infer_building_type
 from knowledge.party import can_attack, healthy_enough
-from knowledge.readiness import assess as readiness_assess, render as readiness_render, battles_total, save_note
+from knowledge.readiness import FLAG_POKEDEX, assess as readiness_assess, render as readiness_render, battles_total, save_note
 from knowledge.repel import REPEL_IDS, VAR_REPEL_STEP_COUNT, note as repel_note
 from knowledge.shopping import shopping_summary
 from knowledge.team import wanted_species
@@ -152,6 +152,18 @@ def _aide_line(t: Tick) -> str:
     return ""
 
 
+PARCEL_ITEM = 349       # ITEM_OAKS_PARCEL (a key item)
+
+
+def _opening_line(t: Tick) -> str:
+    """The first phase of the game, before Oak's Pokédex: what to do next, and what NOT to do (a watched run shopped and grinded with the parcel in its bag)."""
+    if PARCEL_ITEM in _safe("key_items", t.reader.read_key_items, []):
+        return ("OAK'S PARCEL is in your bag — take it to Prof. Oak in his lab (Pallet Town): quest('parcel') does it. Until he has it the Viridian Mart sells nothing and the road north "
+                "stays shut, so do NOT shop() or grind() yet (Oak gives you the first Poké Balls).")
+    return ("OPENING: the Viridian Mart clerk gives you Oak's Parcel when you walk in — fetch it, then take it to Prof. Oak (quest('parcel') does both). "
+            "Shopping, grinding and the gyms wait until Oak has given you the Pokédex.")
+
+
 def _readiness_and_bag(t: Tick) -> list[str]:
     """The fundamentals a good player sorts out BEFORE walking on (heal, restock, team, levels, TMs…) plus the bag digest."""
     r, party, out = t.reader, t.state.party, []
@@ -173,12 +185,15 @@ def _readiness_and_bag(t: Tick) -> list[str]:
         else:
             money = 0                              # (money only feeds the shop() need in readiness)
     due = save_note(d.get("badges_earned", 0), battles_total(d), d.get("saved_badges"), d.get("saved_battles", 0))
+    opening = not _safe("pokedex_flag", lambda: r.read_flag(FLAG_POKEDEX), True)      # before Oak's Pokédex: the starter / rival / parcel phase
     block = readiness_render(readiness_assess(party, balls, pots, money, d.get("gyms_beaten", []),
-                                              dex=dex, tms=tms, boxes=boxes, save_due=due))
+                                              dex=dex, tms=tms, boxes=boxes, save_due=due, pokedex=not opening))
     if block:
         out.append(block)
+    if opening:
+        out.append(_opening_line(t))
     story = _safe("story", lambda: story_line(_story_status_for(t)), "")        # what the main story wants next (after Brock)
-    if story and d.get("badges_earned", 0) >= 1:
+    if story and (d.get("badges_earned", 0) >= 1 or opening):
         out.append(story)
         nxt = _safe("money", lambda: _next_beat_money(t, items), "")
         if nxt:
@@ -427,7 +442,7 @@ def _supplies(t: Tick) -> list[str]:
     if lead:
         pp_line, pp_warn = overworld_pp_summary(lead.move_names, lead.pp)
         out.extend(x for x in (pp_line, pp_warn) if x)
-    if MAP_KIND.get(t.here) == "mart":
+    if MAP_KIND.get(t.here) == "mart" and _safe("pokedex_flag", lambda: r.read_flag(FLAG_POKEDEX), True):      # the Viridian Mart sells nothing before Oak's Pokédex
         rec = shopping_summary(bag, t.ltm.data["badges_earned"], money)
         if rec:
             out.append("MART — " + rec + ". Call shop() to buy the recommended restock automatically.")
