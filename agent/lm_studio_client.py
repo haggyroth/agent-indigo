@@ -25,6 +25,7 @@ from agent.skills.fishing import FishingMixin
 from agent.skills.bike import BikeMixin
 from agent.skills.tutor import TutorMixin
 from agent.skills.gymquest import GymQuestMixin
+from agent.skills.legends import LegendsMixin
 from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.errands import ErrandsMixin
@@ -48,7 +49,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)

@@ -360,8 +360,16 @@ class NavMixin:
             spin_dirs = getattr(self.tilemap, "spin_map", dict)()
             spin = set(spin_dirs) - {(px, py), (tx, ty)}
             expected = None                       # where each press should leave the player (only on a path through arrow tiles)
-            path = find_path((px, py), (tx, ty), (lambda x, y: _passable(x, y) and (x, y) not in spin) if spin else _passable,
-                             w, h, ledge=_ledge, edge_ok=edge_ok)         # arrow tiles slide the player: avoid them while a way round exists
+            path = None
+            if self._surfing():
+                # Stay ON the water until the goal: the union grid happily routes along a shore tile, and stepping onto land ends Surf mid-crossing (Route 10: the walk to the Power Plant
+                # shore dropped the player on the north bank, then stopped with no path). Fall back to the union grid only when no water-only way exists.
+                land, _lw, _lh = self.tilemap.passable_grid(surf=False)
+                if land is not None:
+                    path = find_path((px, py), (tx, ty), lambda x, y: _passable(x, y) and (not land[y][x] or (x, y) == (tx, ty)), w, h)
+            if path is None:
+                path = find_path((px, py), (tx, ty), (lambda x, y: _passable(x, y) and (x, y) not in spin) if spin else _passable,
+                                 w, h, ledge=_ledge, edge_ok=edge_ok)     # arrow tiles slide the player: avoid them while a way round exists
             if path is None and spin_dirs:
                 # No way round: the only route runs through the arrows (Rocket Hideout B3F). Plan with the slides simulated.
                 planned = find_path_spin((px, py), (tx, ty), _passable, w, h, spin_dirs, getattr(self.tilemap, "spin_stops", set)())
@@ -1001,7 +1009,7 @@ class NavMixin:
             before_pos = (px, py)
             if kind_step == "connection":
                 res = self._go_to_map(arg, dest=next_map[:2])
-            elif kind_step == "cut":       # a Cut tree / rock between two regions of this map: walk to the tile beyond it (walk_to cuts the tree on the way)
+            elif kind_step in ("cut", "surf"):   # a Cut tree / rock, or a stretch of water, between two regions of this map: walk to the tile beyond it (walk_to cuts / surfs on the way)
                 res = self._walk_to(*arg)
             else:   # warp: walk onto the door/stairs tile (walk_to steps through)
                 res = self._walk_to(*self._warp_exit_tile(arg))

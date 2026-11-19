@@ -60,6 +60,7 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 8): [Req("hm", "Surf", "Cinnabar Island is across the sea: teach Surf (HM03 from the Safari "
                  "Zone — quest('surf')) to a Pokémon, then use_hm('Surf') / go_to.",
                  alt_flag=0x898)],           # FLAG_VISITED_CINNABAR: once you have been there (Fly lands you on it) the island is reachable
+    (1, 95): [Req("hm", "Surf", "The Power Plant is across Route 10's water — you need Surf (quest('surf')).")],
     (3, 37): [Req("hm", "Surf", "Route 19 is open water — you need Surf.")],
     (3, 38): [Req("hm", "Surf", "Route 20 is open water — you need Surf.")],
     (3, 39): [Req("hm", "Surf", "Route 21 is open water south of Pallet — you need Surf.")],
@@ -70,12 +71,20 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
 }
 
 
+_STEP_HM = {"cut": Req("hm", "Cut", "A Cut tree blocks the way: you need a Pokémon that knows Cut (quest('cut'))."),
+            "surf": Req("hm", "Surf", "The way crosses water: you need a Pokémon that knows Surf (quest('surf')).")}
+
+
 def unmet_gates(route, satisfied) -> list[tuple[int, Req]]:
     """[(step index, Req)] for every step of `route` that enters a gated map whose requirement
     `satisfied(req)` rejects. `route` is route_to()'s step list (dest node = step[2])."""
     out = []
     steps = list(route or [])
     for i, step in enumerate(steps):
+        if step[0] in _STEP_HM:                              # a Cut-tree / water crossing inside a map: the HM is the requirement
+            req = _STEP_HM[step[0]]
+            if not satisfied(req):
+                out.append((i, req))
         dest = tuple(step[2][:2])
         for req in MAP_GATES.get(dest, []):
             if req.only_exits and _exit_direction(steps, i) not in req.only_exits:

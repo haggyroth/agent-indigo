@@ -114,6 +114,49 @@ def grid_for(pf, layout):
     return g, w, h, decks, ramps
 
 
+def water_grid(pf, layout):
+    """[[bool]] water tiles (elevation nibble 1, no collision): what Surf can cross."""
+    w, h = layout["width"], layout["height"]
+    raw = open(f"{pf}/{layout['blockdata_filepath']}", "rb").read()
+    wg = [[False] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            i = (y * w + x) * 2
+            if i + 1 < len(raw):
+                v = raw[i] | (raw[i + 1] << 8)
+                wg[y][x] = ((v >> 12) & 0xF) == 1 and ((v >> 10) & 0x3) == 0
+    return wg
+
+
+def surf_links(lab, wg, w, h):
+    """{(label a, label b, a shore tile, b shore tile)}: two land regions that touch the SAME connected body of water (Surf crosses between them)."""
+    seen = [[False] * w for _ in range(h)]
+    out = set()
+    for y0 in range(h):
+        for x0 in range(w):
+            if not wg[y0][x0] or seen[y0][x0]:
+                continue
+            stack, shore = [(x0, y0)], {}
+            seen[y0][x0] = True
+            while stack:
+                cx, cy = stack.pop()
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = cx + dx, cy + dy
+                    if not (0 <= nx < w and 0 <= ny < h):
+                        continue
+                    if wg[ny][nx]:
+                        if not seen[ny][nx]:
+                            seen[ny][nx] = True
+                            stack.append((nx, ny))
+                    elif lab[ny][nx] >= 0:
+                        shore.setdefault(lab[ny][nx], (nx, ny))          # the first shore tile found per land region
+            labels = sorted(shore)
+            for i, a in enumerate(labels):
+                for b in labels[i + 1:]:
+                    out.add((a, b) + shore[a] + shore[b])
+    return out
+
+
 def components(g, w, h, decks=frozenset(), ramps=frozenset()):
     ok = deck_step_ok(decks, ramps)
     lab = [[-1] * w for _ in range(h)]
@@ -197,7 +240,7 @@ def main():
                 la, lb = lab[ay][ax], lab[by][bx]
                 if la >= 0 and lb >= 0 and la != lb:
                     ledges.add((la, lb))          # one-way: hop from region la down to lb
-        info[gn] = dict(lab=lab, w=w, h=h, touch=touch, ledges=ledges, blk=blk)
+        info[gn] = dict(lab=lab, w=w, h=h, touch=touch, ledges=ledges, blk=blk, surf=surf_links(lab, water_grid(pf, lay), w, h))
     # Incoming connections also make a region interesting on the DESTINATION side.
     for gn, d in maps.items():
         for c in d.get("connections") or []:
@@ -303,6 +346,14 @@ def main():
     out.write("BLOCKER_LINKS: dict[tuple[int, int], list[tuple]] = {\n")
     for gn in sorted(split):
         links = sorted({(tag[gn][a], tag[gn][b], ax, ay, bx, by) for (a, b, ax, ay, bx, by) in info[gn]["blk"]
+                        if a in tag[gn] and b in tag[gn]})
+        if links:
+            out.write(f"    {gn}: {links!r},\n")
+    out.write("}\n\n")
+    out.write("# Land regions of one map that touch the same body of water: (tag a, tag b, a-shore x, y, b-shore x, y). Two-way; Surf crosses. route_to's third pass.\n")
+    out.write("SURF_LINKS: dict[tuple[int, int], list[tuple]] = {\n")
+    for gn in sorted(split):
+        links = sorted({(tag[gn][a], tag[gn][b], ax, ay, bx, by) for (a, b, ax, ay, bx, by) in info[gn]["surf"]
                         if a in tag[gn] and b in tag[gn]})
         if links:
             out.write(f"    {gn}: {links!r},\n")

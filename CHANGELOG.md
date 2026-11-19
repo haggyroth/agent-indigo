@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('zapdos')`, and the router crosses water between regions of one map (#264, first bird)
+- `agent/skills/legends.py`: `go_to('Power Plant')`, walk up to Zapdos (5,11), A through "Gyaoo!", and hand the L50 fight to the model under the one-shot protocol (state saved in slot 9). The
+  beat sits before Sabrina in the chain and needs Surf; it is done by `FLAG_FOUGHT_ZAPDOS`. The driver waits for the battle intro to finish loading `gEnemyParty` before it reads the foe (it used to
+  read the previous fight's Pokémon and the test's autopilot "fought" the legend).
+- **Surf region links**: `tools/gen_regions.py` now flood-fills each water body and links the land regions of one split map that touch it (`SURF_LINKS`, e.g. Route 10: the Rock Tunnel side ↔ the
+  Power Plant side). `route_to` has a third strict pass for them, `go_to` walks the `surf` step, and `unmet_gates` asks for Surf (and Cut, for the existing Cut-tree steps) instead of silently routing.
+- `walk_to` while Surfing now plans over **water only** until the goal: the union grid routed along a shore tile, stepping on it ended Surf mid-crossing and the walk stopped with no path.
+- Verified live: Lavender → Route 10 → Rock Tunnel → Surf across Route 10 → the Power Plant → Zapdos in front of the model. Not done: Articuno (Seafoam boulders) and Moltres.
+
 ### Added — one-shot encounters: Snorlax and the legends are caught, never knocked out (#272, the protocol)
 - `knowledge/one_shot.py`: Snorlax, Articuno, Zapdos, Moltres and Mewtwo appear once. The battle observation now shows **ONE-SHOT: …** instead of the generic wild-battle line: the battle-start state is
   **auto-saved to slot 9** (once per encounter) — `load_state(9)` retries if it faints or flees — weaken it with the *gentlest* damaging move (named), stop at the red bar, status it, then
