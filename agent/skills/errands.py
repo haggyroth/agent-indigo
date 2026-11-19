@@ -8,6 +8,9 @@ quest('flash'): Prof. Oak's Aide in the Route 2 east building (15,2) at (4,6) gi
 quest('dig'): the Rocket grunt behind the robbed house in Cerulean City, at (33,6): beat him and he returns TM28 Dig (FLAG_GOT_TM28_FROM_ROCKET 0x23F).
 quest('hitmon'): Saffron's Fighting Dojo (14,2): beat Master Koichi at (6,5), then take Hitmonchan from the ball at (7,3) (FLAG_GOT_HITMON_FROM_DOJO 0x278) — a one-time
 choice, the other ball goes. quest('magikarp'): the salesman at (1,3) in Route 4's Pokémon Center (16,0) sells a L5 Magikarp for ¥500 (FLAG_BOUGHT_MAGIKARP 0x249).
+quest('old_rod') / ('good_rod') / ('super_rod'): the Fishing Gurus — Vermilion house 1 (9,0) at (4,5) [flag 0x240], Fuchsia house 2 (11,8) at (6,5) [0x244], Route 12's fishing house
+(23,2) at (4,4) [0x255]: "Do you like to fish?" YES and the rod is a key item. quest('bike'): the Pokémon Fan Club chairman (Vermilion, (9,3), at (5,4)) tells his story and gives the
+Bike Voucher [0x241]; the Cerulean bike shop clerk (7,6) at (9,3) swaps it for the Bicycle [0x271].
 quest('fly'): the woman in the Route 16 house (25,0), at (4,2), just gives HM02 Fly (FLAG_GOT_HM02 0x238). The house is on Route 16's WEST end; Celadon's exit lands
 on the east end: cut the tree at (41,11), take the upper gatehouse (27,6)→(20,6) and walk west (the sleeping Snorlax at (31,13) blocks only the lower road to Route
 17, so no Poké Flute is needed). go_to plans this with the region graph's Cut-tree links (#293)."""
@@ -32,6 +35,12 @@ AIDE_SPOTS = (((4, 7), "Up"), ((3, 6), "Right"), ((5, 6), "Left"))            # 
 FLY_WOMAN_SPOTS = (((4, 3), "Up"), ((3, 2), "Right"), ((5, 2), "Left"))      # the woman stands at (4,2)
 AIDE_SEEN_NEEDED = 10          # (the aides count species CAUGHT — see knowledge.aides)
 ROUTE11_GATE_2F, ROUTE15_GATE_2F = (22, 1), (24, 1)
+OLD_ROD_HOUSE, GOOD_ROD_HOUSE, SUPER_ROD_HOUSE, FAN_CLUB, BIKE_SHOP = (9, 0), (11, 8), (23, 2), (9, 3), (7, 6)
+FLAG_OLD_ROD, FLAG_GOOD_ROD, FLAG_SUPER_ROD, FLAG_BIKE_VOUCHER, FLAG_BICYCLE = 0x240, 0x244, 0x255, 0x241, 0x271
+FLAG_B_DASH = 0x800 + 0x2F                                              # FLAG_SYS_B_DASH: the Running Shoes (Oak's Aide, Pewter City)
+GURU_SPOTS = {"old": (((4, 6), "Up"), ((3, 5), "Right"), ((5, 5), "Left")), "good": (((6, 6), "Up"), ((5, 5), "Right"), ((7, 5), "Left")),
+              "super": (((4, 5), "Up"), ((3, 4), "Right"), ((5, 4), "Left"))}              # the guru stands at (4,5) / (6,5) / (4,4)
+CHAIRMAN_SPOTS = (((5, 5), "Up"), ((4, 4), "Right"), ((6, 4), "Left"))                        # the chairman stands at (5,4)
 FLAG_GOT_ITEMFINDER, FLAG_GOT_EXP_SHARE = 0x252, 0x256
 ITEMFINDER_AIDE_SPOTS = (((2, 7), "Up"), ((3, 6), "Left"), ((1, 6), "Right"))      # the aide stands at (2,6)
 EXP_SHARE_AIDE_SPOTS = (((5, 6), "Up"), ((4, 5), "Right"), ((6, 5), "Left"))        # the aide stands at (5,5)
@@ -217,3 +226,42 @@ class ErrandsMixin:
             held = self._give_item("Exp. Share", who.nickname or who.species_name)
             note = f" {held}"
         return f"Got the Exp. Share from Prof. Oak's Aide.{note}"
+
+    def _get_rod(self, which: str, auto_trainers: bool = False) -> str:
+        name, dest, dest_map, flag = {"old": ("Old Rod", "Old Rod House", OLD_ROD_HOUSE, FLAG_OLD_ROD),
+                                      "good": ("Good Rod", "Good Rod House", GOOD_ROD_HOUSE, FLAG_GOOD_ROD),
+                                      "super": ("Super Rod", "Super Rod House", SUPER_ROD_HOUSE, FLAG_SUPER_ROD)}[which]
+        call = f"quest('{which}_rod')"
+        if self.reader.read_flag(flag):
+            return f"You already have the {name} — fish(): face water (Surf's shore) and cast."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        if (msg := self._gift_errand(call, dest, dest_map, GURU_SPOTS[which], flag, f"the Fishing Guru ({name})", auto_trainers)):
+            return msg
+        return f"Got the {name} from the Fishing Guru. fish() casts it from a shore tile; better rods catch better water Pokémon."
+
+    def _get_bike(self, auto_trainers: bool = False) -> str:
+        call = "quest('bike')"
+        if self.reader.read_flag(FLAG_BICYCLE):
+            return "You already have the Bicycle — it is a key item: use_item('Bicycle') mounts and dismounts (not indoors, in caves or on Surf)."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        if not self.reader.read_flag(FLAG_BIKE_VOUCHER):
+            if (msg := self._gift_errand(call, "Pokemon Fan Club", FAN_CLUB, CHAIRMAN_SPOTS, FLAG_BIKE_VOUCHER, "the Pokémon Fan Club chairman", auto_trainers)):
+                return msg
+        if tuple(self.reader.read_current_map()) != BIKE_SHOP:
+            for _ in range(10):
+                out = self._go_to("Cerulean Bike Shop", mode="yield", auto_trainers=auto_trainers, resume_call=call)
+                if tuple(self.reader.read_current_map()) == BIKE_SHOP:
+                    break
+                if self.reader.detect_context() == GameContext.IN_BATTLE:
+                    return out
+                if "Can't get to" in out or "No route" in out or "Blocked" in out or "gated" in out or "no walking route" in out:
+                    return f"Got the Bike Voucher but can't reach Cerulean's Bike Shop: {out}"
+        if tuple(self.reader.read_current_map()) != BIKE_SHOP:
+            return f"Got the Bike Voucher; didn't reach Cerulean's Bike Shop yet — call {call} again."
+        spot = self._clerk_approach((9, 3))
+        spots = (spot,) if spot else (((9, 4), "Up"),)
+        if (msg := self._gift_errand(call, "Cerulean Bike Shop", BIKE_SHOP, spots, FLAG_BICYCLE, "the Bike Shop clerk", auto_trainers)):
+            return msg
+        return "Got the Bicycle (voucher swapped at the Cerulean Bike Shop). use_item('Bicycle') mounts it: about twice walking speed, outdoors only."

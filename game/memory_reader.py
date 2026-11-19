@@ -617,6 +617,10 @@ class LeafGreenReader:
             return []
         return out
 
+    def is_biking(self) -> bool:
+        """gPlayerAvatar.flags bit1 (Mach Bike) or bit2 (Acro Bike): the player is on the Bicycle."""
+        return bool(self.client.read8(Addr.PLAYER_AVATAR_FLAGS) & 0x06)
+
     def is_surfing(self) -> bool:
         return bool(self.client.read8(Addr.PLAYER_AVATAR_FLAGS) & Addr.AVATAR_SURFING)
 
