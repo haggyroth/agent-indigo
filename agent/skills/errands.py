@@ -24,6 +24,7 @@ ROUTE2_EAST_BUILDING, ROUTE16_HOUSE = (15, 2), (25, 0)
 FLAG_GOT_HM05, FLAG_GOT_HM02 = 0x23B, 0x238
 CERULEAN, SAFFRON_DOJO, ROUTE4_CENTER = (3, 3), (14, 2), (16, 0)
 FLAG_GOT_TM28, FLAG_GOT_HITMON, FLAG_BOUGHT_MAGIKARP = 0x23F, 0x278, 0x249
+FLAG_COPYCAT_MIMIC, POKE_DOLL, FLAG_HIDE_SAFFRON_ROCKETS = 0x2CD, 80, 0x03E                                  # the Mimic tutor's one-time flag (knowledge.tutors) / ITEM_POKE_DOLL
 FLAG_BEAT_KOICHI = 0x500 + 317                                          # TRAINER_BLACK_BELT_KOICHI's trainer flag
 TM28_ITEM = 316                                                         # TM01 = 289
 MAGIKARP_PRICE = 500
@@ -158,6 +159,25 @@ class ErrandsMixin:
         if (msg := self._gift_errand(call, "Cerulean City", CERULEAN, GRUNT_SPOTS, FLAG_GOT_TM28, "the Rocket grunt behind the robbed house", auto_trainers)):
             return msg
         return "Beat the Rocket grunt and got TM28 Dig back. teach_move('Dig') to a Pokémon that can learn it (Ground types, Sandshrew, Diglett…)."
+
+    def _get_copycat(self, auto_trainers: bool = False) -> str:
+        """quest('copycat'): the Saffron Copycat teaches Mimic (a one-time tutor lesson) for a Poké Doll — buy one at the Celadon Dept. Store 2F if the bag has none, then tutor('Mimic')."""
+        call = "quest('copycat')"
+        if self.reader.read_flag(FLAG_COPYCAT_MIMIC):
+            return "The Copycat already taught Mimic (it is a one-time lesson)."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        if not self._has_tea():
+            return "The Copycat lives in Saffron City, behind the gate guards: they want Tea (quest('tea'))."
+        if not self.reader.read_flag(FLAG_HIDE_SAFFRON_ROCKETS):
+            return "A Rocket grunt stands in front of the Copycat's door until Silph Co. is cleared: quest('silph_co') first."
+        if not self.reader.count_item(POKE_DOLL):
+            out = self._shop_for("Poké Doll", 1)
+            if self.reader.detect_context() == GameContext.IN_BATTLE:
+                return self._quest_battle(call, "Celadon Dept. Store") or out
+            if not self.reader.count_item(POKE_DOLL):
+                return f"Couldn't get a Poké Doll for the Copycat: {out}"
+        return self._tutor("Mimic")
 
     def _get_hitmon(self, auto_trainers: bool = False) -> str:
         call = "quest('hitmon')"

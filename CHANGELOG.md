@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('copycat')`: Mimic from Saffron's Copycat (#278, the last gift)
+- `quest('copycat')` buys the Poké Doll at the Celadon Dept. Store 2F when the bag has none (`shop(item=…)` machinery) and runs the existing Mimic tutor lesson. The issue called her TM and tutor; in FireRed/LeafGreen she
+  only teaches the Mimic tutor move, once, for a Poké Doll. A Team Rocket grunt stands at her door until Silph Co. is cleared, so the beat needs `silph_co` (the driver says so and checks `FLAG_HIDE_SAFFRON_ROCKETS`).
+- The other items of #278 (Dig from the Cerulean thief, the Dojo's Hitmon, Magikarp) were already scripted. Verified live: doll bought at the Dept. Store, Mimic learned, the beat reads done afterwards.
+
 ### Added — town services: `rename_pokemon` (Name Rater), `daycare`, and a TM shopping line (#277)
 - `rename_pokemon(pokemon, nickname)` (agent/skills/services.py): travels to Lavender's Name Rater, answers his two Yes/No boxes, picks the party slot and types the name. A traded Pokémon or an Egg is refused by the
   game itself and reported. **Fix found on the way:** the naming keyboard is heap-allocated, so its text buffer is not always at the fixed catch-flow address (here 0x02004560; the fixed address held a stale nickname).
