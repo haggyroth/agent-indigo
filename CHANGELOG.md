@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — town services: `rename_pokemon` (Name Rater), `daycare`, and a TM shopping line (#277)
+- `rename_pokemon(pokemon, nickname)` (agent/skills/services.py): travels to Lavender's Name Rater, answers his two Yes/No boxes, picks the party slot and types the name. A traded Pokémon or an Egg is refused by the
+  game itself and reported. **Fix found on the way:** the naming keyboard is heap-allocated, so its text buffer is not always at the fixed catch-flow address (here 0x02004560; the fixed address held a stale nickname).
+  `NamingDriver` now finds the struct through the game's own pointer statics (validated by the page byte and the buffer) and falls back to the old address.
+- `daycare(action, pokemon)`: `deposit` leaves a Pokémon with the Route 5 Day Care man (another party member must still be able to fight), `withdraw` takes it back for ¥100 + ¥100 per level gained; both verified by the party count and the money.
+- `team_report` gains a **TM shop** line: `knowledge/tm_plan.py` runs `tm_advice` over the Celadon Dept. Store 2F stock (TM05 / 15 / 28 / 31 / 43 / 45, prices from the decomp) and names the worthwhile TM per Pokémon with its price
+  and whether you can afford it; TMs already in the case are skipped.
+- Token caps raised for the two new tool schemas (overworld < 4800, everything < 5600). Verified live: rename on Lavender's real Name Rater, deposit/withdraw at the Route 5 Day Care; the existing catch-nickname and keyboard tests still pass.
+
 ### Added — `quest('articuno')`: the Seafoam Islands boulder puzzle (#264, second bird)
 - `tools/gen_seafoam.py` → `knowledge/seafoam_data.py` (decomp): B3F's collision/elevation, the two fall holes, the four boulders and their hide flags, B4F's reveal flags and the stopped-current flag.
   `knowledge/seafoam_route.py` plans the pushes with the Victory Road solver (`solve(drop=True)`): any two B3F boulders sent through the holes reveal both boulders on B4F, and re-entering B4F swaps in the calm

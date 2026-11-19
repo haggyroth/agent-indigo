@@ -47,8 +47,31 @@ class NamingDriver:
     def active(self) -> bool:
         return self.m.read32(Addr.GMAIN_CALLBACK2) == Addr.NAMING_CB2
 
+    # The keyboard's struct (NamingScreenData) is heap-allocated, so WHERE it sits depends on what else was allocated when it opened: the new-game / catch flows land on the
+    # fixed NAMING_TEXT, the Name Rater's did not (its text buffer was at 0x02004560 and the fixed address held a stale nickname). The game keeps the struct's address in a few
+    # EWRAM statics (sNamingScreenData among them); read it from there, validated by the page byte and the text buffer, and fall back to the fixed address.
+    _PTR_VARS = (0x0203998C, 0x0203AE90, 0x0203B05C, 0x0203B09C)
+
+    def _base(self) -> int:
+        for var in self._PTR_VARS:
+            try:
+                p = self.m.read32(var)
+                if not (0x02000000 <= p < 0x0203E000):
+                    continue
+                if self.m.read8(p + 0x1E22) not in _RAM_PAGE:
+                    continue
+                raw = self.m.read_range(p + 0x1800, MAX_NAME)
+                if all(b == 0xFF or b in GEN3_CHARSET for b in raw) and self.m.read8(p + 0x1800 + MAX_NAME + 1) is not None:
+                    return p
+            except Exception:
+                continue
+        return Addr.NAMING_TEXT - 0x1800
+
+    def _text_addr(self) -> int:
+        return self._base() + 0x1800
+
     def text(self) -> str:
-        raw = self.m.read_range(Addr.NAMING_TEXT, MAX_NAME)
+        raw = self.m.read_range(self._text_addr(), MAX_NAME)
         out = []
         for b in raw:
             if b == 0xFF:
@@ -57,7 +80,7 @@ class NamingDriver:
         return "".join(out)
 
     def _buffer_ok(self) -> bool:
-        raw = self.m.read_range(Addr.NAMING_TEXT, MAX_NAME)
+        raw = self.m.read_range(self._text_addr(), MAX_NAME)
         return all(b == 0xFF or b in GEN3_CHARSET for b in raw)
 
     def cursor(self):
@@ -72,7 +95,7 @@ class NamingDriver:
         read8 = getattr(self.m, "read8", None)
         if read8 is not None:
             try:
-                ram = read8(Addr.NAMING_PAGE)
+                ram = read8(self._base() + 0x1E22)
             except Exception:
                 ram = None
             if ram in _RAM_PAGE:

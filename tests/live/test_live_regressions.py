@@ -1792,3 +1792,42 @@ def test_articuno_quest_drops_the_b3f_boulders_stops_the_current_and_hands_over_
     t = NS(run=NS(), map_key=(1, 87), reader=live.r)
     text = _one_shot(t, foe, list(names), list(pp))
     assert "ONE-SHOT: Articuno" in text and "load_state(9)" in text and t.run.one_shot_saved == (144, (1, 87)), text
+
+
+def _outdoors_at_celadon(live):
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    for _ in range(6):
+        live.c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            live.c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 6):
+            break
+
+
+def test_rename_pokemon_changes_a_nickname_at_the_name_rater(live):
+    """rename_pokemon on the real ROM (#277): travel to Lavender's Name Rater, answer his two Yes/No boxes, pick the party slot, type the new name on the keyboard."""
+    _outdoors_at_celadon(live)
+    live.fly_to("lavender town")
+    party = live.r.read_party()
+    who = party[1].species_name
+    out = live.c._execute("rename_pokemon", json.dumps({"pokemon": who, "nickname": "Zippy"}))
+    assert live.r.read_party()[1].nickname == "Zippy", out
+    assert "Zippy" in out and live.r.detect_context().name == "OVERWORLD"
+
+
+def test_daycare_takes_a_pokemon_and_gives_it_back_for_a_fee(live):
+    """daycare on the real ROM (#277): deposit the second party member at the Route 5 Day Care, walk a little, withdraw it — the party count and the money follow."""
+    _outdoors_at_celadon(live)
+    from knowledge.story_beats import SS_TICKET
+    live.fly_to("cerulean city", flags=(0x234,), key_items=(SS_TICKET,))        # the S.S. Ticket moves the Slowbro that blocks Cerulean's south exit
+    live.patch_mon(0, moves=[15, 75, 22, 33], pps=[30, 25, 25, 35])           # Cut: a tree stands in the gap of Cerulean's south wall
+    live.set_money(5000)
+    n0 = len(live.r.read_party())
+    who = live.r.read_party()[1].species_name
+    out = live.c._execute("daycare", json.dumps({"action": "deposit", "pokemon": who}))
+    assert len(live.r.read_party()) == n0 - 1, out
+    out = live.c._execute("daycare", json.dumps({"action": "withdraw"}))
+    assert len(live.r.read_party()) == n0 and live.r.read_money() < 5000, out

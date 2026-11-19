@@ -77,6 +77,8 @@ MAP_NAMES: dict[tuple[int, int], str] = {
     (10, 17): "Celadon Restaurant",
     (11, 7): "Warden's House",
     (11, 9): "Move Deleter's House",
+    (8, 4): "Name Rater's House",
+    (17, 0): "Pokemon Day Care",
     (15, 2): "Route 2 East Building",
     (14, 2): "Saffron Dojo",
     (1, 95): "Power Plant",

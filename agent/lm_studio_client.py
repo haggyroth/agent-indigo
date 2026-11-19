@@ -26,6 +26,7 @@ from agent.skills.bike import BikeMixin
 from agent.skills.tutor import TutorMixin
 from agent.skills.gymquest import GymQuestMixin
 from agent.skills.legends import LegendsMixin
+from agent.skills.services import ServicesMixin
 from agent.skills.state import SkillState
 from agent.skills.nav import NavMixin
 from agent.skills.errands import ErrandsMixin
@@ -49,7 +50,7 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
-class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, ServicesMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -370,7 +371,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
 
     _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
                                  "quest", "pc", "pick_up_items",
-                                 "use_hm", "teach_move", "forget_move", "fish", "tutor", "load_state"})
+                                 "use_hm", "teach_move", "forget_move", "fish", "tutor", "rename_pokemon", "daycare", "load_state"})
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
@@ -412,7 +413,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             case "team_report":
                 from knowledge.team import team_report
                 return team_report(self.reader.read_party(), self.reader.read_boxes(),
-                                   self.ltm.data.get("gyms_beaten", []), "\n".join(n for n in (self._money_note(), self._dex_note()) if n))
+                                   self.ltm.data.get("gyms_beaten", []), "\n".join(n for n in (self._money_note(), self._tm_shop_note(), self._dex_note()) if n))
             case "pc":
                 return self._pc_tool(str(args.get("action", "") or ""), str(args.get("pokemon", "") or ""),
                                      str(args.get("box_pokemon", "") or ""), bool(args.get("detail", False)),
@@ -427,6 +428,10 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                 return self._tutor(str(args["move"]), str(args.get("pokemon", "") or ""), str(args.get("forget", "") or ""))
             case "fish":
                 return self._fish(int(args.get("casts", 3) or 3))
+            case "rename_pokemon":
+                return self._rename_pokemon(str(args["pokemon"]), str(args["nickname"]))
+            case "daycare":
+                return self._daycare(str(args["action"]), str(args.get("pokemon", "") or ""))
             case "forget_move":
                 return self._forget_move(str(args["pokemon"]), str(args["move"]), bool(args.get("force", False)))
             case "fly_to":

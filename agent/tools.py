@@ -252,6 +252,18 @@ TOOLS = [
         }, "required": ["pokemon", "move"]},
     }},
     {"type": "function", "function": {
+        "name": "rename_pokemon",
+        "description": "Change a Pokémon's nickname at the Name Rater in Lavender Town (travels there). Not for traded Pokémon or Eggs.",
+        "parameters": {"type": "object", "properties": {
+            "pokemon": {"type": "string", "description": "species or slot"}, "nickname": {"type": "string"}}, "required": ["pokemon", "nickname"]},
+    }},
+    {"type": "function", "function": {
+        "name": "daycare",
+        "description": "Route 5 Day Care (travels there): action='deposit' leaves one Pokémon (it gains 1 exp per step you walk; another must be able to fight); 'withdraw' takes it back for ¥100 + ¥100 per level gained.",
+        "parameters": {"type": "object", "properties": {
+            "action": {"type": "string", "enum": ["deposit", "withdraw"]}, "pokemon": {"type": "string", "description": "for deposit: species or slot"}}, "required": ["action"]},
+    }},
+    {"type": "function", "function": {
         "name": "tutor",
         "description": "Learn a move from its Kanto tutor (free, once each; travels there): Counter, Softboiled, Seismic Toss, Rock Slide, Thunder Wave, Double-Edge, Substitute… `pokemon` optional.",
         "parameters": {"type": "object", "properties": {
