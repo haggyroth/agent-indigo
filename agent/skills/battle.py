@@ -107,8 +107,8 @@ class BattleMixin:
                         f"use: {', '.join(usable)}.")
             return self._struggle()
         if not key or key not in names:   # `not key` guards an empty name matching an empty slot
-            known = ", ".join(m for m in move_names if m)
-            return f"'{name}' is not a known move. Known moves: {known}."
+            return (f"'{name}' is not a known move for the active Pokémon right now (a move may have been replaced when it learned a new one). "
+                    f"Its moves: {self._moves_with_pp(move_names, pp)}.")
         slot = names.index(key)
         move_label = move_names[slot]
         if slot == dslot:
@@ -116,7 +116,10 @@ class BattleMixin:
             return (f"{move_label} is DISABLED ({dturns} more turn(s)) — the game refuses it, so "
                     f"pressing it again does nothing. Use a different move: {alt or 'none left'}.")
         if pp[slot] == 0:
-            return f"{move_label} has no PP left — choose another move."
+            left = [(m, q) for m, q in zip(move_names, pp) if m and q > 0]
+            if not left:
+                return f"{move_label} has no PP left, and neither does any other move — Struggle is all that's left: switch_pokemon to a Pokémon with PP, or heal() once the battle is over."
+            return f"{move_label} has no PP left — usable now: {self._moves_with_pp(*zip(*left))}."
         if in_battle and move_label in SUICIDE_MOVES:
             others = [m for i, (m, q) in enumerate(zip(move_names, pp))
                       if m and q > 0 and i != slot and i != dslot and m not in SUICIDE_MOVES
@@ -214,6 +217,11 @@ class BattleMixin:
         if forced_party_screen(self.mgba, self.reader):
             return forced_msg.format(_healthy_roster(self.reader))
         return f"Could not use {name} — the battle menu did not respond as expected."
+
+    @staticmethod
+    def _moves_with_pp(move_names, pp) -> str:
+        """'Sleep Powder (PP 15), Vine Whip (PP 0)' — the moves a Pokémon has, with the PP each has left."""
+        return ", ".join(f"{m} (PP {q})" for m, q in zip(move_names, pp) if m) or "none"
 
     def _status_streak_note(self, move_label: str) -> str:
         """Warn when the same no-damage move is used turn after turn (Growl/Harden spam)."""
@@ -566,11 +574,16 @@ class BattleMixin:
         # space and . , ! ? — and the model's first idea is often just the species name ("Zubat",
         # "Kakuna1"). Refuse ONCE per species with the reason (no ball thrown) so it invents something
         # better; a second try is accepted as sanitized, so this can never loop.
+        shortened = ""
         if nickname:
-            from knowledge.nicknames import critique, pick, sanitize, suggest, usable
+            from knowledge.nicknames import MAX_NAME as MAX_NICK, _clean as _clean_nick, critique, pick, sanitize, shorten, suggest, usable
             foe = self.reader.read_enemy_lead()
             species = (foe.species_name or "") if foe else ""
             taken = [p.nickname for p in self.reader.read_party()]
+            if len(_clean_nick(nickname)) > MAX_NICK:                   # too long is not worth a refusal (it cost a call three times in a watched run): cut it ourselves
+                short = shorten(nickname)
+                if usable(short, taken):
+                    shortened, nickname = f" (nickname shortened to '{short}': the keyboard takes {MAX_NICK} characters)", short
             why = critique(nickname, species, taken)
             asked = self._nick_refused
             if why and asked != species:
@@ -664,6 +677,7 @@ class BattleMixin:
         self._exit_battle_menus()            # clear any prompt; never strand in a menu
         if caught or self.mgba.read8(OUTCOME) == Addr.B_OUTCOME_CAUGHT or named.startswith("Named"):
             extra = f" {named}" if named else ""
+            extra += shortened
             quality = self._caught_quality(foe_pid)
             if quality:
                 extra += f" {quality}"
@@ -965,7 +979,12 @@ class BattleMixin:
         from knowledge.matchup import switch_options
         forced = forced_party_screen(self.mgba, self.reader)
         if not forced and self.reader.detect_context() != GameContext.IN_BATTLE:
-            return "switch_pokemon is only for battles."
+            # The model often calls this a moment after a battle ENDS (the fade / level-up text still reads as "not the field"): settle first, then say where we really are
+            # (a watched run called it five times in a row and got the same one-line refusal each time).
+            if self._advance_to_control(tries=20) != GameContext.IN_BATTLE:
+                where = tuple(self.reader.read_current_map())
+                return (f"There is no battle to switch in — it is over and you're on the field at map {where[0]}/{where[1]}. To change who leads, reorder_party('<pokemon>'); "
+                        "to heal, heal(); to carry on, go_to(...) / grind() / quest(...).")
         shift = not forced and self._shift_prompt_live()           # the trainer's 'Will you change POKéMON?' box: YES opens the party screen, free of charge
         party = self.reader.read_party()
         if len(party) < 2:

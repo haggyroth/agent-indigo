@@ -28,6 +28,20 @@ def sanitize(name: str) -> str:
     return _clean(name)[:MAX_NAME].strip()
 
 
+def shorten(name: str) -> str:
+    """A name that is too long for the keyboard, cut down to fit: whole words while at least 5 characters survive ('Beaky Blinders' -> 'Beaky'), else a plain cut ('Hyperactive Beast' -> 'Hyperactiv')."""
+    full = _clean(name)
+    if len(full) <= MAX_NAME:
+        return full
+    words, out = full.split(" "), ""
+    for w in words:
+        nxt = (out + " " + w).strip()
+        if len(nxt) > MAX_NAME:
+            break
+        out = nxt
+    return out if len(out) >= 5 else full[:MAX_NAME].strip()
+
+
 POOL = (
     # dad energy / titles
     "Zap Daddy", "Big Dave", "Uncle Stu", "Coach", "Sarge", "The Duke", "Dr. Pain", "Mr. Boots", "Mrs. Doyle", "Sir Loin", "Lord Gus",

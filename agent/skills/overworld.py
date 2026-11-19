@@ -147,7 +147,7 @@ class OverworldMixin:
             return "Party is already at full HP and PP — no need to heal."
         # Get inside a Pokémon Center first (resumable travel).
         if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
-            res = self._go_to("Pokemon Center", mode="flee")
+            res = self._go_to("Pokemon Center", mode="flee", resume_call="heal()")
             if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
                 return f"On the way to a Pokémon Center to heal: {res}"
         # Walk to the nurse's counter and face her.

@@ -1885,3 +1885,22 @@ def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parce
     sb2 = m.read32(Addr.SAVEBLOCK2_PTR)
     assert "".join(GEN3_CHARSET.get(b, "?") for b in m.read_range(sb2, 8) if b != 0xFF) == "KYLE"
     assert c._story()["parcel"] == "done"
+
+
+def test_watched_run_fixes_stale_move_reply_long_nickname_and_switch_outside_a_battle(live):
+    """Three fixes from a watched run, on the real ROM: switch_pokemon on the field settles and says where you are (it used to repeat "only for battles"), use_move with a move the
+    Pokémon doesn't have lists the real moves with PP, and a catch with a 15-character nickname is shortened instead of refused (no ball thrown, a wasted call)."""
+    live.load("threemon")
+    out = live.c._execute("switch_pokemon", json.dumps({"target": "Pikachu"}))
+    assert "no battle to switch" in out and "reorder_party" in out, out
+    assert live.wild_battle(), "no wild battle found"
+    out = live.c._execute("use_move", json.dumps({"move": "Hyper Beam"}))
+    assert "not a known move" in out and "(PP " in out and "Tackle" in out, out
+    got = ""
+    for _ in range(3):
+        live.set_foe_hp(1)
+        got = live.c._execute("catch", json.dumps({"nickname": "Wolfgang Amadeus"}))
+        if "Gotcha" in got:
+            break
+    assert "Gotcha" in got and "shortened to 'Wolfgang'" in got, got
+    assert any(p.nickname == "Wolfgang" for p in live.r.read_party()), [p.nickname for p in live.r.read_party()]

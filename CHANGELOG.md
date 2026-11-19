@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — four problems from a watched new-game run
+- **`heal()` hung in a trainer battle.** Its trip to the Center auto-fought a trainer with a hurt party (`mode="flee"`): two Pokémon fainted and the watchdog stopped it ("no progress for 3.4 min of game time"), twice. With a
+  must-heal need, a trainer on a heal trip (or grind's relocation) now goes to the model like any encounter — "switch to a healthy Pokémon or use a Potion" — and `heal()` resumes the trip. Healthy parties still auto-fight.
+- **Stale moves and empty PP.** `use_move` with a move the Pokémon no longer has (Bulbasaur replaced Tackle) or one at 0 PP now lists the moves it really has WITH their PP ("usable now: Sleep Powder (PP 15)…", or "Struggle is
+  all that's left" when everything is empty). The model had called `Tackle` / `Vine Whip` again and again.
+- **Over-long nicknames.** `catch(nickname=…)` with more than 10 characters is shortened (whole words while ≥ 5 characters survive: "Beaky Blinders" → "Beaky") and the reply says so, instead of throwing no ball and
+  asking again — that cost a call three times.
+- **`switch_pokemon` right after a battle.** The post-battle fade reads as "not a battle"; the tool answered the same one-liner five times. It now settles to the field first and says where you are and what to use instead
+  (`reorder_party`, `heal()`, `go_to`).
+- Verified: unit tests for all four; a live test for the last three on the real ROM. The heal hand-off is covered by unit tests only (the original fight is not reproducible from a fixture).
+
 ### Fixed — a new game starts with a blank journal
 - `START_NEW_GAME=true` used to keep `logs/progress.json`: its `delivered_oaks_parcel` milestone made `quest('new_game')` answer "already done" at the title screen. A new game now backs the journal up
   (`progress.json.pre-newgame-<time>.bak`) and starts from the defaults (`LongTermMemory.start_fresh`).

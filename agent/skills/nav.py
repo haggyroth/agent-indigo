@@ -626,6 +626,11 @@ class NavMixin:
         if mode == "yield" and not (is_trainer and auto_trainers):
             return self._yield_encounter(target_name, is_trainer, resume, call)
         low_hp_stop = mode != "flee"      # a heal trip is already on its way to the Center
+        if is_trainer and mode == "flee" and self._has_must_need():
+            # A trip to heal (or grind's relocation) with a HURT party: auto-fighting the trainer is how a watched run lost two Pokémon and then sat in the battle for 3.4 minutes
+            # of game time ("heal was stopped: no progress"). The model can switch to a healthy mon or use a Potion; heal() resumes it.
+            return (self._yield_encounter(target_name, True, resume, call)
+                    + " Your party is hurt — switch to a healthy Pokémon or use a Potion rather than risk another faint.")
         if is_trainer:
             # Auto-fight the (usually weak) travel trainer with best-move logic. Hand
             # back to the model for anything that needs judgement — a loss, a fight that
