@@ -1831,3 +1831,23 @@ def test_daycare_takes_a_pokemon_and_gives_it_back_for_a_fee(live):
     assert len(live.r.read_party()) == n0 - 1, out
     out = live.c._execute("daycare", json.dumps({"action": "withdraw"}))
     assert len(live.r.read_party()) == n0 and live.r.read_money() < 5000, out
+
+
+def test_quest_copycat_buys_the_poke_doll_and_learns_mimic(live):
+    """quest('copycat') on the real ROM (#278): the bag has no Poké Doll, so it buys one at the Celadon Dept. Store 2F, walks to Saffron's Copycat and the party learns Mimic (one-time)."""
+    _outdoors_at_celadon(live)
+    live.fly_to("saffron city", flags=(0x2A6, 0x03E))                           # FLAG_GOT_TEA (the gate guards let you through) + the Saffron Rockets gone (Silph Co. cleared)
+    live.defeat_all_trainers()
+    live.set_money(9000)
+    assert not live.r.count_item(80) and not live.r.read_flag(0x2CD)
+    out = ""
+    for _ in range(8):
+        out = live.c._execute("quest", json.dumps({"name": "copycat", "auto_trainers": True}))
+        if live.r.read_flag(0x2CD) or live.r.detect_context().name != "OVERWORLD":
+            if live.r.detect_context().name == "IN_BATTLE":
+                live.c._auto_fight()
+                continue
+            break
+    assert live.r.read_flag(0x2CD), out
+    assert any("Mimic" in (p.move_names or []) for p in live.r.read_party()), out
+    assert "already done" in live.c._execute("quest", json.dumps({"name": "copycat"}))                       # the chain marks it done by the tutor's flag
