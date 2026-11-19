@@ -129,11 +129,18 @@ def test_quest_lists_the_chain_with_the_next_beats_marked():
 
 
 def test_a_guide_only_beat_prints_a_state_aware_plan_not_an_error():
+    out = client(FakeReader(**AFTER_ERIKA))._quest_tool("parcel")                      # the one beat without a script left (the game start)
+    assert out == "Oak's Parcel → Pokédex: already done." or out.startswith("No script for this one yet")
+
+
+def test_a_locked_gym_says_what_comes_first_and_an_open_one_runs_its_driver():
     out = client(FakeReader(**AFTER_ERIKA))._quest_tool("sabrina")
-    assert out.startswith("No script for this one yet") and "Not yet" in out and "quest('silph_co')" in out and "teleport-pad" in out
+    assert out.startswith("Not yet — Marsh Badge") and "quest('silph_co')" in out and "teleport-pad" in out
     after_silph = dict(AFTER_ERIKA, flags={0x234, 0x237, 0x2A6, 0x250})
-    out = client(FakeReader(**after_silph))._quest_tool("sabrina")
-    assert "Not yet" not in out and "Alakazam" in out
+    c = client(FakeReader(**after_silph))
+    ran = []
+    c._get_gym = lambda key, auto: (ran.append(key), "gym driver ran")[1]
+    assert c._quest_tool("sabrina") == "gym driver ran" and ran == ["sabrina"]
 
 
 def test_a_scripted_beat_runs_its_script_and_says_what_it_needs_first():
