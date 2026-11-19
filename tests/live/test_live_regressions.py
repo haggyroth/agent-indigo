@@ -1368,6 +1368,7 @@ def test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town(live)
     assert main.drive_into_gameplay(live.m, live.r)
     assert tuple(live.r.read_current_map()) == (3, 0)                                    # Pallet Town
     assert live.r.read_flag(0x82C) and live.r.read_badges()[0] == 8 and len(live.r.read_party()) == 6
+    live.m.save_state_file(str(live.dir / "post_hof.ss1"))        # the post-game fixture (Pallet Town, game cleared, 8 badges): the Sevii / Mewtwo / roamer work starts here
 
 
 def test_flash_and_fly_quests_collect_the_hms(live):
