@@ -105,8 +105,10 @@ class TowerMixin:
             if (b := self._quest_battle(call, "Route 12's Snorlax")):
                 return b
             if self.reader.read_flag(FLAG_WOKE_ROUTE12):
-                return ("The Snorlax woke up and is gone from the road (caught, beaten or fled). Route 12 leads south: Routes 13, 14, 15 → "
-                        "Fuchsia City (Koga's gym: quest('koga')).")
+                got = bool(self.reader.read_dex_owned(143))
+                return ("The Snorlax woke up and is gone from the road" + (" — and you CAUGHT it: a L30 Snorlax is one of the best team members. " if got else
+                        " (beaten or fled — it is in your Pokédex only if you caught it; Route 16 has a second one). ")
+                        + "Route 12 leads south: Routes 13, 14, 15 → Fuchsia City (Koga's gym: quest('koga')).")
             if tuple(self.reader.read_current_map()) != ROUTE_12:
                 if (msg := self._hideout_travel("Route 12", ROUTE_12, call, auto_trainers)):
                     return msg
@@ -129,6 +131,6 @@ class TowerMixin:
                 continue
             if not self._press_on_tile(*SNORLAX_STAND, yesno=True):
                 return "Couldn't reach the Snorlax at (14,70) — walk_to (14,69), face down, press A, answer YES."
-            if (b := self._hideout_fight(call, "the Snorlax", auto_trainers)):
+            if (b := self._hideout_fight(call, "the Snorlax", False)):      # never the autopilot: it would knock the Snorlax out — it must be CAUGHT (knowledge.one_shot)
                 return b
         return f"Made progress on Route 12 — call {call} again to continue (it resumes)."

@@ -353,9 +353,29 @@ def _battle(t: Tick) -> list[str]:
     if run.battle_is_trainer:
         out.append("TRAINER battle — you cannot flee; win or switch.")
     else:
-        out.append("WILD battle — you may flee_battle() to escape if you're just passing through or HP is low.")
+        shot = _safe("one_shot", lambda: _one_shot(t, enemy, move_names, pp_view), "")
+        if shot:
+            out.append(shot)                                  # a Snorlax / a legend: catch it, never KO it
+        else:
+            out.append("WILD battle — you may flee_battle() to escape if you're just passing through or HP is low.")
         out.extend(_catch_advice(t, enemy, move_names, pp_view))
     return out
+
+
+def _one_shot(t: Tick, enemy, move_names, pp_view) -> str:
+    """The ONE-SHOT protocol for a Snorlax / legendary foe (knowledge.one_shot), and the battle-start save it promises (slot 9, once per encounter)."""
+    from knowledge.leafgreen_data import MOVE_POWER
+    from knowledge.one_shot import SAVE_SLOT, gentlest_move, is_one_shot, protocol
+    if not enemy or not enemy.max_hp or not is_one_shot(enemy.species_id):
+        return ""
+    key = (enemy.species_id, tuple(t.map_key))
+    if getattr(t.run, "one_shot_saved", None) != key:
+        if t.reader.client.save_state(SAVE_SLOT):             # the very first look at this foe: nothing has hit it yet
+            t.run.one_shot_saved = key
+    balls = {b: n for b, n in t.reader.read_bag().items() if b in BALL_IDS}
+    asleep = any(w in (enemy.status or "") for w in ("asleep", "paraly"))
+    return protocol(enemy.species_id, enemy.current_hp, enemy.max_hp, balls, catch_setup_hint(move_names, pp_view),
+                    gentlest_move(move_names, pp_view, MOVE_POWER), asleep)
 
 
 def _volatiles(v: dict) -> list[str]:
