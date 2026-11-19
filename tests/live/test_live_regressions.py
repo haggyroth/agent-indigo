@@ -444,9 +444,9 @@ def test_inspect_pokemon_and_the_catch_report_use_the_real_ivs(live):
     assert "Compared with your team" in out
     assert "Can't find" in live.c._execute("inspect_pokemon", json.dumps({"pokemon": "Mew"}))
     assert live.wild_battle(), "no wild battle found"
-    live.set_foe_hp(1)
     got = ""
-    for _ in range(6):
+    for _ in range(3):                                                               # the fixture has 3 Poké Balls; the foe is kept at 1 HP so each throw is ~96% to catch
+        live.set_foe_hp(1)
         got = live.c._execute("catch", json.dumps({"nickname": "Judge"}))
         if "Gotcha" in got:
             break
@@ -939,8 +939,11 @@ def test_tea_quest_then_the_saffron_gate_guard_lets_you_in(live):
     live.set_badges(0b1111)                       # the fixture predates Erika: with the Rainbow Badge the Hideout and the Tea are open
     listing = c._execute("quest", "{}")
     assert "▶ tea" in listing and "▶ rocket_hideout" in listing and "… pokemon_tower" in listing, listing
-    assert "No script for this one yet" in c._execute("quest", json.dumps({"name": "silph_co"}))          # (a beat still without a script)
-    assert "Silph Scope" in c._execute("quest", json.dumps({"name": "pokemon_tower"}))                    # the Tower's script says what it needs
+    assert "No script for this one yet" not in c._execute("quest", json.dumps({"name": "silph_co"}))      # silph_co has a driver now: it answers (here: the readiness warning), never "no script"
+    tower = c._execute("quest", json.dumps({"name": "pokemon_tower"}))
+    if "Silph Scope" not in tower:                                                                          # the first call may be the readiness warning (a 2nd call proceeds)
+        tower = c._execute("quest", json.dumps({"name": "pokemon_tower"}))
+    assert "Silph Scope" in tower                                                                           # the Tower's script says what it needs
     out = ""
     for _ in range(6):
         live.heal_hp()

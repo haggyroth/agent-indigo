@@ -328,6 +328,9 @@ python -c "from game.mgba_core import NativeMGBAClient as C; m=C(); print(m.get_
 #   curl "http://localhost:5000/core/read32?address=0x02024284"  -> 0-6
 #   curl -X POST "http://localhost:5000/mgba-http/button/tap?button=A"
 
+# Live suite (real ROM + fixtures in saves/live, never in CI): one command, preflight + summary; --post-status attests a PR via the `live-suite` commit status
+python tools/live_suite.py --changed origin/main --post-status      # see docs/live-ci.md
+
 # Test Python imports  (fish shell)
 cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish

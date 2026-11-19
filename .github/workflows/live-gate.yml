@@ -1,0 +1,47 @@
+name: live-gate
+
+# The live suite (tests/live) drives the real ROM, which can never be in CI. It runs on a developer machine instead
+# (python tools/live_suite.py --changed origin/main --post-status) and attests to the result with a commit status named `live-suite`.
+# This workflow keeps that status honest on pull requests:
+#   - the PR touches no guarded code  -> `live-suite` = success ("not needed")
+#   - the PR touches guarded code     -> `live-suite` = pending until a local run posts success for the head commit
+# A new push resets it to pending/success for the new head, so a stale attestation never covers new code.
+# Making `live-suite` a *required* status check is a repository setting (docs/live-ci.md); this workflow only maintains it.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  gate:
+    name: live-gate (does this PR need the live suite?)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Does the diff touch guarded code?
+        id: guard
+        run: |
+          out="$(python3 tools/live_suite.py --guard-needed "origin/${{ github.base_ref }}" 2>guarded.txt)"
+          echo "needed=$out" >> "$GITHUB_OUTPUT"
+          cat guarded.txt || true
+      - name: Publish the live-suite status for this head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="${{ github.event.pull_request.head.sha }}"
+          if [ "${{ steps.guard.outputs.needed }}" = "yes" ]; then
+            # Never downgrade a success a developer already posted for this exact commit.
+            current="$(gh api "repos/${{ github.repository }}/commits/$sha/status" -q '[.statuses[] | select(.context=="live-suite")][0].state // ""')"
+            if [ "$current" != "success" ]; then
+              gh api "repos/${{ github.repository }}/statuses/$sha" -f state=pending -f context=live-suite \
+                -f description="Guarded code changed: run python tools/live_suite.py --changed origin/main --post-status"
+            fi
+          else
+            gh api "repos/${{ github.repository }}/statuses/$sha" -f state=success -f context=live-suite -f description="not needed: no guarded code changed"
+          fi
