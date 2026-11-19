@@ -129,7 +129,9 @@ class QuestMixin:
                 "pokemon_mansion": self._get_secret_key, "silph_co": self._get_silph_co,
                 "victory_road": self._get_victory_road, "elite_four": self._get_elite_four,
                 "flash": self._get_flash, "fly": self._get_fly, "dig": self._get_dig, "hitmon": self._get_hitmon,
-                "magikarp": self._get_magikarp, "itemfinder": self._get_itemfinder, "exp_share": self._get_exp_share}[beat.driver](auto_trainers)
+                "magikarp": self._get_magikarp, "itemfinder": self._get_itemfinder, "exp_share": self._get_exp_share,
+                "old_rod": lambda a: self._get_rod("old", a), "good_rod": lambda a: self._get_rod("good", a),
+                "super_rod": lambda a: self._get_rod("super", a), "bike": self._get_bike}[beat.driver](auto_trainers)
 
     # ── Safari Zone: HM03 Surf (Secret House) and HM04 Strength (Gold Teeth → the Warden) ─────────────────────
     def _in_safari_zone(self) -> bool:

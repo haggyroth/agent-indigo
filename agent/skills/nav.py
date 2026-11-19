@@ -277,6 +277,8 @@ class NavMixin:
         the identical path and stalling (the Viridian Forest / ledge stall)."""
         from game.pathfinding import find_path, find_path_spin
         from game.state import GameContext
+        if getattr(self.reader, "is_biking", lambda: False)() and self.reader.detect_context() == GameContext.OVERWORLD:
+            self._use_bicycle()          # the step logic assumes one tile per press: a bike covers two and overshoots targets / walks into doors (live-verified)
         # A lingering post-battle / dialog / heal-fade state (DIALOG_OPEN / TRANSITIONING
         # / IN_MENU) absorbs the D-pad, so A* taps can't move the player and walk_to
         # stalls in place — the Poké Center exit and Mt. Moon post-trainer-battle stalls

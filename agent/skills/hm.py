@@ -226,6 +226,8 @@ class HMMixin:
     def _surf(self) -> str:
         if self._surfing():
             return "Already surfing."
+        if self.reader.is_biking():
+            self._use_bicycle()                          # Surf needs the player on foot
         t = self.tilemap
         t.refresh()
         grid, w, h = t.passable_grid()

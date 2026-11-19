@@ -64,7 +64,7 @@ def test_every_schema_has_a_dispatcher_case():
 
 def test_token_budget_has_not_crept_back():
     assert tokens(GameContext.IN_BATTLE) < 1500            # was ~5.6k with every tool on every call
-    assert tokens(GameContext.OVERWORLD) < 4300
+    assert tokens(GameContext.OVERWORLD) < 4450               # grew with forget_move (#273) and fish (#269): each a capability the agent lacked, kept to one line
     assert tokens(None) < 5100                              # the "everything" fallback grew with save_game, give_item, safari, game_corner
     for t in TOOLS:
         assert len(t["function"]["description"]) < 650, t["function"]["name"]      # long guidance belongs in the prompt

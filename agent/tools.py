@@ -252,6 +252,11 @@ TOOLS = [
         }, "required": ["pokemon", "move"]},
     }},
     {"type": "function", "function": {
+        "name": "fish",
+        "description": "Cast your best rod at the nearest water (walks to a shore) up to `casts` times; a wild Pokémon on the hook becomes a battle. Needs a rod: quest('old_rod').",
+        "parameters": {"type": "object", "properties": {"casts": {"type": "integer"}}},
+    }},
+    {"type": "function", "function": {
         "name": "fly_to",
         "description": "Fly to a visited town (needs a Pokémon that knows Fly + the Thunder Badge, outdoors): "
                        "Pallet, Viridian, Pewter, Cerulean, Lavender, Vermilion, Celadon, Fuchsia, Cinnabar, "

@@ -5,6 +5,19 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — fishing rods, the Bicycle and the Running Shoes flag (#269, first part)
+- **Acquisition quests** (all verified live): `quest('old_rod')` (Vermilion house 1), `quest('good_rod')` (Fuchsia house 2), `quest('super_rod')` (Route 12's fishing house; reached
+  from Fuchsia through Routes 15/12) — "Do you like to fish?" → YES; `quest('bike')` — the Pokémon Fan Club chairman's story gives the Bike Voucher, the Cerulean Bike Shop swaps it for the
+  Bicycle. New optional beats (plus a guide-only `running_shoes` beat: the Pewter aide's scene is forced, `FLAG_SYS_B_DASH` 0x82F is the proof) and `go_to` map names.
+- **`fish(casts?)`** (new tool): walks to the nearest shore, turns to the water and casts the best rod from the Bag (Key Items → rod → USE). From the decomp's fishing task: A is
+  ignored during the dots and only a NEW press inside the 30-36-frame bite window reels in, so A is pressed every few frames until the cast ends — and never after (A facing water
+  opens Surf's prompt). A wild Pokémon on the hook becomes a battle for the model; otherwise "no bite". Hooked a Magikarp at Vermilion on the second cast.
+- **`use_item('Bicycle')`** mounts / dismounts (`is_biking` reads gPlayerAvatar.flags). `walk_to` gets off the bike first: a bike covers two tiles per press and overshot targets into doors
+  (live-verified: it walked into the Cerulean Pokémon Center), and `use_hm('surf')` dismounts too.
+- The overworld token cap in `test_tool_gating` went 4300 → 4450 for `forget_move` and `fish`.
+- **Not done** (the rest of #269): running with B in the movement primitive (needs per-tile verification: doors, ledges, arrow tiles, stairs), bike-aware routing (the Cycling Road), the
+  rod tier in the generated wild data for the dex plan.
+
 ### Added — Oak's Aide rewards and hidden items (#275, #276)
 - **`quest('itemfinder')` / `quest('exp_share')`** (verified live): the Route 11 gatehouse (2F) aide gives the Itemfinder for **30 species caught**, the Route 15 one the Exp. Share
   for **50** (`knowledge/aides.py`); when short the quest says how many more to catch, and the Exp. Share is handed to the Pokémon that lags (`holder_for` + `give_item`).

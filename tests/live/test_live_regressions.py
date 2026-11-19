@@ -1521,3 +1521,81 @@ def test_pick_up_items_collects_the_worthwhile_hidden_items_on_route_9(live):
     assert after.get(34, 0) == before.get(34, 0) + 1 and after.get(68, 0) == before.get(68, 0) + 1, (out, after)       # an Ether and a Rare Candy
     assert {"3/27/15/7", "3/27/63/2"} <= set(c.ltm.data["hidden_taken"])
     assert "No item balls visible" in c._execute("pick_up_items", json.dumps({}))                                      # nothing left to walk to
+
+
+def test_rod_and_bike_quests_collect_the_key_items(live):
+    """quest('old_rod') (Vermilion house 1), quest('bike') (the Fan Club chairman's voucher, then the Cerulean Bike Shop) and quest('good_rod') (Fuchsia house 2)
+    on the real ROM (#269); each is a talk with 'Do you like to fish?' / the story → YES."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+
+    def run(name, flag, tries=10):
+        out = ""
+        for _ in range(tries):
+            out = c._execute("quest", json.dumps({"name": name, "auto_trainers": True}))
+            if live.r.read_flag(flag):
+                return out
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._auto_fight()
+        return out
+
+    def outside(town_map, town):
+        for _ in range(8):
+            c._execute("go_to", json.dumps({"destination": town, "force": True}))
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._auto_fight()
+            elif tuple(live.r.read_current_map()) == town_map:
+                return
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("vermilion city", badges=0xFF)
+    live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])
+    live.defeat_all_trainers()
+    assert live.r.read_flag(0x240) or "Old Rod" in run("old_rod", 0x240)
+    assert live.r.read_flag(0x240) and 262 in live.r.read_key_items()
+    outside((3, 5), "Vermilion City")
+    out = run("bike", 0x271, 12)
+    assert live.r.read_flag(0x241) and live.r.read_flag(0x271) and 360 in live.r.read_key_items(), out        # voucher, then the Bicycle
+    for _ in range(6):                                                                                       # out of the shop: Fly works outdoors only
+        c._execute("go_to", json.dumps({"destination": "Cerulean City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 3):
+            break
+    live.fly_to("fuchsia city", badges=0xFF)
+    out = run("good_rod", 0x244)
+    assert live.r.read_flag(0x244) and 263 in live.r.read_key_items(), out
+
+
+def test_fish_hooks_a_wild_pokemon_and_the_bicycle_mounts_and_dismounts(live):
+    """fish() on the real ROM (#269): from a Vermilion shore the Old Rod is cast from the Bag (Key Items → rod → USE) and A is pressed through the cast — ignored during
+    the dots, landing in the bite window — until a wild Pokémon is on the hook (a battle) or 'not even a nibble'. use_item('Bicycle') flips gPlayerAvatar's bike flag and
+    walk_to gets off the bike first (a bike covers two tiles per press and overshot targets into doors)."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("vermilion city", badges=0xFF)
+    live.give_key_item(262)
+    live.give_key_item(360)
+    hooked = False
+    for _ in range(12):
+        out = c._execute("fish", json.dumps({"casts": 4}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            hooked = True
+            assert "on the hook" in out, out
+            break
+        assert "no bite" in out, out
+    assert hooked, "twelve rounds of four casts never hooked anything"
+    c._auto_fight()
+    live.m.tick(60)
+    assert live.r.detect_context().name == "OVERWORLD"
+    assert not live.r.is_biking()
+    assert "riding the Bicycle" in c._execute("use_item", json.dumps({"item": "Bicycle"})) and live.r.is_biking()
+    px, py = live.r.read_player_pos()
+    c._walk_to(px, py + 1) if False else c._walk_to(px - 1, py)                          # any adjacent walk: it must dismount first
+    assert not live.r.is_biking()
