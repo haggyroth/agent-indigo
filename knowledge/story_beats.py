@@ -29,7 +29,7 @@ class Beat:
 
 
 BEATS: tuple[Beat, ...] = (
-    Beat("parcel", "Oak's Parcel → Pokédex", "Viridian City Mart → Pallet Town (Oak's Lab)",
+    Beat("parcel", "Oak's Parcel → Pokédex", "Viridian City Mart → Pallet Town (Oak's Lab)", driver="new_game",
          done=(("milestone", "delivered_oaks_parcel"), ("flag", 0x829)),                          # FLAG_SYS_POKEDEX_GET: a save from after the parcel has no milestone
          steps=("Take the starter, then the clerk at Viridian's Poké Mart gives you Oak's Parcel.",
                 "Deliver it to Prof. Oak in Pallet Town: you get the Pokédex and Poké Balls. Only then does the Route 2 / Viridian Forest road open.")),
@@ -177,7 +177,7 @@ CHAIN_KEYS = tuple(b.key for b in BEATS)
 # extra aliases accepted by quest('…')
 ALIASES = {"tower": "pokemon_tower", "mansion": "pokemon_mansion", "flute": "poke_flute", "pokeflute": "poke_flute",
            "silph": "silph_co", "silphco": "silph_co", "hideout": "rocket_hideout", "scope": "rocket_hideout", "silph_scope": "rocket_hideout",
-           "saffron": "silph_co", "elite4": "elite_four", "league_rooms": "elite_four", "champion": "elite_four", "hall_of_fame": "elite_four", "snorlax_12": "snorlax", "victory": "victory_road", "league": "victory_road", "oak": "parcel"}
+           "saffron": "silph_co", "elite4": "elite_four", "league_rooms": "elite_four", "champion": "elite_four", "hall_of_fame": "elite_four", "snorlax_12": "snorlax", "victory": "victory_road", "league": "victory_road", "oak": "parcel", "new_game": "parcel", "newgame": "parcel", "start": "parcel", "start_game": "parcel", "intro": "parcel"}
 
 
 def resolve(name):

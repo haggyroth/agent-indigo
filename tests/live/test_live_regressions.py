@@ -1852,3 +1852,33 @@ def test_quest_copycat_buys_the_poke_doll_and_learns_mimic(live):
     assert live.r.read_flag(0x2CD), out
     assert any("Mimic" in (p.move_names or []) for p in live.r.read_party()), out
     assert "already done" in live.c._execute("quest", json.dumps({"name": "copycat"}))                       # the chain marks it done by the tutor's flag
+
+
+def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parcel(tmp_path):
+    """quest('new_game') on the real ROM from the TITLE SCREEN of a blank cartridge (#260): the controls pages and Oak's speech, BOY, the player's and the rival's names on the keyboard, the bedroom, Oak's
+    intercept at Route 1, the lab, Squirtle, the rival's battle (played on autopilot here, as the model would), Viridian's Mart (the parcel), and Oak (the Pokédex + the Poké Balls)."""
+    import pytest
+    from game.constants import GEN3_CHARSET, Addr
+    from live.conftest import ROM
+    if not ROM.exists():
+        pytest.skip(f"ROM not found at {ROM}")
+    import main
+    link = tmp_path / "blank.gba"
+    link.symlink_to(ROM)                                           # a ROM path with no sibling .sav: the cartridge is blank, the title shows no Continue
+    rt = main.build_runtime(new_game=True, rom_path=str(link), ltm_path=str(tmp_path / "ltm.json"), journal_path=str(tmp_path / "j.jsonl"), verbose=False)
+    assert rt is not None
+    c, r, m = rt.client, rt.reader, rt.mgba
+    assert m.read8(Addr.MAP_BANK) == 0 and not r.read_party()          # still at the title
+    out = ""
+    for _ in range(40):
+        if r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "new_game squirtle name=KYLE rival=GARY"}))
+        if r.read_flag(0x829):
+            break
+    assert r.read_flag(0x829) and "delivered" in out, out                                          # FLAG_SYS_POKEDEX_GET
+    assert r.read_party()[0].species_name == "Squirtle" and 349 not in r.read_key_items()          # the parcel was handed over
+    sb2 = m.read32(Addr.SAVEBLOCK2_PTR)
+    assert "".join(GEN3_CHARSET.get(b, "?") for b in m.read_range(sb2, 8) if b != 0xFF) == "KYLE"
+    assert c._story()["parcel"] == "done"

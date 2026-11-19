@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — `quest('new_game')`: the model can start the game from the title screen (#260)
+- `START_NEW_GAME=true` boots the ROM to the title with no save loaded; `quest('new_game')` (alias of the `parcel` beat, which had no driver) then plays everything up to the Pokédex: the controls pages and Oak's speech, BOY/GIRL, the
+  player's and the rival's names on the keyboard, the bedroom, Oak's "Hey! Wait!" intercept at Route 1, the lab, the starter, the rival's battle (handed to the model like any trainer fight), Viridian's Mart (the clerk's forced scene
+  hands over Oak's Parcel) and Oak (the Pokédex and five Poké Balls: `FLAG_SYS_POKEDEX_GET`, what the chain's `parcel` beat checks). Every phase is resumable; screens are told apart by the main callback, the live cursor menu and
+  the party / flag / key-item state, never by counting presses. Options follow the name: `quest('new_game squirtle name=KYLE rival=GARY girl')` (default: Bulbasaur, RED, BLUE, boy).
+- With a save present the title shows CONTINUE above NEW GAME — the driver presses Down first. The observation carries a `NEW GAME:` line while the game has not started, and `go_to` now knows "Oak's Lab" and "Viridian Mart".
+- Verified live from a blank cartridge: title → names (KYLE read back from SaveBlock2) → Squirtle → the rival fight → the parcel → the Pokédex, in about three minutes. Not done: an eval scenario that starts from the title, and a measured model-driven run.
+
 ### Added — `quest('copycat')`: Mimic from Saffron's Copycat (#278, the last gift)
 - `quest('copycat')` buys the Poké Doll at the Celadon Dept. Store 2F when the bag has none (`shop(item=…)` machinery) and runs the existing Mimic tutor lesson. The issue called her TM and tutor; in FireRed/LeafGreen she
   only teaches the Mimic tutor move, once, for a Poké Doll. A Team Rocket grunt stands at her door until Silph Co. is cleared, so the beat needs `silph_co` (the driver says so and checks `FLAG_HIDE_SAFFRON_ROCKETS`).

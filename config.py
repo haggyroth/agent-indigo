@@ -68,6 +68,9 @@ START_FROM_SAVE   = os.path.expanduser(os.getenv("START_FROM_SAVE", ""))
 #   no Continue, no quest-log recap. Takes precedence over START_FROM_SAVE.
 #   Handy for testing from a fixed spot (e.g. the Pallet Town exterior).
 START_FROM_STATE  = os.path.expanduser(os.getenv("START_FROM_STATE", ""))
+# START_NEW_GAME: boot the ROM to the TITLE SCREEN with no save loaded (native backend) — the model then starts the game itself with quest('new_game')
+#   (title → names → Oak's lab → starter → the rival → Oak's parcel). Takes precedence over START_FROM_SAVE / START_FROM_STATE.
+START_NEW_GAME    = os.getenv("START_NEW_GAME", "").strip().lower() in ("1", "true", "yes", "on")
 # RESUME: "latest" (newest checkpoint under logs/runs/*/checkpoints/) or a path to a checkpoint .ss1 —
 #   loads it as START_FROM_STATE, so a cancelled/stuck run continues from its last checkpoint.
 RESUME            = os.getenv("RESUME", "").strip()
