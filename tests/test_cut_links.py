@@ -20,7 +20,7 @@ def test_a_route_without_a_cut_tree_is_unchanged_and_plain_maps_still_route():
 def test_the_route_16_flute_gate_applies_to_the_road_south_not_to_the_fly_house():
     req = MAP_GATES[(3, 34)][0]
     assert req.only_exits == ("South",)
-    no = lambda r: False                                                       # noqa: E731  (nothing satisfied)
+    no = lambda r: r.kind == "hm" and r.value == "Cut"                          # noqa: E731  (only Cut known: the Snorlax gate is the subject here)
     house = [("connection", "West", (3, 34, "4")), ("cut", (41, 10), (3, 34, "1")), ("warp", (27, 6), (25, 1, "0"))]
     assert unmet_gates(house, no) == []                                        # goes indoors from Route 16: not blocked by the Snorlax
     south = [("connection", "West", (3, 34, "4")), ("connection", "South", (3, 35))]
@@ -34,3 +34,19 @@ def test_route_4s_magikarp_house_cannot_be_walked_to_from_cerulean_but_can_from_
     assert "one way" in no_walk_reason((3, 22), (16, 0), (107, 10))            # the Cerulean end: say why instead of stalling
     assert no_walk_reason((3, 22), (16, 0), (12, 6)) is None                   # the Mt. Moon-side pocket: one hop
     assert "one way" in no_walk_reason((3, 3), (16, 0))
+
+
+def test_a_cut_or_surf_step_needs_that_hm_but_only_a_cut_step_needs_cut():
+    none = lambda r: False   # noqa: E731
+    cut, surf = [("cut", (1, 1), (3, 34, "1"))], [("surf", (1, 1), (3, 28, "1"))]
+    assert [r.value for _i, r in unmet_gates(cut, none)] == ["Cut"]
+    assert [r.value for _i, r in unmet_gates(surf, none)] == ["Surf"]
+    assert unmet_gates(surf, lambda r: r.value == "Surf") == []
+
+
+def test_route_10s_power_plant_side_is_reached_over_water_from_rock_tunnels_north_door():
+    from knowledge.map_graph import node_for
+    steps = route_to(node_for(3, 28, 8, 79), (1, 95))
+    kinds = [s[0] for s in steps]
+    assert "surf" in kinds and steps[-1] == ("warp", (7, 40), (1, 95))
+    assert kinds.index("surf") > max(i for i, s in enumerate(steps) if s[0] == "warp" and s[2][:2] == (1, 82))   # after Rock Tunnel, not before

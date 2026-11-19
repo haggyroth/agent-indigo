@@ -534,7 +534,7 @@ MAP_KIND: dict[tuple[int, int], str] = {
 # region graph finds no route, and the runtime learns failed edges (nav._go_to).
 from collections import deque  # noqa: E402
 
-from knowledge.map_regions import BLOCKER_LINKS, CONN_LINKS, LEDGE_LINKS, REGION_GRIDS, WARP_ARRIVAL  # noqa: E402
+from knowledge.map_regions import BLOCKER_LINKS, CONN_LINKS, LEDGE_LINKS, REGION_GRIDS, SURF_LINKS, WARP_ARRIVAL  # noqa: E402
 
 SPLIT_MAPS: frozenset = frozenset(REGION_GRIDS)
 
@@ -642,6 +642,20 @@ def _build_blocker_graph():
 
 
 _R_BLK = _build_blocker_graph()
+
+
+def _build_surf_graph():
+    """node -> [(x, y, dest node)]: cross a body of water between two land regions of one split map (two-way). (x, y) is a shore tile of the FAR side; walk_to there and it surfs on the way."""
+    srf: dict = {}
+    for mp, links in SURF_LINKS.items():
+        for ta, tb, ax, ay, bx, by in links:
+            na, nb = (mp[0], mp[1], ta), (mp[0], mp[1], tb)
+            srf.setdefault(na, []).append((bx, by, nb))
+            srf.setdefault(nb, []).append((ax, ay, na))
+    return srf
+
+
+_R_SRF = _build_surf_graph()
 # Coarse (region-blind) graph — the optimistic fallback.
 _C_CONN = {m: sorted(d.items()) for m, d in MAP_CONNECTIONS.items()}
 _C_WARP = MAP_WARPS
@@ -660,7 +674,7 @@ def _matches(node, goal) -> bool:
 UNWALKABLE_MAPS = frozenset({(3, 11)})
 
 
-def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=(), blk=None):
+def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=(), blk=None, srf=None):
     """BFS. accept(node) -> truthy ends the search; returns (node, steps) or None.
     avoid_edges: set of (from_node, kind, arg) the runtime has learned are blocked. `blk` (node -> [(x, y, node)]) adds ("cut", (x, y), node) steps:
     walk to the tile beyond a Cut tree / rock (the walk clears it)."""
@@ -673,6 +687,8 @@ def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=()
             cand += [("warp", (x, y), n) for (x, y, n) in warp.get(cur, [])]
             if blk:
                 cand += [("cut", (x, y), n) for (x, y, n) in blk.get(cur, [])]
+            if srf:
+                cand += [("surf", (x, y), n) for (x, y, n) in srf.get(cur, [])]
         for step in cand:
             if (cur, step[0], step[1]) in avoid_edges:
                 continue
@@ -718,6 +734,9 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=()):
         # Same strict graph, but a Cut tree / rock may be cleared: a gate the strict view saw as a wall (Route 16's tree before the upper gatehouse) is a real way
         # through — the region-blind fallback below would plan a direct door that skips the gatehouse.
         hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps, blk=_R_BLK)
+    if hit is None and warps:
+        # …and water: two land regions of one map that touch the same lake / river (Route 10's Power Plant side) are joined by Surf.
+        hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps, blk=_R_BLK, srf=_R_SRF)
     if hit is None and warps:
         # coarse fallback: plain maps; a learned-blocked edge is keyed by region node, so
         # also match it by its plain map to keep the avoidance effective.

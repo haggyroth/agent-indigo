@@ -24,7 +24,7 @@ SPECIAL: dict[int, tuple[str, str]] = {
     142: ("fossil: Old Amber (Pewter Museum) revived at the Cinnabar Pokémon Lab", ""),
     143: ("a sleeping Snorlax on Route 12 / Route 16 (needs the Poké Flute)", "snorlax"),
     144: ("Seafoam Islands B4F (legendary; use the Master Ball or weaken it)", ""),
-    145: ("Power Plant (legendary)", ""), 146: ("Mt. Ember on Sevii (legendary)", ""),
+    145: ("Power Plant (legendary: Surf, then it appears once — catch it)", "zapdos"), 146: ("Mt. Ember on Sevii (legendary)", ""),
     150: ("Cerulean Cave B1F (legendary; after the Network Machine)", ""), 151: ("event only (Mew)", ""),
 }
 

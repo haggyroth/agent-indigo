@@ -1710,3 +1710,42 @@ def test_snorlax_is_a_one_shot_the_model_plays_with_a_saved_state(live):
     assert live.m.load_state(9)
     live.m.tick(30)
     assert live.r.read_enemy_lead().current_hp == foe.max_hp and live.r.detect_context().name == "IN_BATTLE"
+
+
+def test_zapdos_quest_surfs_to_the_power_plant_and_hands_the_one_shot_battle_to_the_model(live):
+    """quest('zapdos') on the real ROM (#264): go_to routes over Route 10's water (the new Surf region links) to the Power Plant door, walks up to Zapdos, and the L50 legendary fight
+    is handed to the model under the one-shot protocol with the battle-start state saved in slot 9."""
+    import pytest
+    from types import SimpleNamespace as NS
+    from agent.observation import _one_shot
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    for _ in range(6):
+        c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+        elif tuple(live.r.read_current_map()) == (3, 6):
+            break
+    live.fly_to("lavender town", flags=(0x23C, 0x23D))
+    live.patch_mon(0, moves=[57, 15, 75, 22], pps=[15, 30, 25, 25])        # Surf, Cut, Razor Leaf, Vine Whip
+    live.strong_lead(60)                                                     # out-levels the cave wilds, so Max Repel keeps them away
+    live.give_item(2, 5)
+    live.give_item(84, 30)
+    foe = None
+    for _ in range(40):
+        if live.r.detect_context().name != "IN_BATTLE":
+            c._execute("use_item", json.dumps({"item": "Max Repel"}))
+        c._execute("quest", json.dumps({"name": "zapdos", "auto_trainers": False}))
+        if live.r.detect_context().name == "IN_BATTLE":
+            foe = live.r.read_enemy_lead()
+            if foe and foe.species_id == 145:
+                break
+            c._auto_fight()                                                  # Rock Tunnel / Route 10 trainers and wilds on the way
+    assert foe and foe.species_id == 145 and foe.current_hp == foe.max_hp, "the Zapdos fight was not handed to the model"
+    assert tuple(live.r.read_current_map()) == (1, 95)
+    _ids, names, pp = live.r.read_active_battle_moves()
+    t = NS(run=NS(), map_key=(1, 95), reader=live.r)
+    text = _one_shot(t, foe, list(names), list(pp))
+    assert "ONE-SHOT: Zapdos" in text and "load_state(9)" in text and t.run.one_shot_saved == (145, (1, 95)), text
