@@ -109,3 +109,45 @@ def test_other_errors_are_returned_untouched_and_a_stale_menu_is_cleared_first()
     assert c._open_pc() == "Couldn't find the PC in this Pokémon Center." and calls == {"backout": 0, "once": 1}
     c, calls = _pc_client([None], ctx=GameContext.IN_MENU)
     assert c._open_pc() is None and calls["backout"] == 1                                  # a menu left open by an earlier failure: backed out before trying
+
+
+def _pc_menu_sim(first_menu_live):
+    """The PC dialogue: dialogue boxes, the 4-entry 'Which PC?' menu, more dialogue, then the 5-entry storage menu (cursor starts on WITHDRAW). A on the storage menu opens
+    the screen for whichever mode the cursor is on."""
+    st = {"i": 0, "cursor": 0, "opened": None, "presses": []}
+    screens = ["dialogue", "which_pc", "dialogue", "storage_menu"]
+
+    def cur():
+        return screens[min(st["i"], len(screens) - 1)]
+
+    def read8(addr):
+        from game.constants import Addr
+        assert addr == Addr.MENU_CURSOR + 2
+        return {"which_pc": 3, "storage_menu": 4}.get(cur(), 0)               # sMenu.maxCursorPos
+
+    def hold(btn, n):
+        if cur() == "storage_menu":
+            st["opened"] = st["cursor"]
+        else:
+            st["i"] += 1
+
+    c = client()
+    c.mgba = NS(read8=read8, hold=hold, tick=lambda n: None)
+    c._in_storage = lambda: st["opened"] is not None
+    c._menu_driver = NS(choice_live=lambda: cur() == "storage_menu" or (cur() == "which_pc" and first_menu_live))
+    c._mcur = lambda: st["cursor"]
+
+    def press(btn, n):
+        st["presses"].append(btn)
+        st["cursor"] += 1 if btn == "Down" else -1
+    c._press = press
+    return c, st
+
+
+@pytest.mark.parametrize("first_menu_live", [True, False])
+def test_the_storage_menu_is_steered_to_the_mode_even_when_the_which_pc_menu_reads_as_no_menu(first_menu_live):
+    """The watched run's stuck swap: 'Which PC?' read as not-a-menu, so the old menu counting steered nothing and A took WITHDRAW with a full party, forever."""
+    for mode in (0, 1, 2):
+        c, st = _pc_menu_sim(first_menu_live)
+        assert c._pc_to_storage(mode) is None and st["opened"] == mode, (mode, st)
+        assert st["presses"] == ["Down"] * mode                                  # and the 4-entry menu before it was never steered
