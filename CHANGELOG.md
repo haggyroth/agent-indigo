@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the Cycling Road: Route 16's Snorlax and bike-aware routing (#272 / #269, the rest)
+- **`quest('snorlax_16')`** (optional beat): the second Snorlax at Route 16 (31,13), Celadon's side. Same flute-and-fight script as Route 12's — the fight goes to the model under the one-shot protocol, never
+  the autopilot — and `FLAG_HIDE_ROUTE_16_SNORLAX` (0x080, set when the fight starts) is the proof. Verified live from the stalled run's Route 16 state.
+- **Celadon -> Fuchsia over the Cycling Road** when the Snorlax is gone and the Bicycle is owned: Route 16's gate house -> Routes 17-18 -> Fuchsia in one `go_to` leg (9 hops instead of the 20 through Lavender).
+  `SNORLAX_LINKS` now holds Route 16's crossing too; the gates say "quest('snorlax_16')" / "quest('bike')" when one is missing.
+- **On the Cycling Road the game keeps you on the bike**, and `walk_to` used to try to dismount there: "Interrupted while walking to the South edge (TRANSITIONING)" and the Start menu left open. It now
+  rides (`FLAG_SYS_ON_CYCLING_ROAD`, 0x830). Live-verified with real bikers on the slope: the fights, a heal mid-road and the arrival.
+- **The road is one-way**: Route 17's pull-down tiles carry you south and the bike cannot climb them, so Fuchsia -> Celadon is never planned over it (it went "stuck at Route 17 (North edge)" first).
+- Gate hunting fixes: a crossing inside the map you stand on (a Cut tree, a Snorlax) no longer bans the whole map, and the region-blind fallback may not be taken as the alternative when it would walk
+  through Route 12 / 16 (it cannot see the Snorlax there).
+
 ### Fixed — go_to('Fuchsia City') said "you need Surf" when the land route was open
 - Two watched runs reached four badges and then stalled on Fuchsia (about 20 identical `go_to('Gym')` / `quest('koga')` / `quest('surf')` calls, each "Route 21 is open water — you need Surf"). The
   generated region grids see a sleeping Snorlax's square as a wall, so Route 12's pier was split in two with only a water link between the halves; the planner chose a 24-step sea trip via Pallet, and

@@ -75,7 +75,9 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
 
 # A Snorlax crossing inside a split map: held to that map's wake flag (the flute alone is not enough — the Snorlax has to have been woken: quest('snorlax')).
 _SNORLAX_REQ = {(3, 30): Req("flag", 0x253, "Route 12's Snorlax is still asleep on the pier — the road to Fuchsia runs over it: wake it with the Poké Flute (quest('snorlax'); "
-                             "the flute comes from Mr. Fuji, quest('poke_flute')).", alt_flag=0x253)}
+                             "the flute comes from Mr. Fuji, quest('poke_flute')).", alt_flag=0x253),
+                 (3, 34): Req("flag", 0x080, "Route 16's Snorlax is still asleep at (31,13), plugging the road to the Cycling Road's gate house: wake it with the Poké Flute "
+                              "(quest('snorlax_16')).", alt_flag=0x080)}      # FLAG_HIDE_ROUTE_16_SNORLAX is set when its wake-up fight starts
 
 _STEP_HM = {"cut": Req("hm", "Cut", "A Cut tree blocks the way: you need a Pokémon that knows Cut (quest('cut'))."),
             "surf": Req("hm", "Surf", "The way crosses water: you need a Pokémon that knows Surf (quest('surf')).")}

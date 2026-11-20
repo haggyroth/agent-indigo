@@ -23,6 +23,7 @@ python tools/live_suite.py --changed origin/main --post-status      # only if th
 | `threemon.ss1` | Viridian City, party Bulbasaur L8 / Pikachu L5 / Caterpie L5 |
 | `fullparty.ss1` | inside a Pokémon Center with a FULL party of six (Zubat, Ivysaur, Spearow, Beedrill, Pikachu, Pidgey) and Sandshrew boxed — the PC swap that looped on WITHDRAW (run `20261119-210923`, checkpoint 1, walked to the Center) |
 | `fuchsia_by_land.ss1` | Route 16 (41,7), 4 badges, Poké Flute in the bag, Route 12's Snorlax already awake (flag 0x253), no Bicycle — the watched stall on the way to Fuchsia (run `20261120-172153`, checkpoint 21) |
+| `cycling_road.ss1` | Route 16's east end (Celadon's exit), Bicycle in the bag (voucher + flags 0x241/0x271), Route 16's Snorlax gone (flag 0x080), trainers beaten — Celadon -> Fuchsia over the Cycling Road |
 | `disabled.ss1` | mid-battle, the lead's Tackle is Disabled (found via `gDisableStructs` 0x02023E0C) |
 | `post_misty.ss1` | Route 24 (north of Cerulean), Misty beaten, Ivysaur L26, no SS Ticket yet |
 | `vermilion_gym_surge.ss1` | Vermilion Gym, 2 badges, Ivysaur L30 with five L22 teammates, in front of Surge's trainers (run checkpoint `ckpt_00117_OVERWORLD`) |
