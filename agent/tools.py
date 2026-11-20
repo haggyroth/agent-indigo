@@ -205,9 +205,9 @@ TOOLS = [
         "description": "The Pokémon PC (box storage). action='list' shows what is stored (reads memory, works anywhere; "
                        "detail=true adds box:slot, types, moves, HM ability and a quality grade — use it to pick who to "
                        "withdraw). 'deposit' stores party `pokemon`; 'withdraw' takes `pokemon` (species, nickname or "
-                       "'box:slot') out into a free party slot; 'swap' deposits `pokemon` and withdraws `box_pokemon` in one "
+                       "a reference like '1:4' = box 1, slot 4) out into a free party slot; 'swap' deposits `pokemon` and withdraws `box_pokemon` in one "
                        "go (both checked first). These travel to a Center if needed. A name matching several Pokémon returns "
-                       "the list — use a slot or 'box:slot'. It won't store your last battle-ready Pokémon, or the only HM "
+                       "the list — use the reference (e.g. '1:4'). It won't store your last battle-ready Pokémon, or the only HM "
                        "carrier unless force=true.",
         "parameters": {"type": "object", "properties": {
             "action": {"type": "string", "enum": ["list", "deposit", "withdraw", "swap"]},

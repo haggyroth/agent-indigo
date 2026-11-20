@@ -7,6 +7,8 @@ boxes × 30 BoxPokemon × 80 bytes), storage-screen cursor area 0x02039820 (0 bo
 3 top buttons) and cursor position 0x02039821 (grid 0-29 = col + 6·row; buttons 0 = PARTY POKéMON, 1 = CLOSE BOX;
 party panel = slot).
 """
+import re
+
 from game.constants import Addr
 from game.state import GameContext
 
@@ -32,10 +34,16 @@ def resolve_boxed(who: str, boxes: list) -> tuple[dict | None, str]:
     (exact first, then partial). Returns (mon, '') or (None, why) — several matches are listed, never guessed
     (the old pick-the-highest-level could grab the wrong Pokémon, or the one just deposited)."""
     key = str(who).strip().lower()
+    loose = re.fullmatch(r"box\s*:?\s*(\d+)(?:\s*(?:[:/,]\s*(?:slot\s*)?|slot\s*)(\d+))?", key)             # 'box:4' / 'box 1:4' / 'box1 slot 4': the placeholder copied literally
+    if loose:
+        if loose.group(2) is None:
+            return None, (f"{who!r} isn't a reference — write the BOX NUMBER, a colon and the SLOT, like '1:4' (box 1, slot 4: the numbers pc('list', detail=true) prints), "
+                          "or just the Pokémon's name.")
+        key = f"{loose.group(1)}:{loose.group(2)}"
     if ":" in key and key.replace(":", "").replace(" ", "").isdigit():
         b, sl = (int(x) for x in key.split(":"))
         mon = next((m for m in boxes if m["box"] == b - 1 and m["slot"] == sl), None)
-        return (mon, "") if mon else (None, f"Nothing at {who!r} — box:slot is 1-based box, 0-based slot (see pc('list')).")
+        return (mon, "") if mon else (None, f"Nothing at {who!r} — a reference is BOX:SLOT, like '1:4' (1-based box, 0-based slot; see pc('list', detail=true)).")
     exact = [m for m in boxes if key in (m["nickname"].lower(), m["species_name"].lower())]
     cands = exact or [m for m in boxes if key and (key in m["nickname"].lower() or key in m["species_name"].lower())]
     if not cands:
@@ -72,7 +80,44 @@ class PCMixin:
         self.mgba.hold(button, 8)
         self.mgba.tick(ticks)
 
+    _PC_RETRYABLE = ("The PC didn't open the storage screen.", "Couldn't steer the PC menu to the requested mode.")
+
+    def _pc_diag(self) -> str:
+        """What the screen is, for an error message (a watched run's PC failed six times and nothing said why)."""
+        try:
+            return (f"callback {self.mgba.read32(Addr.GMAIN_CALLBACK2):#x}, context {self.reader.detect_context().name}, menu cursor {self._mcur()}, "
+                    f"at {tuple(self.reader.read_player_pos())} on map {tuple(self.reader.read_current_map())}")
+        except Exception:
+            return "screen unreadable"
+
+    def _pc_backout(self) -> None:
+        """Leave whatever PC / menu screen is up and get back to the free field (a failed open used to leave the 'Which PC?' menu showing, so the next call said 'open the PC from the overworld')."""
+        self._pc_close()
+
     def _open_pc(self, mode: int = 1) -> str | None:
+        """_open_pc_once with recovery: a failed open backs out of the menus and tries once more from scratch; a second failure says what the screen showed, and after two failed calls in a
+        row tells the model to stop retrying (a watched run made ten PC calls, none worked, and it fumbled through the storage screen by hand). None on success, else an error message."""
+        if self._in_storage():
+            return None
+        if self.reader.detect_context() != GameContext.OVERWORLD:        # a menu left open by an earlier failure: clear it before refusing
+            self._pc_backout()
+        err = self._open_pc_once(mode)
+        if err in self._PC_RETRYABLE:
+            self._pc_backout()
+            err = self._open_pc_once(mode)
+        if err is None:
+            self._pc_fail_streak = 0
+            return None
+        if err in self._PC_RETRYABLE:
+            diag = self._pc_diag()
+            self._pc_backout()
+            self._pc_fail_streak += 1
+            err = f"{err} Tried twice and backed out (screen: {diag})."
+            if self._pc_fail_streak >= 2:
+                err += f" The PC has failed {self._pc_fail_streak} calls in a row — stop retrying: carry on and try again at another Pokémon Center later."
+        return err
+
+    def _open_pc_once(self, mode: int = 1) -> str | None:
         """Walk to the Center's PC and open SOMEONE'S PC → the storage screen in `mode` (0 WITHDRAW, 1 DEPOSIT,
         2 MOVE). The PC has two list menus: 'Which PC?' (first entry = SOMEONE'S PC) and the storage system menu
         (WITHDRAW / DEPOSIT / MOVE POKéMON / MOVE ITEMS / SEE YA!). Text in between is advanced with A. None on
@@ -284,7 +329,7 @@ class PCMixin:
         boxes = self.reader.read_boxes()
         pick, why = resolve_boxed(who, boxes)
         if pick is None:
-            return f"{why} {self._pc_boxes}" if why.startswith(("No Pokémon", "Nothing")) else why
+            return f"{why} {self._pc_boxes()}" if why.startswith(("No Pokémon", "Nothing")) else why
         party = self.reader.read_party()
         if len(party) >= 6:
             return "Your party is full (6) — pc('deposit') one first, or use pc('swap')."
@@ -335,7 +380,7 @@ class PCMixin:
         boxes = self.reader.read_boxes()
         pick, why = resolve_boxed(box_mon, boxes)
         if pick is None:
-            return f"{why} Nothing was deposited." + (f" {self._pc_boxes}" if why.startswith("No Pokémon") else "")
+            return f"{why} Nothing was deposited." + (f" {self._pc_boxes()}" if why.startswith("No Pokémon") else "")
         party = self.reader.read_party()
         i, err = self._pick_party(str(party_mon), party)
         if i is None:
