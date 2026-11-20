@@ -1904,3 +1904,32 @@ def test_watched_run_fixes_stale_move_reply_long_nickname_and_switch_outside_a_b
             break
     assert "Gotcha" in got and "shortened to 'Wolfgang'" in got, got
     assert any(p.nickname == "Wolfgang" for p in live.r.read_party()), [p.nickname for p in live.r.read_party()]
+
+
+def test_pc_recovers_from_a_failed_open_and_a_failure_saves_a_real_screenshot(live, tmp_path, monkeypatch):
+    """A PC open that reports failure while the storage screen is actually up (what a watched run's PC did, six times): the skill backs out through the real menus, tries again and the
+    deposit goes through; and a failure result saves a real frame under the run directory."""
+    from memory.run_log import RunLog
+    live.load("threemon")
+    c = live.c
+    real, calls = c._open_pc_once, {"opened": 0}
+
+    def flaky(mode=1):
+        err = real(mode)
+        if err is None:
+            calls["opened"] += 1
+            if calls["opened"] == 1:
+                return "The PC didn't open the storage screen."        # the first open succeeds for real, but is reported as a failure
+        return err
+    monkeypatch.setattr(c, "_open_pc_once", flaky)
+    out = _pc(live, "pc_deposit", pokemon="Pikachu")
+    assert out.startswith("Deposited") and calls["opened"] == 2, (out, calls)
+    assert live.r.detect_context() == GameContext.OVERWORLD and len(live.r.read_party()) == 2
+    old_log = c.run_log
+    c.run_log = RunLog(tmp_path / "runs")
+    try:
+        rel = c._failure_shot("pc", "The PC didn't open the storage screen.")
+        shot = c.run_log.dir / rel
+        assert rel.startswith("shots/") and shot.exists() and shot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    finally:
+        c.run_log = old_log

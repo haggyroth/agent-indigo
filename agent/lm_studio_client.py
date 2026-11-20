@@ -321,8 +321,24 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
         except Exception:
             log_once("client._log_tool", "client._log_tool: tolerated failure (continuing with a default)")
             pass
+        shot = self._failure_shot(name, result)
         self.run_log.event("tool", name=name, args=args_json, secs=round(secs, 2),
-                           result=str(result)[:800], **snap)
+                           result=str(result)[:800], **({"shot": shot} if shot else {}), **snap)
+
+    def _failure_shot(self, name: str, result) -> str:
+        """When a tool's result reads like a failure, save the current frame under the run directory and return its path relative to it ('' when not saved)."""
+        from agent.failure_shots import should_save
+        try:
+            run_dir, grab = getattr(self.run_log, "dir", None), getattr(self.mgba, "screenshot", None)
+            if not run_dir or grab is None or not should_save(self._shot_log, name, result, time.time()):
+                return ""
+            rel = f"shots/{time.time() - self.run_log.t0:08.1f}_{name}.png"
+            (run_dir / "shots").mkdir(parents=True, exist_ok=True)
+            grab(str(run_dir / rel))
+            return rel
+        except Exception:
+            log_once("client._failure_shot", "client._failure_shot: could not save a failure screenshot (ignored)")
+            return ""
 
     def _progress_signature(self):
         """What 'making progress' means to the watchdog: location, party growth, money, and (in a

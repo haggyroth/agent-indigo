@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — the PC, from a watched run whose PC never worked (ten `pc` calls, none succeeded)
+- **A bug in two error messages:** `pc swap` / `pc withdraw` with no match printed `<bound method PCMixin._pc_boxes …>` instead of the box list (`{self._pc_boxes}` for `{self._pc_boxes()}`).
+- **`box:4` copied literally.** The model sent the placeholder from the docs; a reference is `box:slot` as numbers — `'1:4'` (box 1, slot 4). `box:4`, `box 1:4` and `box1 slot 4` are now understood or answered with a hint,
+  and the tool description gives the example.
+- **The skill recovers.** A failed PC open used to leave the 'Which PC?' menu showing (the next call: "open the PC from the overworld"). It now backs out through the menus, tries once more from scratch, reports what the
+  screen showed (callback, context, menu cursor, position) and, after two failed calls in a row, tells the model to stop retrying. A menu left open before the call is cleared first.
+- **Failure screenshots.** When a tool's result reads like a failure ("Couldn't…", "didn't open…", "was stopped: no progress", "stuck at…"), the current frame is saved to `<run dir>/shots/<seconds>_<tool>.png` and
+  the path is recorded in that tool's run-log event (`shot`). At most 40 per run, spaced 5 s apart, one per repeated failure (`agent/failure_shots.py`).
+- Not found: why the PC would not open in that run — it did not reproduce on a clean Cerulean Center fixture (deposits of party slots 3-6 all worked). The next failure will leave a picture.
+
 ### Fixed — four problems from a watched new-game run
 - **`heal()` hung in a trainer battle.** Its trip to the Center auto-fought a trainer with a hurt party (`mode="flee"`): two Pokémon fainted and the watchdog stopped it ("no progress for 3.4 min of game time"), twice. With a
   must-heal need, a trainer on a heal trip now goes to the model like any encounter — "switch to a healthy Pokémon or use a Potion" — and `heal()` resumes the trip. Healthy parties still auto-fight.
