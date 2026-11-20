@@ -12,6 +12,7 @@ All notable changes to this project are documented here. Format loosely follows
   answer is "wake it: quest('snorlax')"; awake, `go_to` walks Lavender → Route 12's gatehouse → over the Snorlax → Routes 13-15 (live-verified from Route 16, 3 calls).
 - Route 17 (the Cycling Road) is gated on the Bicycle: Route 16's south edge used to pass the flute gate and then fail with "Reached the South edge but could not cross".
 - The team report no longer lists a Surf gap as a reason Fuchsia is out of reach (the HM comes from inside it).
+- Checked end to end: `quest('bike')` from Route 16 on foot reaches the Fan Club (voucher) and the Cerulean Bike Shop (Bicycle, key item 360), and `go_to('Fuchsia City')` still takes the Route 12 road afterwards (new live test).
 
 ### Fixed — the Pokémon Tower's ghost Marowak is not catchable
 - A watched run threw 18 Poké Balls at the Marowak on 6F ("It broke free!" every time) until the watchdog fired: the game dodges every ball in a ghost battle (`BATTLE_TYPE_GHOST`, bit 15 of

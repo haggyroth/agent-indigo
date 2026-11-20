@@ -2005,3 +2005,28 @@ def test_go_to_fuchsia_with_the_snorlax_asleep_names_the_snorlax_not_surf(live):
     live.set_flag(0x253, on=False)
     out = live.c._execute("go_to", json.dumps({"destination": "Fuchsia City"}))
     assert "quest('snorlax')" in out and "Surf" not in out.split("(Before")[0], out
+
+
+def test_quest_bike_gets_the_voucher_and_the_bicycle_from_where_a_run_stalls_on_fuchsia(live):
+    """The Bicycle is the Cycling Road's gate. From Route 16 on foot (no Fly hop), quest('bike') travels to Vermilion's Fan Club for the voucher, on to Cerulean's Bike Shop for the Bicycle
+    (key item 360), and go_to('Fuchsia City') still takes the Route 12 land road afterwards."""
+    live.load("fuchsia_by_land")
+    live.defeat_all_trainers()
+    assert not live.r.read_flag(0x271) and not live.r.read_flag(0x241), "fixture: no voucher or Bicycle yet"
+    for _ in range(40):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            live.c._execute("flee_battle", "{}")
+            continue
+        live.c._execute("quest", json.dumps({"name": "bike"}))
+        if live.r.read_flag(0x271):
+            break
+    assert live.r.read_flag(0x241) and live.r.read_flag(0x271) and 360 in live.r.read_key_items()
+    out = ""
+    for _ in range(30):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            live.c._execute("flee_battle", "{}")
+            continue
+        out = live.c._execute("go_to", json.dumps({"destination": "Fuchsia City"}))
+        if "Arrived" in out or "Can't" in out or "stuck" in out:
+            break
+    assert tuple(live.r.read_current_map()) == (3, 7), out
