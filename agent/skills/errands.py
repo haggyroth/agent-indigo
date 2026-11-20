@@ -133,6 +133,12 @@ class ErrandsMixin:
         if caught < AIDE_SEEN_NEEDED:
             return (f"Prof. Oak's Aide wants {AIDE_SEEN_NEEDED} Pokémon species CAUGHT (complete Pokédex data) and you have caught {caught}. Catch more, "
                     f"then call {call} again.")
+        if not self._can_use_cut():                       # the east building is behind a Cut tree: a watched run called quest('flash') eight times and re-learned the chain each time
+            from knowledge import story_beats as sb
+            first = sb.first_open("flash", self._story())
+            hop = f" Do {first.title} first: quest('{first.driver or first.key}')." if first and first.key != "flash" else " teach_move('Cut') to a Pokémon (needs the Cascade Badge), then call quest('flash') again."
+            return ("Not yet — Route 2's east building is behind a Cut tree, and you can't Cut yet (a Pokémon that knows Cut + the Cascade Badge). "
+                    f"The story chain is misty → ss_ticket → cut → surge → flash.{hop} Don't call quest('flash') again until then.")
         if (msg := self._gift_errand(call, "Route 2 East Building", ROUTE2_EAST_BUILDING, AIDE_SPOTS, FLAG_GOT_HM05, "Prof. Oak's Aide at (4,6)", auto_trainers)):
             return msg
         return "Got HM05 Flash from Prof. Oak's Aide. teach_move('Flash') to a Pokémon that can learn it, then use_hm('Flash') lights a dark cave (Rock Tunnel)."

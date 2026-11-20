@@ -1948,3 +1948,23 @@ def test_swap_with_a_full_party_deposits_first_then_withdraws(live):
     assert out.startswith("Deposited") and "Withdrew" in out and live.r.detect_context() == GameContext.OVERWORLD, out
     assert len(after) == 6 and "Sandshrew" in after and "Zubat" not in after, (out, after)
     assert any(b["species_name"] == "Zubat" for b in live.r.read_boxes())
+
+
+def test_a_move_disabled_during_the_previous_turn_is_caught_at_the_move_menu_not_after_a_long_stall(live):
+    """A watched run: the foe's Disable landed after use_move's pre-flight read, so use_move re-committed the dead move through 60 text rounds (2.5 min of game time, then the watchdog).
+    Simulate the missed pre-flight on the Disabled fixture: the move-menu re-check answers at once."""
+    live.load("disabled")
+    if live.r.detect_context() != GameContext.IN_BATTLE:
+        import pytest
+        pytest.skip("fixture is not mid-battle")
+    real, calls = live.r.read_disabled_move, {"n": 0}
+
+    def miss_once(battler=0):
+        calls["n"] += 1
+        return (0, 0) if calls["n"] == 1 else real(battler)
+    live.r.read_disabled_move = miss_once
+    try:
+        out = live.c._use_move("Tackle")
+    finally:
+        live.r.read_disabled_move = real
+    assert "DISABLED" in out and "Growl" in out and calls["n"] >= 2, (out, calls)
