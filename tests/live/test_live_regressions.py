@@ -1968,3 +1968,16 @@ def test_a_move_disabled_during_the_previous_turn_is_caught_at_the_move_menu_not
     finally:
         live.r.read_disabled_move = real
     assert "DISABLED" in out and "Growl" in out and calls["n"] >= 2, (out, calls)
+
+
+def test_a_ghost_battle_refuses_the_ball_and_the_observation_says_so(live):
+    """Pokémon Tower's ghost Marowak (BATTLE_TYPE_GHOST, 1 << 15) dodges every ball: a watched run threw 18 at it. Set the flag on a real wild battle: catch() refuses without throwing, the bag is
+    untouched, and the battle advice says not to catch."""
+    from game.constants import Addr
+    live.load("threemon")
+    assert live.wild_battle(), "no wild battle found"
+    balls = live.c._ball_count()
+    live.m.write32(Addr.BATTLE_TYPE_FLAGS, live.m.read32(Addr.BATTLE_TYPE_FLAGS) | Addr.BATTLE_TYPE_GHOST)
+    out = live.c._catch("Bonehead")
+    assert "ghost Marowak" in out and "can't be caught" in out, out
+    assert live.c._ball_count() == balls and live.r.detect_context() == GameContext.IN_BATTLE

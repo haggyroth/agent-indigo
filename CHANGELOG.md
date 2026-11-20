@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — the Pokémon Tower's ghost Marowak is not catchable
+- A watched run threw 18 Poké Balls at the Marowak on 6F ("It broke free!" every time) until the watchdog fired: the game dodges every ball in a ghost battle (`BATTLE_TYPE_GHOST`, bit 15 of
+  `gBattleTypeFlags`), and our encounter hand-off had said "Worth a ball: a NEW Pokédex entry". `catch()` now refuses without throwing, the `quest` / `grind` encounter hand-offs and the battle observation
+  say it can't be caught and to defeat it with `use_move`.
+
 ### Fixed — from a one-hour watched run (150 steps, 798 model calls, three watchdog stalls, eight `quest('flash')` calls)
 - **A Disable that lands mid-turn stalled `use_move` (and `grind`'s trainer fights) for 2.5-4 min of game time.** The foe's Disable can land after `use_move`'s pre-flight read; the move menu then
   bounced the commit through 60 text-advance rounds until the watchdog fired, and `grind`'s auto-fight (which goes through `use_move`) did the same against a Grimer. `use_move` now re-reads the Disable

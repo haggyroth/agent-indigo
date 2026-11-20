@@ -206,6 +206,7 @@ class Addr:
     BATTLE_TYPE_FLAGS   = 0x02022B4C
     BATTLE_TYPE_DOUBLE = 0x01    # gBattleTypeFlags & this != 0 → two Pokémon a side (Victory Road 3F's Ray & Tyra)
     BATTLE_TYPE_TRAINER = 0x08   # gBattleTypeFlags & this != 0 → a trainer battle
+    BATTLE_TYPE_GHOST   = 0x8000  # BATTLE_TYPE_GHOST (1 << 15): Pokémon Tower's ghosts — and the unveiled Marowak on 6F: every ball is dodged ("can't be caught")
     BATTLE_TYPE_SAFARI  = 0x80   # …and this one → a Safari Zone battle (BALL / BAIT / GO NEAR / RUN, no party or bag)
 
     # Bag key-items pocket, inside gSaveBlock1 (deref SAVEBLOCK1_PTR — the block

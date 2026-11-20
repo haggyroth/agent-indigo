@@ -574,6 +574,8 @@ class BattleMixin:
             return "Not in a battle — you can only catch a wild Pokémon during its battle."
         if self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
             return "You can't catch a trainer's Pokémon — only wild ones. Win with use_move."
+        if self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_GHOST:        # a watched run threw 18 Poké Balls at it ("It broke free!" every time) until the watchdog fired
+            return "That's the Pokémon Tower's ghost Marowak: it dodges every ball (it can't be caught), so a ball is wasted and nothing is learned. Defeat it with use_move (or switch_pokemon / use_item), then carry on."
         safari = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI)
         balls0 = self.mgba.read8(Addr.SAFARI_BALLS) if safari else self._ball_count()
         if balls0 <= 0:

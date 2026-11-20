@@ -601,6 +601,10 @@ class NavMixin:
                 what = f"{foe.species_name} L{foe.level} (HP {foe.current_hp}/{foe.max_hp})"
                 balls = self._ball_count()
                 party = self.reader.read_party()
+                from game.constants import Addr as _Addr
+                if self.mgba.read32(_Addr.BATTLE_TYPE_FLAGS) & _Addr.BATTLE_TYPE_GHOST:
+                    return (f"A wild {what} appeared at {here} on the way to {target_name}. It is the Tower's ghost: it dodges every ball (can't be caught) — "
+                            f"defeat it with use_move (or switch_pokemon), then call {again} to continue.")
                 if balls > 0 and foe.species_id not in {p.species_id for p in party}:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
