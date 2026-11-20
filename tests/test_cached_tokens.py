@@ -48,6 +48,8 @@ def test_the_client_sums_cached_tokens_and_logs_them_per_call():
 
 
 def test_the_episode_result_and_the_tally_show_the_cached_share():
+    import pytest
+    pytest.importorskip("openai")                                 # main imports the client
     from main import EpisodeResult
     r = EpisodeResult(reason="goal", passed=True, steps=1, llm_calls=2, prompt_tokens=1000, completion_tokens=10, final_map=(3, 0), final_pos=(1, 1), badges=0, cached_tokens=900)
     assert "cached 90% of prompt" in r.summary() and r.to_dict()["cached_tokens"] == 900
