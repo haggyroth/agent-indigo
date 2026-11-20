@@ -52,6 +52,7 @@ def _make_client(scripted) -> AgentClient:
     client.llm_calls = 0
     client.total_prompt_tokens = 0
     client.total_completion_tokens = 0
+    client.total_cached_tokens = 0
     return client
 
 

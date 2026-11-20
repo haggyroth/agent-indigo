@@ -5,6 +5,7 @@ import re
 import time
 from pathlib import Path
 from openai import OpenAI
+from agent.usage import cached_prompt_tokens
 from agent.tools import SAFARI_CONTEXT, tools_for, normalize_button
 from agent.history import trim_messages, strip_control_tokens
 from game.memory_reader import LeafGreenReader
@@ -67,6 +68,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
         self.llm_calls = 0
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
+        self.total_cached_tokens = 0         # prompt tokens the server served from its prompt cache (when it reports them)
 
     @property
     def total_tokens(self) -> int:
@@ -239,6 +241,8 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             if usage:
                 self.total_prompt_tokens     += getattr(usage, "prompt_tokens", 0) or 0
                 self.total_completion_tokens += getattr(usage, "completion_tokens", 0) or 0
+            cached = cached_prompt_tokens(usage)
+            self.total_cached_tokens += cached or 0
             msg = resp.choices[0].message
 
             # Split thinking from the actual response BEFORE storing in history.
@@ -251,6 +255,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                 "llm", n=self.llm_calls, round=_round,
                 prompt_tokens=getattr(usage, "prompt_tokens", None) if usage else None,
                 completion_tokens=getattr(usage, "completion_tokens", None) if usage else None,
+                cached_tokens=cached,
                 reasoning=(reasoning or "")[:1500], content=(clean_content or "")[:500],
                 tool_calls=[[tc.function.name, tc.function.arguments]
                             for tc in (msg.tool_calls or [])])

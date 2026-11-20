@@ -63,7 +63,7 @@ def _run_summary(client, steps: int) -> str:
     """One-line end-of-run tally: steps, what happened (the event-stream statistics) and LLM usage (spend visibility)."""
     return (f"steps={steps}  {events.stats_line()}  "
             f"llm_calls={client.llm_calls}  tokens={client.total_tokens} "
-            f"(prompt={client.total_prompt_tokens}, completion={client.total_completion_tokens})")
+            f"(prompt={client.total_prompt_tokens}, completion={client.total_completion_tokens}, cached={client.total_cached_tokens})")
 
 
 # A goal predicate: given the live state + long-term memory, has the episode's
@@ -101,6 +101,7 @@ class EpisodeResult:
     milestones:        list[str] = field(default_factory=list)
     stuck_ratio:       float = 0.0    # fraction of overworld decision ticks with no movement
     goal_desc:         str = ""
+    cached_tokens:     int = 0        # prompt tokens served from the server's prompt cache (0 when the endpoint doesn't report it)
 
     @property
     def total_tokens(self) -> int:
@@ -111,7 +112,7 @@ class EpisodeResult:
         return (f"[{flag}] {self.reason}  steps={self.steps}  "
                 f"map={self.final_map} pos={self.final_pos}  badges={self.badges}  "
                 f"stuck={self.stuck_ratio:.0%}  llm_calls={self.llm_calls}  "
-                f"tokens={self.total_tokens}")
+                f"tokens={self.total_tokens}" + (f" (cached {self.cached_tokens / self.prompt_tokens:.0%} of prompt)" if self.cached_tokens and self.prompt_tokens else ""))
 
     def to_dict(self) -> dict:
         d = dict(self.__dict__)
@@ -567,6 +568,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             stats=events.run_stats(), llm_calls=client.llm_calls,
             prompt_tokens=client.total_prompt_tokens,
             completion_tokens=client.total_completion_tokens,
+            cached_tokens=client.total_cached_tokens,
             final_map=(s.map_bank, s.map_id), final_pos=(s.player_x, s.player_y),
             badges=ltm.data["badges_earned"],
             milestones=list(ltm.data.get("milestones", [])),
