@@ -215,6 +215,18 @@ def next_beats(status: dict, include_optional: bool = False) -> list:
     return ready
 
 
+def first_open(key: str, status: dict):
+    """The beat to run FIRST on the way to `key`: follow the unmet needs down the chain to the first one whose own needs are all met (None when `key` is done). quest('flash') needs the Thunder
+    Badge (surge) → Cut → the SS Ticket → Misty: this names the one to run now, not just the next link."""
+    b = BY_KEY[key]
+    if status.get(key) == "done":
+        return None
+    for n in b.needs:
+        if status.get(n) != "done":
+            return first_open(n, status)
+    return b
+
+
 def missing_needs(beat: Beat, status: dict) -> list:
     return [BY_KEY[n] for n in beat.needs if status.get(n) != "done"]
 
