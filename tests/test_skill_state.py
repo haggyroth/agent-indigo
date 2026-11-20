@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = sorted((ROOT / "agent" / "skills").glob("*.py")) + [ROOT / "agent" / "lm_studio_client.py"]
 DECLARED = {n for n in vars(SkillState) if not n.startswith("__")}
 # Set in AgentClient.__init__ (not skill state): connections, the message list, spend counters.
-INIT_OWNED = {"llm", "mgba", "reader", "ltm", "tilemap", "messages", "llm_calls", "total_prompt_tokens", "total_completion_tokens",
+INIT_OWNED = {"llm", "mgba", "reader", "ltm", "tilemap", "messages", "llm_calls", "total_prompt_tokens", "total_completion_tokens", "total_cached_tokens",
               "run_log"}
 
 

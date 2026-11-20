@@ -34,6 +34,7 @@ def _client(exc):
     c.llm_calls = 0
     c.total_prompt_tokens = 0
     c.total_completion_tokens = 0
+    c.total_cached_tokens = 0
     c._trim_image_history = lambda: None
     return c
 
