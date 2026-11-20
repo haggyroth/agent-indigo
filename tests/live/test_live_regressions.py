@@ -1981,3 +1981,27 @@ def test_a_ghost_battle_refuses_the_ball_and_the_observation_says_so(live):
     out = live.c._catch("Bonehead")
     assert "ghost Marowak" in out and "can't be caught" in out, out
     assert live.c._ball_count() == balls and live.r.detect_context() == GameContext.IN_BATTLE
+
+
+def test_go_to_fuchsia_walks_the_land_route_over_route_12s_awake_snorlax(live):
+    """Watched runs 163742 / 172153: the planner saw the Snorlax's square as a wall, planned a sea trip via Pallet and answered "Route 21 is open water — you need Surf" about 20 times.
+    From Route 16 with the Snorlax awake, go_to('Fuchsia City') now walks Lavender → Route 12 gatehouse → over the Snorlax → Routes 13-15 (wild fights fled, trainers pre-beaten)."""
+    live.load("fuchsia_by_land")
+    live.defeat_all_trainers()
+    assert live.r.read_flag(0x253), "fixture: the Route 12 Snorlax should be awake"
+    out = ""
+    for _ in range(25):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            live.c._execute("flee_battle", "{}")
+            continue
+        out = live.c._execute("go_to", json.dumps({"destination": "Fuchsia City"}))
+        if "Arrived" in out or "Can't get" in out:
+            break
+    assert tuple(live.r.read_current_map()) == (3, 7) and "Surf" not in out, out
+
+
+def test_go_to_fuchsia_with_the_snorlax_asleep_names_the_snorlax_not_surf(live):
+    live.load("fuchsia_by_land")
+    live.set_flag(0x253, on=False)
+    out = live.c._execute("go_to", json.dumps({"destination": "Fuchsia City"}))
+    assert "quest('snorlax')" in out and "Surf" not in out.split("(Before")[0], out
