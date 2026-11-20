@@ -2004,7 +2004,7 @@ def test_go_to_fuchsia_with_the_snorlax_asleep_names_the_snorlax_not_surf(live):
     live.load("fuchsia_by_land")
     live.set_flag(0x253, on=False)
     out = live.c._execute("go_to", json.dumps({"destination": "Fuchsia City"}))
-    assert "quest('snorlax')" in out and "Surf" not in out.split("(Before")[0], out
+    assert ("quest('snorlax')" in out or "quest('snorlax_16')" in out) and "Surf" not in out.split("(Before")[0], out      # from Route 16 the shortest plan is the Cycling Road: its Snorlax is named first
 
 
 def test_quest_bike_gets_the_voucher_and_the_bicycle_from_where_a_run_stalls_on_fuchsia(live):
@@ -2030,3 +2030,32 @@ def test_quest_bike_gets_the_voucher_and_the_bicycle_from_where_a_run_stalls_on_
         if "Arrived" in out or "Can't" in out or "stuck" in out:
             break
     assert tuple(live.r.read_current_map()) == (3, 7), out
+
+
+def test_quest_snorlax_16_walks_to_the_sleeper_and_hands_the_one_shot_fight_to_the_model(live):
+    """#272: Route 16's Snorlax (31,13) — flute, face it from (32,13), YES; the fight is the model's (never the autopilot), and FLAG_HIDE_ROUTE_16_SNORLAX (0x080) is set at once."""
+    live.load("fuchsia_by_land")
+    live.defeat_all_trainers()
+    assert not live.r.read_flag(0x080), "fixture: Route 16's Snorlax should still be asleep"
+    out = live.c._execute("quest", json.dumps({"name": "snorlax_16"}))
+    assert live.r.detect_context() == GameContext.IN_BATTLE and "Snorlax" in out, out
+    assert live.r.read_flag(0x080) and tuple(live.r.read_player_pos()) == (32, 13)
+
+
+def test_go_to_fuchsia_rides_the_cycling_road_from_celadon_in_one_leg(live):
+    """#269: with the Bicycle and Route 16's Snorlax gone, Celadon -> Fuchsia is Route 16's gate house and the Cycling Road (the game puts you on the bike and will not let you off: walk_to used to try the
+    dismount and left the Start menu open). One call used to end 'stuck at Route 16 (TRANSITIONING)' and then fall back to the long road through Lavender."""
+    live.load("cycling_road")
+    live.defeat_all_trainers()
+    assert 360 in live.r.read_key_items() and live.r.read_flag(0x080)
+    seen, out = set(), ""
+    for _ in range(12):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            live.c._execute("flee_battle", "{}")
+            continue
+        out = live.c._execute("go_to", json.dumps({"destination": "Fuchsia City"}))
+        seen.add(tuple(live.r.read_current_map()))
+        if "Arrived" in out or "Can't get" in out:
+            break
+    assert tuple(live.r.read_current_map()) == (3, 7), out
+    assert (3, 33) not in seen and (3, 30) not in seen, seen               # not round by Routes 15 / 12

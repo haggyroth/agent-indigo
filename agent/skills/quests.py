@@ -150,7 +150,7 @@ class QuestMixin:
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
                 "strength": self._get_strength, "coin_case": self._get_coin_case,
                 "rocket_hideout": self._get_silph_scope, "tea": self._get_tea, "pokemon_tower": self._get_pokemon_tower,
-                "poke_flute": self._get_poke_flute, "snorlax": self._get_snorlax,
+                "poke_flute": self._get_poke_flute, "snorlax": self._get_snorlax, "snorlax_16": self._get_snorlax_16,
                 "pokemon_mansion": self._get_secret_key, "silph_co": self._get_silph_co,
                 "victory_road": self._get_victory_road, "elite_four": self._get_elite_four,
                 "flash": self._get_flash, "fly": self._get_fly, "dig": self._get_dig, "hitmon": self._get_hitmon, "copycat": self._get_copycat,

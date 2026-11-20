@@ -90,8 +90,8 @@ BEATS: tuple[Beat, ...] = (
     Beat("snorlax", "Wake the Snorlax (Route 12 → Fuchsia)", "Route 12, south of Lavender", needs=("poke_flute",), driver="snorlax", done=(("flag", 0x253),),
          steps=("Walk south from Lavender down Route 12 until the sleeping Snorlax blocks the path at (14,70).",
                 "Face it and press A: with the Poké Flute in the bag the game asks to play it → YES, then fight it (L30 Snorlax: weaken, then throw Ultra Balls, or just win).",
-                "Routes 12 → 13 → 14 → 15 lead on to Fuchsia City. (Route 16's Snorlax, west of Celadon, blocks the Cycling Road — also needs the flute and a Bicycle; "
-                "the Route 12 road is the way.)"),
+                "Routes 12 → 13 → 14 → 15 lead on to Fuchsia City. (Route 16's Snorlax, west of Celadon, blocks the shortcut — the Cycling Road — see quest('snorlax_16') and quest('bike'); "
+                "the Route 12 road is the way without them.)"),
          tip="Do this fight at full HP; it hits hard and has lots of HP."),
     Beat("koga", "Soul Badge — Koga (Poison)", "Fuchsia City Gym", needs=("snorlax",), driver="koga", done=(("badge", 4),),
          steps=("Fuchsia City via Routes 12-15 (after the Snorlax).", "The Gym has invisible walls; challenge_leader() walks it. Bring Antidotes and Full Heals.",
@@ -127,6 +127,10 @@ BEATS: tuple[Beat, ...] = (
     Beat("bike", "Bicycle: Fan Club voucher → Cerulean Bike Shop (optional)", "Vermilion Pokémon Fan Club → Cerulean City", needs=("misty",), driver="bike", optional=True,
          done=(("flag", 0x271),), steps=("The chairman of the Vermilion Pokémon Fan Club tells his story and gives the Bike Voucher; the Cerulean Bike Shop swaps it for the Bicycle.",
                                          "Twice walking speed; the Cycling Road (Routes 16-18) needs it. Not usable indoors, in caves or on water.")),
+    Beat("snorlax_16", "Wake Route 16's Snorlax (the Cycling Road, optional)", "Route 16, Celadon's side", needs=("poke_flute",), driver="snorlax_16", optional=True,
+         done=(("flag", 0x080),), steps=("Celadon's west exit lands on Route 16's east end; the second sleeping Snorlax plugs the road at (31,13) — a second chance at a catch (the one-shot protocol applies).",
+                                         "Face it from (32,13), press A: play the Poké Flute → YES, then fight (weaken, then catch). Beyond it the Cycling Road's gate house needs the Bicycle: quest('bike')."),
+         tip="Optional: Fuchsia is reached by Routes 12-15 without it. The Cycling Road (Celadon → Fuchsia in a few minutes) needs this plus the Bicycle."),
     Beat("itemfinder", "Itemfinder from Oak's Aide, 30 caught (optional)", "Route 11, the gatehouse's 2nd floor", needs=("surge",), driver="itemfinder", optional=True,
          done=(("flag", 0x252),),
          steps=("Oak's Aide on the 2nd floor of Route 11's east gatehouse trades the Itemfinder for 30 species CAUGHT.",)),
@@ -177,7 +181,7 @@ CHAIN_KEYS = tuple(b.key for b in BEATS)
 # extra aliases accepted by quest('…')
 ALIASES = {"tower": "pokemon_tower", "mansion": "pokemon_mansion", "flute": "poke_flute", "pokeflute": "poke_flute",
            "silph": "silph_co", "silphco": "silph_co", "hideout": "rocket_hideout", "scope": "rocket_hideout", "silph_scope": "rocket_hideout",
-           "saffron": "silph_co", "elite4": "elite_four", "league_rooms": "elite_four", "champion": "elite_four", "hall_of_fame": "elite_four", "snorlax_12": "snorlax", "victory": "victory_road", "league": "victory_road", "oak": "parcel", "new_game": "parcel", "newgame": "parcel", "start": "parcel", "start_game": "parcel", "intro": "parcel"}
+           "saffron": "silph_co", "elite4": "elite_four", "league_rooms": "elite_four", "champion": "elite_four", "hall_of_fame": "elite_four", "snorlax_12": "snorlax", "snorlax16": "snorlax_16", "route16_snorlax": "snorlax_16", "victory": "victory_road", "league": "victory_road", "oak": "parcel", "new_game": "parcel", "newgame": "parcel", "start": "parcel", "start_game": "parcel", "intro": "parcel"}
 
 
 def resolve(name):

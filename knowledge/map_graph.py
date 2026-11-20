@@ -628,6 +628,17 @@ def _build_region_graph():
 
 _R_CONN, _R_WARP = _build_region_graph()
 
+# The Cycling Road is a one-way slope: Route 17's pull-down tiles carry you south and the bike cannot climb them (live: from Route 18 north, "Reached the North edge but could not
+# cross" at the bottom of Route 17). Celadon -> Fuchsia may take it; Fuchsia -> Celadon goes round by Routes 15-12 (or Saffron).
+ONE_WAY_BLOCKED = frozenset({((3, 36), "North", (3, 35)), ((3, 35), "North", (3, 34))})
+
+
+def _drop_one_way(conn: dict) -> dict:
+    return {src: [(d, dest) for d, dest in edges if (tuple(src[:2]), d, tuple(dest[:2])) not in ONE_WAY_BLOCKED] for src, edges in conn.items()}
+
+
+_R_CONN = _drop_one_way(_R_CONN)
+
 
 def _build_blocker_graph():
     """node -> [(x, y, dest node)]: cross a Cut tree / Rock Smash rock from one region of a split map into the next (two-way). (x, y) is the tile on the FAR side:
@@ -660,7 +671,8 @@ _R_SRF = _build_surf_graph()
 # A sleeping Snorlax is an object, not a tile, so the generated region grids see its square as a wall and split the map in two (Route 12's pier at (14,70): the region
 # above it and the one below were joined only by the water beside the pier, i.e. "needs Surf"). Hand data, because it is a fact of the story, not of the tiles:
 # {map: [(region above, region below, (x, y) above the Snorlax, (x, y) below it)]}. The crossing is a "snorlax" step that knowledge.gates holds to the map's wake flag.
-SNORLAX_LINKS: dict = {(3, 30): [("1", "3", 14, 69, 14, 71)]}      # Route 12
+SNORLAX_LINKS: dict = {(3, 30): [("1", "3", 14, 69, 14, 71)],      # Route 12
+                       (3, 34): [("4", "3", 32, 13, 30, 13)]}      # Route 16: Celadon's east end -> the gate house of the Cycling Road
 
 
 def _build_snorlax_graph():
@@ -676,7 +688,7 @@ def _build_snorlax_graph():
 
 _R_SNZ = _build_snorlax_graph()
 # Coarse (region-blind) graph — the optimistic fallback.
-_C_CONN = {m: sorted(d.items()) for m, d in MAP_CONNECTIONS.items()}
+_C_CONN = _drop_one_way({m: sorted(d.items()) for m, d in MAP_CONNECTIONS.items()})
 _C_WARP = MAP_WARPS
 
 
@@ -735,7 +747,7 @@ def bfs_route(start, goal):
     return [(d, m) for kind, d, m in steps]
 
 
-def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=()):
+def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True):
     """Shortest route from start to goal over connections (and warps if warps=True).
     Returns a list of steps, [] if already there, or None if unreachable:
       ("connection", direction, next_node)  — cross a seamless edge
@@ -744,7 +756,7 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=()):
     Tries the strict region graph first (a floor split into regions is routed through
     the right ladders); if that finds nothing, falls back to the coarse region-blind graph
     (optimistic about HM/puzzle obstacles the tiles can't show). `avoid_edges` removes
-    edges the runtime learned are blocked, as (from_node, kind, arg).
+    edges the runtime learned are blocked, as (from_node, kind, arg). `coarse=False` skips the optimistic region-blind fallback.
     """
     if _matches(start, goal):
         return []
@@ -757,7 +769,7 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=()):
     if hit is None and warps:
         # …and water: two land regions of one map that touch the same lake / river (Route 10's Power Plant side) are joined by Surf.
         hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps, blk=_R_BLK, srf=_R_SRF)
-    if hit is None and warps:
+    if hit is None and warps and coarse:
         # coarse fallback: plain maps; a learned-blocked edge is keyed by region node, so
         # also match it by its plain map to keep the avoidance effective.
         coarse_avoid = {(_coarse(f), k, a) for (f, k, a) in avoid_edges}

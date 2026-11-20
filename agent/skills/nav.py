@@ -11,6 +11,7 @@ from agent.skills.base import log_once
 from knowledge.navigation import MAP_NAMES
 from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
+FLAG_SYS_ON_CYCLING_ROAD = 0x830        # SYS_FLAGS (0x800) + 0x30: set on Route 16's lower road and Routes 17-18; the game keeps you on the Bicycle there
 console = Console()
 logger = logging.getLogger(__name__)
 
@@ -277,7 +278,8 @@ class NavMixin:
         the identical path and stalling (the Viridian Forest / ledge stall)."""
         from game.pathfinding import find_path, find_path_spin
         from game.state import GameContext
-        if getattr(self.reader, "is_biking", lambda: False)() and self.reader.detect_context() == GameContext.OVERWORLD:
+        if getattr(self.reader, "is_biking", lambda: False)() and self.reader.detect_context() == GameContext.OVERWORLD \
+                and not self.reader.read_flag(FLAG_SYS_ON_CYCLING_ROAD):         # on the Cycling Road the game refuses to let you off (and the dismount attempt left the Start menu open)
             self._use_bicycle()          # the step logic assumes one tile per press: a bike covers two and overshoots targets / walks into doors (live-verified)
         # A lingering post-battle / dialog / heal-fade state (DIALOG_OPEN / TRANSITIONING
         # / IN_MENU) absorbs the D-pad, so A* taps can't move the player and walk_to
@@ -786,7 +788,7 @@ class NavMixin:
         Strength, badges), look for a route that avoids it; else return (route, hint) so go_to explains
         what to get first instead of walking into a locked road. Returns (route, None) when fine."""
         from knowledge.gates import unmet_gates
-        from knowledge.map_graph import route_to
+        from knowledge.map_graph import SNORLAX_LINKS, route_to
         blocked = set(avoid)
         banned_maps: set = set()
         first_hint = None
@@ -800,8 +802,14 @@ class NavMixin:
             blocked.add((prev, route[idx][0], route[idx][1]))
             # Ban the WHOLE gated map: a gated city has several doors (Saffron's four gatehouses, each
             # with two mat tiles) and blocking one edge at a time ran out of retries on the same gate.
-            banned_maps.add(tuple(route[idx][2][:2]))
-            alt = route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps)
+            # (A crossing INSIDE a map — a Cut tree, a Snorlax, a stretch of water — bans only its own edge: banning the map the player is standing on cut every strict route off at the start,
+            # and the region-blind fallback then planned straight through the other Snorlax.)
+            if tuple(route[idx][2][:2]) != tuple(prev[:2]):
+                banned_maps.add(tuple(route[idx][2][:2]))
+            alt = route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps, coarse=False) \
+                or route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps)
+            if alt and any(tuple(st[2][:2]) in SNORLAX_LINKS for st in alt) and not any(st[0] == "snorlax" for st in alt):
+                alt = None             # the region-blind fallback cannot see a Snorlax in the road: it would walk into Route 12 / 16 and stall ("could not cross")
             if not alt:
                 return route, first_hint
             route = alt

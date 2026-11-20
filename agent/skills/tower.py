@@ -15,6 +15,9 @@ FUJI_TOWER_STAND = ((11, 5), "Up")                  # Fuji stands at (11,4) on 7
 FUJI_HOUSE_SPOTS = (((3, 4), "Up"), ((2, 3), "Right"), ((4, 3), "Left"))     # Fuji at (3,3) in his house
 SNORLAX_STAND = ((14, 69), "Down")                  # Route 12's Snorlax at (14,70)
 ROUTE12_GATE_IN, ROUTE12_GATE_ROW, GATE_HOUSE_SOUTH_DOOR = (14, 15), 20, (5, 11)
+ROUTE_16 = (3, 34)
+FLAG_HIDE_ROUTE16_SNORLAX = 0x080                   # set the moment the wake-up fight starts (beaten, caught or fled: it is gone for good)
+SNORLAX16_STAND = ((32, 13), "Left")                # Route 16's Snorlax at (31,13): Celadon's side of the Cycling Road's gate house
 
 
 def _interrupted(walk_result: str) -> bool:
@@ -92,6 +95,41 @@ class TowerMixin:
             return f"Talked to Mr. Fuji but no Poké Flute yet — call {call} again."
         self._advance_to_control(tries=24)
         return "Got the Poké Flute. Route 12's Snorlax (south of Lavender) is next: quest('snorlax')."
+
+    def _get_snorlax_16(self, auto_trainers: bool = False) -> str:
+        """Route 16's sleeper (31,13), the plug in the road to the Cycling Road's gate house. Same flute-and-fight script as Route 12's; reached from Celadon's exit (the east end)."""
+        call = "quest('snorlax_16')"
+        if self.reader.read_flag(FLAG_HIDE_ROUTE16_SNORLAX):
+            return "Route 16's Snorlax is already gone from the road — the Cycling Road's gate house is open (it needs the Bicycle: quest('bike'))."
+        if not self.reader.read_flag(FLAG_GOT_FLUTE):
+            return "You need the Poké Flute (Mr. Fuji): quest('poke_flute')."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        for _ in range(12):
+            if (b := self._quest_battle(call, "Route 16's Snorlax")):
+                return b
+            if self.reader.read_flag(FLAG_HIDE_ROUTE16_SNORLAX):
+                got = bool(self.reader.read_dex_owned(143))
+                return ("The Snorlax woke up and is gone from the road" + (" — and you CAUGHT it: a L30 Snorlax is one of the best team members. " if got else
+                        " (beaten or fled — it is in your Pokédex only if you caught it). ")
+                        + "The way to the Cycling Road's gate house is open; Route 17 itself needs the Bicycle (quest('bike')).")
+            if tuple(self.reader.read_current_map()) != ROUTE_16:
+                if (msg := self._hideout_travel("Route 16", ROUTE_16, call, auto_trainers)):
+                    return msg
+                continue
+            px, py = self.reader.read_player_pos()
+            if (px, py) != SNORLAX16_STAND[0]:
+                out = self._walk_far(SNORLAX16_STAND[0])
+                if (b := self._quest_battle(call, "Route 16")):
+                    return b
+                if tuple(self.reader.read_player_pos()) == (px, py) and not _interrupted(out):
+                    return f"Couldn't walk up to the Snorlax on Route 16 ({out}) — walk_to (32,13), face left, press A, answer YES."
+                continue
+            if not self._press_on_tile(*SNORLAX16_STAND, yesno=True):
+                return "Couldn't reach the Snorlax at (31,13) — walk_to (32,13), face left, press A, answer YES."
+            if (b := self._hideout_fight(call, "the Snorlax", False)):      # never the autopilot (knowledge.one_shot): it must be CAUGHT, not knocked out
+                return b
+        return f"Made progress on Route 16 — call {call} again to continue (it resumes)."
 
     def _get_snorlax(self, auto_trainers: bool = False) -> str:
         call = "quest('snorlax')"
