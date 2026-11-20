@@ -71,6 +71,13 @@ START_FROM_STATE  = os.path.expanduser(os.getenv("START_FROM_STATE", ""))
 # START_NEW_GAME: boot the ROM to the TITLE SCREEN with no save loaded (native backend) — the model then starts the game itself with quest('new_game')
 #   (title → names → Oak's lab → starter → the rival → Oak's parcel). Takes precedence over START_FROM_SAVE / START_FROM_STATE.
 START_NEW_GAME    = os.getenv("START_NEW_GAME", "").strip().lower() in ("1", "true", "yes", "on")
+# New-game choices (used by quest('new_game'); blank = the built-in default). Options typed in the quest call itself (quest('new_game squirtle name=KYLE')) override these.
+#   STARTER      bulbasaur | charmander | squirtle      (default bulbasaur)
+#   PLAYER_NAME  up to 7 letters                          (default RED)
+#   RIVAL_NAME   up to 7 letters                          (default BLUE)
+STARTER           = os.getenv("STARTER", "").strip().lower()
+PLAYER_NAME       = os.getenv("PLAYER_NAME", "").strip()
+RIVAL_NAME        = os.getenv("RIVAL_NAME", "").strip()
 # RESUME: "latest" (newest checkpoint under logs/runs/*/checkpoints/) or a path to a checkpoint .ss1 —
 #   loads it as START_FROM_STATE, so a cancelled/stuck run continues from its last checkpoint.
 RESUME            = os.getenv("RESUME", "").strip()

@@ -1857,7 +1857,7 @@ def test_quest_copycat_buys_the_poke_doll_and_learns_mimic(live):
     assert "already done" in live.c._execute("quest", json.dumps({"name": "copycat"}))                       # the chain marks it done by the tutor's flag
 
 
-def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parcel(tmp_path):
+def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parcel(tmp_path, monkeypatch):
     """quest('new_game') on the real ROM from the TITLE SCREEN of a blank cartridge (#260): the controls pages and Oak's speech, BOY, the player's and the rival's names on the keyboard, the bedroom, Oak's
     intercept at Route 1, the lab, Squirtle, the rival's battle (played on autopilot here, as the model would), Viridian's Mart (the parcel), and Oak (the Pokédex + the Poké Balls)."""
     import pytest
@@ -1865,7 +1865,10 @@ def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parce
     from live.conftest import ROM
     if not ROM.exists():
         pytest.skip(f"ROM not found at {ROM}")
+    import config
     import main
+    for k, v in ("STARTER", "squirtle"), ("PLAYER_NAME", "kyle"), ("RIVAL_NAME", "gary"):          # the choices come from .env (STARTER / PLAYER_NAME / RIVAL_NAME), not from the call
+        monkeypatch.setattr(config, k, v)
     link = tmp_path / "blank.gba"
     link.symlink_to(ROM)                                           # a ROM path with no sibling .sav: the cartridge is blank, the title shows no Continue
     rt = main.build_runtime(new_game=True, rom_path=str(link), ltm_path=str(tmp_path / "ltm.json"), journal_path=str(tmp_path / "j.jsonl"), verbose=False)
@@ -1877,7 +1880,7 @@ def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parce
         if r.detect_context().name == "IN_BATTLE":
             c._auto_fight()
             continue
-        out = c._execute("quest", json.dumps({"name": "new_game squirtle name=KYLE rival=GARY"}))
+        out = c._execute("quest", json.dumps({"name": "new_game"}))
         if r.read_flag(0x829):
             break
     assert r.read_flag(0x829) and "delivered" in out, out                                          # FLAG_SYS_POKEDEX_GET
