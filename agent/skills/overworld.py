@@ -967,7 +967,10 @@ class OverworldMixin:
             if foe and foe.species_id and not (foe.species_name or "").startswith("#"):
                 what = f"{foe.species_name} L{foe.level} (HP {foe.current_hp}/{foe.max_hp})"
                 balls = self._ball_count()
-                if run["catch"] and not trainer and balls > 0 and foe.species_id not in {p.species_id for p in party}:
+                from game.constants import Addr as _Addr
+                if self.mgba.read32(_Addr.BATTLE_TYPE_FLAGS) & _Addr.BATTLE_TYPE_GHOST:
+                    verdict = " It is the Tower's ghost: it dodges every ball (can't be caught) — just defeat it with use_move."
+                elif run["catch"] and not trainer and balls > 0 and foe.species_id not in {p.species_id for p in party}:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
                                  dex_owned=self.reader.read_dex_owned(foe.species_id),

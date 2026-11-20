@@ -413,6 +413,8 @@ def _volatiles(v: dict) -> list[str]:
 def _catch_advice(t: Tick, enemy, move_names, pp_view) -> list[str]:
     """A NEW species while you have balls: is it worth one? (Called for wild battles only.)"""
     r, party = t.reader, t.state.party
+    if r.client.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_GHOST:
+        return ["GHOST — the Pokémon Tower's ghost Marowak dodges every ball (it CAN'T be caught): don't catch(); defeat it with use_move, then carry on."]
     balls = sum(r.read_bag().get(b, 0) for b in BALL_IDS)
     if balls > 0 and enemy and enemy.species_id and enemy.species_id not in {p.species_id for p in party}:
         v = catch_evaluate(party, enemy.species_id, enemy.level or 0, dex_owned=r.read_dex_owned(enemy.species_id),
