@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — from a one-hour watched run (150 steps, 798 model calls, three watchdog stalls, eight `quest('flash')` calls)
+- **A Disable that lands mid-turn stalled `use_move` (and `grind`'s trainer fights) for 2.5-4 min of game time.** The foe's Disable can land after `use_move`'s pre-flight read; the move menu then
+  bounced the commit through 60 text-advance rounds until the watchdog fired, and `grind`'s auto-fight (which goes through `use_move`) did the same against a Grimer. `use_move` now re-reads the Disable
+  state each time the move menu is up and answers "X is DISABLED" at once, and stops after three commits that never spent PP (Taunt, a sleeping or paralysed Pokémon…).
+- **`quest('flash')` before Cut said nothing useful.** The Route 2 east building is behind a Cut tree; the model called it eight times, each time learning one more hop of flash → cut → ss_ticket. It now answers
+  up front with the chain (misty → ss_ticket → cut → surge → flash) and the beat to run first (`story_beats.first_open`).
+
+### Changed — the system prompt keeps what changes as you play last
+- `Progress` (badges, towns, `Battles: N won`), the loss lessons and the `Navigation` block moved from the top of the system prompt to a final "Current status" section, so the ~5.7k-token static rules are an
+  identical prefix every step. The run's prompt cache hit rate was 54% overall and only ~224 tokens on the first call of most steps (the first changed line sat ~224 tokens in). The tool list still changes with
+  the screen (battle vs overworld) and the history window still slides, so the rest of the prompt cannot be reused across steps; compare `cached_tokens` in the next run.
+
 ### Added — new-game choices in `.env`
 - `STARTER` (bulbasaur | charmander | squirtle), `PLAYER_NAME` and `RIVAL_NAME` (up to 7 letters) in `.env` set what `quest('new_game')` picks; blank keeps bulbasaur / RED / BLUE. Options typed in the call
   (`quest('new_game charmander name=ASH')`) still override them, and the new-game hint tells the model what `.env` chose. `girl` stays a call option. The live new-game test now drives the real ROM from these variables.
