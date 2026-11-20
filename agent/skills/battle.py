@@ -143,6 +143,7 @@ class BattleMixin:
         forced_msg = ("Your Pokémon fainted — the game is forcing a replacement. Call "
                       "switch_pokemon('<name or slot>'). Healthy: {}.")
         refused = 0
+        commits = 0                         # times we pressed A on the move menu for this call (a landed move ends the call, so >3 means it is being refused)
         for _ in range(60):                 # the rival's first fight plays Oak's battle tutorial (~35 text boxes) before the action menu: 20 was not enough
             if forced_party_screen(self.mgba, self.reader):
                 return forced_msg.format(_healthy_roster(self.reader))
@@ -168,6 +169,20 @@ class BattleMixin:
             # battler (gBattleMons[0]) — the live in-battle PP that decrements when the
             # move lands, and matches the slot the cursor indexes.
             pp_before = self.reader.read_active_battle_moves()[2][slot]
+            # The menu is up, so any Disable the foe used during the previous turn's text has landed — the pre-flight check above can have run before it did (a watched run: use_move
+            # re-committed a freshly Disabled move through 60 text-advance rounds, 2.5 min of game time, until the watchdog fired). Look again before committing.
+            _i, _n, _pp, dslot_now, dturns_now = self._active_moves_view()
+            if dslot_now == slot:
+                self._battle_press("B")              # clear the "is disabled!" box / back out to the action menu
+                alt = ", ".join(m for m, q in zip(move_names, _pp) if m and q > 0 and m != move_label)
+                return (f"{move_label} is DISABLED ({dturns_now} more turn(s)) — the game refuses it, so "
+                        f"pressing it again does nothing. Use a different move: {alt or 'none left'}.")
+            commits += 1
+            if commits > 3:                           # committed the same move three times and its PP never dropped: the game is refusing it, whatever the reason
+                self._battle_press("B")
+                alt = ", ".join(m for m, q in zip(move_names, pp) if m and q > 0 and m != move_label)
+                return (f"{move_label} keeps not going through — the game is refusing it (Disabled, Taunted…) or your Pokémon can't move (asleep, paralysed, flinching). "
+                        f"Read the observation for its status; try a different move: {alt or 'none'}, or switch_pokemon.")
             from agent import events
             events.observe(self.reader)          # the move menu is up: the foe reads cleanly now (battle start)
             self.mgba.write8(Addr.MOVE_CURSOR, slot)
