@@ -1,6 +1,6 @@
 """quest('new_game') — start the game from the title screen: the intro, the names, Oak's lab, the starter, the rival, Oak's parcel (#260, the one beat that had no driver).
 
-    quest('new_game')                        Bulbasaur, you are RED, the rival BLUE
+    quest('new_game')                        Bulbasaur, you are RED, the rival BLUE (or STARTER / PLAYER_NAME / RIVAL_NAME from .env)
     quest('new_game charmander')             starter: bulbasaur | charmander | squirtle
     quest('new_game squirtle name=KYLE rival=GARY girl')
 
@@ -12,6 +12,7 @@ that is interrupted (a battle, a long dialogue) is simply called again:
      (gender, the two "NEW NAME / RED / ASH…" lists, the two Yes/No confirmations) are answered in the order they appear.
   2. the house, Pallet Town, Oak's intercept at Route 1, the lab, the starter, the rival's battle (handed to the model).
   3. Route 1 → Viridian's Poké Mart: the clerk gives Oak's Parcel → back to the lab: the Pokédex (FLAG_SYS_POKEDEX_GET) and five Poké Balls — which is what the chain's `parcel` beat checks."""
+import config
 from game.constants import Addr
 from game.state import GameContext
 
@@ -21,9 +22,21 @@ LAB, MART = (4, 3), (5, 3)                    # PalletTown_ProfessorOaksLab, Vir
 OAKS_PARCEL, FLAG_POKEDEX = 349, 0x829        # ITEM_OAKS_PARCEL (a key item) / FLAG_SYS_POKEDEX_GET: what the chain's `parcel` beat checks
 
 
+def env_defaults() -> dict:
+    """The new-game defaults: STARTER / PLAYER_NAME / RIVAL_NAME from .env where set (and valid), else bulbasaur / RED / BLUE. Names are upper-cased and cut to the game's 7 letters."""
+    starter = str(config.STARTER or "").strip().lower()
+    name = str(config.PLAYER_NAME or "").strip().upper()[:7]
+    rival = str(config.RIVAL_NAME or "").strip().upper()[:7]
+    return {"starter": starter if starter in STARTERS else "bulbasaur", "name": name or "RED", "rival": rival or "BLUE"}
+
+
+def env_configured() -> bool:
+    return any(str(v or "").strip() for v in (config.STARTER, config.PLAYER_NAME, config.RIVAL_NAME))
+
+
 def parse_options(words) -> dict:
-    """['squirtle', 'name=KYLE', 'rival=GARY', 'girl'] -> {'starter': 'squirtle', 'name': 'KYLE', 'rival': 'GARY', 'girl': True}."""
-    o = {"starter": "bulbasaur", "name": "RED", "rival": "BLUE", "girl": False}
+    """['squirtle', 'name=KYLE', 'rival=GARY', 'girl'] -> {'starter': 'squirtle', 'name': 'KYLE', 'rival': 'GARY', 'girl': True}. Anything the words don't say comes from env_defaults()."""
+    o = {**env_defaults(), "girl": False}
     for w in words:
         k, _eq, v = str(w).partition("=")
         key = k.strip().lower()

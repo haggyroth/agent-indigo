@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from agent.lm_studio_client import AgentClient
 from agent.skills.base import log_once
+from agent.skills.newgame import env_configured, env_defaults
 from config import IV_PEEK_BEFORE_CATCH, USE_VISION
 from game.constants import Addr  # noqa: F401  (kept for callers that patch it)
 from game.menu import MenuDriver
@@ -555,6 +556,14 @@ def _loop_signals(t: Tick) -> list[str]:
     return out
 
 
+def _env_choice_note() -> str:
+    """When .env sets STARTER / PLAYER_NAME / RIVAL_NAME: say what they are, so the model just calls quest('new_game')."""
+    if not env_configured():
+        return ""
+    d = env_defaults()
+    return f". .env already chose: {d['starter']}, you are {d['name']}, the rival {d['rival']} — plain quest('new_game') uses them"
+
+
 def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool, run, reader: "LeafGreenReader",
                       tilemap: "TilemapReader", ltm: "LongTermMemory", stm: "ShortTermMemory", map_key: tuple,
                       trip: dict | None = None) -> str:
@@ -576,7 +585,8 @@ def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool,
     parts += _gym(t) + _area(t) + _field(t) + _exits(t) + _loop_signals(t)
     if not in_battle and (state.map_bank == 0 or not state.party):
         parts.append("NEW GAME: the game has not started (title screen / intro / no Pokémon yet) — call quest('new_game') and it plays the intro, names you, picks the starter and "
-                     "fetches Oak's Parcel. Options go after the name: quest('new_game squirtle name=KYLE rival=GARY girl') (starter: bulbasaur | charmander | squirtle)")
+                     "fetches Oak's Parcel. Options go after the name: quest('new_game squirtle name=KYLE rival=GARY girl') (starter: bulbasaur | charmander | squirtle)"
+                     + _env_choice_note())
     # Close every turn with an explicit call to action: some models read a bare state dump as "no question asked".
     parts.append("→ Your turn: decide the best next action and call a tool NOW (do not reply with text only)")
     return " | ".join(parts)

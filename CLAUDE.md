@@ -300,7 +300,7 @@ battery save and drives to "Continue" (real gameplay instead of the new-game
 intro); `MAX_STEPS=<n>` bounds a run for smoke/eval; `CHECKPOINT_EVERY=<ticks>` (default 20) saves emulator states under
 `logs/runs/<ts>/checkpoints/`; `RESUME=latest` (or a `.ss1` path) continues from the last one; `BATTLE_STYLE=shift|set|` (default `shift` — the free switch after a trainer's Pokémon faints; see `game/options.py`); `LOG_LEVEL=quiet|events|debug` (default `events`) sets how much of the live
 game-event stream prints (catches, KOs, level-ups, badges, battle results, heals, every tool call; `STATUS_EVERY=<ticks>` adds
-a status line) — see `agent/events.py`; `START_NEW_GAME=true` boots to the title screen with no save (the model starts the game with `quest('new_game')`; see CHANGELOG); `USE_VISION=false` runs
+a status line) — see `agent/events.py`; `START_NEW_GAME=true` boots to the title screen with no save (the model starts the game with `quest('new_game')`; see CHANGELOG; `STARTER` / `PLAYER_NAME` / `RIVAL_NAME` choose the starter and the two names, call options override); `USE_VISION=false` runs
 text-only (for text models or unstable vision). Example bounded text-only run:
 `USE_VISION=false MAX_STEPS=20 START_FROM_SAVE=~/mgba-http/Pokemon_LeafGreen.sav python main.py`
 

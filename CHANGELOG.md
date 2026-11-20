@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — new-game choices in `.env`
+- `STARTER` (bulbasaur | charmander | squirtle), `PLAYER_NAME` and `RIVAL_NAME` (up to 7 letters) in `.env` set what `quest('new_game')` picks; blank keeps bulbasaur / RED / BLUE. Options typed in the call
+  (`quest('new_game charmander name=ASH')`) still override them, and the new-game hint tells the model what `.env` chose. `girl` stays a call option. The live new-game test now drives the real ROM from these variables.
+
 ### Fixed — the PC, from a watched run whose PC never worked (ten `pc` calls, none succeeded)
 - **A bug in two error messages:** `pc swap` / `pc withdraw` with no match printed `<bound method PCMixin._pc_boxes …>` instead of the box list (`{self._pc_boxes}` for `{self._pc_boxes()}`).
 - **`box:4` copied literally.** The model sent the placeholder from the docs; a reference is `box:slot` as numbers — `'1:4'` (box 1, slot 4). `box:4`, `box 1:4` and `box1 slot 4` are now understood or answered with a hint,

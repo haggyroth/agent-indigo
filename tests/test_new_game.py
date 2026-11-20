@@ -7,6 +7,39 @@ from agent.skills.newgame import STARTERS, parse_options
 from knowledge import story_beats as sb
 
 
+@pytest.fixture(autouse=True)
+def _blank_env(monkeypatch):
+    """The user's .env may set STARTER / PLAYER_NAME / RIVAL_NAME: start every test from the built-in defaults."""
+    import config
+    for k in ("STARTER", "PLAYER_NAME", "RIVAL_NAME"):
+        monkeypatch.setattr(config, k, "")
+
+
+def test_env_values_are_the_defaults_and_the_call_overrides_them(monkeypatch):
+    import config
+    from agent.skills.newgame import env_configured
+    assert not env_configured()
+    monkeypatch.setattr(config, "STARTER", " Squirtle ")
+    monkeypatch.setattr(config, "PLAYER_NAME", "kyleculp")
+    monkeypatch.setattr(config, "RIVAL_NAME", "Gary")
+    assert env_configured()
+    assert parse_options([]) == {"starter": "squirtle", "name": "KYLECUL", "rival": "GARY", "girl": False}               # upper-cased, cut to 7 letters
+    assert parse_options(["charmander", "name=ash"]) == {"starter": "charmander", "name": "ASH", "rival": "GARY", "girl": False}   # the call wins, the rest stays from .env
+    monkeypatch.setattr(config, "STARTER", "pikachu")                                                                  # not a starter: ignored, not a crash
+    assert parse_options([])["starter"] == "bulbasaur"
+
+
+def test_the_new_game_hint_names_the_env_choices_only_when_set(monkeypatch):
+    pytest.importorskip("openai")
+    import config
+    from agent.observation import _env_choice_note
+    assert _env_choice_note() == ""
+    monkeypatch.setattr(config, "STARTER", "squirtle")
+    monkeypatch.setattr(config, "RIVAL_NAME", "gary")
+    note = _env_choice_note()
+    assert "squirtle" in note and "you are RED" in note and "rival GARY" in note and "plain quest('new_game')" in note
+
+
 def test_defaults_and_options():
     assert parse_options([]) == {"starter": "bulbasaur", "name": "RED", "rival": "BLUE", "girl": False}
     o = parse_options(["squirtle", "name=kyle", "rival=GaryLongName", "girl"])
