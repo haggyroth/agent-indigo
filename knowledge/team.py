@@ -40,7 +40,7 @@ GYM_COUNTERS: dict[str, tuple[str, ...]] = {
 HM_NEEDS: dict[str, tuple[int, str]] = {
     "Cut": (2, "Vermilion Gym's door and several route trees"),
     "Fly": (3, "fast travel back to Centers and gyms"),
-    "Surf": (4, "Fuchsia / Cinnabar and every water route"),
+    "Surf": (4, "Cinnabar and every water route — Fuchsia itself does NOT need it: walk there by land (Routes 12-15) and the HM comes from its Safari Zone"),
     "Strength": (6, "Victory Road's boulders"),
 }
 

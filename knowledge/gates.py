@@ -67,9 +67,15 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 40): [Req("hm", "Surf", "Route 21 is open water south of Pallet — you need Surf.")],
     (1, 83): [Req("hm", "Surf", "Seafoam Islands needs Surf (and Strength for its boulders).")],
     (1, 39): [Req("hm", "Strength", "Victory Road's boulders need Strength (HM04 — quest('strength')).")],
+    (3, 35): [Req("key_item", BICYCLE, "Route 17 is the Cycling Road: you need the Bicycle (quest('bike'): the Fan Club's voucher in Vermilion, then the Cerulean Bike Shop), and Route 16's Snorlax "
+                  "must be woken too. Fuchsia needs neither: walk south from Lavender down Routes 12-15 (quest('snorlax') first).")],
     (3, 42): [Req("badges", 8, "Route 23's checkpoints only let you through with all 8 badges.")],
 }
 
+
+# A Snorlax crossing inside a split map: held to that map's wake flag (the flute alone is not enough — the Snorlax has to have been woken: quest('snorlax')).
+_SNORLAX_REQ = {(3, 30): Req("flag", 0x253, "Route 12's Snorlax is still asleep on the pier — the road to Fuchsia runs over it: wake it with the Poké Flute (quest('snorlax'); "
+                             "the flute comes from Mr. Fuji, quest('poke_flute')).", alt_flag=0x253)}
 
 _STEP_HM = {"cut": Req("hm", "Cut", "A Cut tree blocks the way: you need a Pokémon that knows Cut (quest('cut'))."),
             "surf": Req("hm", "Surf", "The way crosses water: you need a Pokémon that knows Surf (quest('surf')).")}
@@ -86,6 +92,8 @@ def unmet_gates(route, satisfied) -> list[tuple[int, Req]]:
             if not satisfied(req):
                 out.append((i, req))
         dest = tuple(step[2][:2])
+        if step[0] == "snorlax" and dest in _SNORLAX_REQ and not satisfied(_SNORLAX_REQ[dest]):
+            out.append((i, _SNORLAX_REQ[dest]))
         for req in MAP_GATES.get(dest, []):
             if req.only_exits and _exit_direction(steps, i) not in req.only_exits:
                 continue

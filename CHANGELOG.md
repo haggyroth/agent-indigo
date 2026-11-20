@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — go_to('Fuchsia City') said "you need Surf" when the land route was open
+- Two watched runs reached four badges and then stalled on Fuchsia (about 20 identical `go_to('Gym')` / `quest('koga')` / `quest('surf')` calls, each "Route 21 is open water — you need Surf"). The
+  generated region grids see a sleeping Snorlax's square as a wall, so Route 12's pier was split in two with only a water link between the halves; the planner chose a 24-step sea trip via Pallet, and
+  the land alternative carried a Surf step too. New `SNORLAX_LINKS` (`knowledge/map_graph.py`) model the crossing as a `snorlax` step, held by `knowledge/gates.py` to the wake flag (0x253): asleep, the
+  answer is "wake it: quest('snorlax')"; awake, `go_to` walks Lavender → Route 12's gatehouse → over the Snorlax → Routes 13-15 (live-verified from Route 16, 3 calls).
+- Route 17 (the Cycling Road) is gated on the Bicycle: Route 16's south edge used to pass the flute gate and then fail with "Reached the South edge but could not cross".
+- The team report no longer lists a Surf gap as a reason Fuchsia is out of reach (the HM comes from inside it).
+- Checked end to end: `quest('bike')` from Route 16 on foot reaches the Fan Club (voucher) and the Cerulean Bike Shop (Bicycle, key item 360), and `go_to('Fuchsia City')` still takes the Route 12 road afterwards (new live test).
+
 ### Fixed — the Pokémon Tower's ghost Marowak is not catchable
 - A watched run threw 18 Poké Balls at the Marowak on 6F ("It broke free!" every time) until the watchdog fired: the game dodges every ball in a ghost battle (`BATTLE_TYPE_GHOST`, bit 15 of
   `gBattleTypeFlags`), and our encounter hand-off had said "Worth a ball: a NEW Pokédex entry". `catch()` now refuses without throwing, the `quest` / `grind` encounter hand-offs and the battle observation

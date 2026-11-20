@@ -765,6 +765,8 @@ class NavMixin:
         try:
             if req.alt_flag is not None and self.reader.read_flag(req.alt_flag):
                 return True
+            if req.kind == "flag":
+                return bool(self.reader.read_flag(int(req.value)))
             if req.kind == "key_item":
                 return int(req.value) in self.reader.read_key_items()
             if req.kind == "badges":
@@ -1019,7 +1021,7 @@ class NavMixin:
             before_pos = (px, py)
             if kind_step == "connection":
                 res = self._go_to_map(arg, dest=next_map[:2])
-            elif kind_step in ("cut", "surf"):   # a Cut tree / rock, or a stretch of water, between two regions of this map: walk to the tile beyond it (walk_to cuts / surfs on the way)
+            elif kind_step in ("cut", "surf", "snorlax"):   # a Cut tree / rock, or a stretch of water, between two regions of this map: walk to the tile beyond it (walk_to cuts / surfs on the way)
                 res = self._walk_to(*arg)
             else:   # warp: walk onto the door/stairs tile (walk_to steps through)
                 res = self._walk_to(*self._warp_exit_tile(arg))

@@ -24,7 +24,7 @@ def test_the_route_16_flute_gate_applies_to_the_road_south_not_to_the_fly_house(
     house = [("connection", "West", (3, 34, "4")), ("cut", (41, 10), (3, 34, "1")), ("warp", (27, 6), (25, 1, "0"))]
     assert unmet_gates(house, no) == []                                        # goes indoors from Route 16: not blocked by the Snorlax
     south = [("connection", "West", (3, 34, "4")), ("connection", "South", (3, 35))]
-    assert [i for i, _r in unmet_gates(south, no)] == [0]                      # leaves outdoors toward Route 17: blocked
+    assert [i for i, _r in unmet_gates(south, no)] == [0, 1]                   # leaves outdoors toward Route 17: blocked by the flute gate, and Route 17 itself wants the Bicycle
     assert unmet_gates([("connection", "West", (3, 34, "4"))], no) == []       # the route ENDS on Route 16: fine
     back = [("warp", (10, 5), (3, 34, "0")), ("warp", (20, 6), (25, 1, "0")), ("warp", (27, 6), (3, 34, "1")), ("cut", (41, 12), (3, 34, "4")), ("connection", "East", (3, 6))]
     assert unmet_gates(back, no) == []                                         # house → Celadon: leaves by the EAST edge, not toward Route 17

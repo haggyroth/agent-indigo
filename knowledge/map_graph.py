@@ -656,6 +656,25 @@ def _build_surf_graph():
 
 
 _R_SRF = _build_surf_graph()
+
+# A sleeping Snorlax is an object, not a tile, so the generated region grids see its square as a wall and split the map in two (Route 12's pier at (14,70): the region
+# above it and the one below were joined only by the water beside the pier, i.e. "needs Surf"). Hand data, because it is a fact of the story, not of the tiles:
+# {map: [(region above, region below, (x, y) above the Snorlax, (x, y) below it)]}. The crossing is a "snorlax" step that knowledge.gates holds to the map's wake flag.
+SNORLAX_LINKS: dict = {(3, 30): [("1", "3", 14, 69, 14, 71)]}      # Route 12
+
+
+def _build_snorlax_graph():
+    """node -> [(x, y, dest node)]: walk past a Snorlax from one region of a split map to the other (two-way). (x, y) is the tile on the FAR side."""
+    snz: dict = {}
+    for mp, links in SNORLAX_LINKS.items():
+        for ta, tb, ax, ay, bx, by in links:
+            na, nb = (mp[0], mp[1], ta), (mp[0], mp[1], tb)
+            snz.setdefault(na, []).append((bx, by, nb))
+            snz.setdefault(nb, []).append((ax, ay, na))
+    return snz
+
+
+_R_SNZ = _build_snorlax_graph()
 # Coarse (region-blind) graph — the optimistic fallback.
 _C_CONN = {m: sorted(d.items()) for m, d in MAP_CONNECTIONS.items()}
 _C_WARP = MAP_WARPS
@@ -685,6 +704,7 @@ def _search(start, conn, warp, accept, warps=True, avoid_edges=(), avoid_maps=()
         cand = [("connection", d, n) for d, n in sorted(conn.get(cur, []), key=str)]
         if warps:
             cand += [("warp", (x, y), n) for (x, y, n) in warp.get(cur, [])]
+            cand += [("snorlax", (x, y), n) for (x, y, n) in _R_SNZ.get(cur, [])] if conn is _R_CONN else []
             if blk:
                 cand += [("cut", (x, y), n) for (x, y, n) in blk.get(cur, [])]
             if srf:
