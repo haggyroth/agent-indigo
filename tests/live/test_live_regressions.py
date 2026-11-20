@@ -1933,3 +1933,15 @@ def test_pc_recovers_from_a_failed_open_and_a_failure_saves_a_real_screenshot(li
         assert rel.startswith("shots/") and shot.exists() and shot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     finally:
         c.run_log = old_log
+
+
+def test_swap_with_a_full_party_deposits_first_then_withdraws(live):
+    """A watched run's stuck PC: with six in the party the storage menu was never steered off WITHDRAW ('Can't take any more POKéMON.', forever). The swap must deposit one, then withdraw."""
+    live.load("fullparty")
+    before = [p.species_name for p in live.r.read_party()]
+    assert len(before) == 6 and any(b["species_name"] == "Sandshrew" for b in live.r.read_boxes()), before
+    out = _pc(live, "pc", action="swap", pokemon="1", box_pokemon="Sandshrew")
+    after = [p.species_name for p in live.r.read_party()]
+    assert out.startswith("Deposited") and "Withdrew" in out and live.r.detect_context() == GameContext.OVERWORLD, out
+    assert len(after) == 6 and "Sandshrew" in after and "Zubat" not in after, (out, after)
+    assert any(b["species_name"] == "Zubat" for b in live.r.read_boxes())

@@ -140,21 +140,25 @@ class PCMixin:
             return f"Couldn't reach the PC at ({px},{py})."
         self.mgba.tap("Up")
         self.mgba.tick(8)
-        menus_seen, was_live = 0, False
+        return self._pc_to_storage(mode)
+
+    def _pc_to_storage(self, mode: int) -> str | None:
+        """Press A through the PC dialogue to the storage screen, steering the storage-system menu (WITHDRAW / DEPOSIT / MOVE) onto `mode`.
+        That menu is recognised by its SIZE — five entries, so sMenu.maxCursorPos (MENU_CURSOR + 2) is 4 — not by counting menus: the 'Which PC?' menu before it
+        can read as no menu at all (a stale flag keeps the context on OVERWORLD), which used to make the storage menu 'menu #1', never steered, so A took the default
+        WITHDRAW ('Can't take any more POKéMON.' with a full party) forever."""
+        steered = False
         for _ in range(60):
             if self._in_storage():
                 break
-            live = self._menus.choice_live()
-            if live and not was_live:
-                menus_seen += 1
-                if menus_seen == 2:                         # the storage-system menu: pick the mode
-                    for _k in range(6):
-                        if self._mcur() == mode:
-                            break
-                        self._press("Down" if self._mcur() < mode else "Up", 30)
-                    if self._mcur() != mode:
-                        return "Couldn't steer the PC menu to the requested mode."
-            was_live = live
+            if not steered and self.mgba.read8(Addr.MENU_CURSOR + 2) == 4 and self._menus.choice_live():
+                for _k in range(6):
+                    if self._mcur() == mode:
+                        break
+                    self._press("Down" if self._mcur() < mode else "Up", 30)
+                if self._mcur() != mode:
+                    return "Couldn't steer the PC menu to the requested mode."
+                steered = True
             self.mgba.hold("A", 8)
             self.mgba.tick(70)
         self.mgba.tick(90)

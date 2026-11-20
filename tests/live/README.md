@@ -21,6 +21,7 @@ python tools/live_suite.py --changed origin/main --post-status      # only if th
 |---|---|
 | `work.sav` | battery save the runtime boots from (Pallet/Viridian, Bulbasaur L8) |
 | `threemon.ss1` | Viridian City, party Bulbasaur L8 / Pikachu L5 / Caterpie L5 |
+| `fullparty.ss1` | inside a Pokémon Center with a FULL party of six (Zubat, Ivysaur, Spearow, Beedrill, Pikachu, Pidgey) and Sandshrew boxed — the PC swap that looped on WITHDRAW (run `20261119-210923`, checkpoint 1, walked to the Center) |
 | `disabled.ss1` | mid-battle, the lead's Tackle is Disabled (found via `gDisableStructs` 0x02023E0C) |
 | `post_misty.ss1` | Route 24 (north of Cerulean), Misty beaten, Ivysaur L26, no SS Ticket yet |
 | `vermilion_gym_surge.ss1` | Vermilion Gym, 2 badges, Ivysaur L30 with five L22 teammates, in front of Surge's trainers (run checkpoint `ckpt_00117_OVERWORLD`) |
