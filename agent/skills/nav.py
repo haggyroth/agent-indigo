@@ -319,7 +319,10 @@ class NavMixin:
                 # frames later, so checking immediately abandons an in-progress warp
                 # (which left the agent needing a second go_to to leave a Poké Center).
                 if (tx, ty) in warps:
-                    for mv in ("Down", "Left", "Right", "Up"):
+                    # A staircase / arrow mat fires on ITS direction (East / West for the Dept. Store's stairs): Down first stepped off it, the replan stepped back on, and
+                    # that D / U shuffle ran about twenty times per floor before a probe found the side.
+                    first = self.tilemap.warp_press(tx, ty)
+                    for mv in ([first] if first else []) + [d for d in ("Down", "Left", "Right", "Up") if d != first]:
                         self.mgba.tap(mv)
                         warped = False
                         for _ in range(12):
@@ -1034,6 +1037,9 @@ class NavMixin:
             else:   # warp: walk onto the door/stairs tile (walk_to steps through)
                 res = self._walk_to(*self._warp_exit_tile(arg))
 
+            if kind_step == "warp" and self.reader.read_current_map() == before:
+                self._press_on_warp(self._warp_exit_tile(arg))
+
             # Handle a battle that interrupted this hop.
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 stop = self._handle_travel_battle(target_name, mode, auto_trainers, destination, resume_call)
@@ -1110,6 +1116,22 @@ class NavMixin:
         return ("Nobody on the team can learn Fly — load an earlier save, or catch a Fly-capable bird "
                 "(Pidgey / Spearow lines) before you head east again.")
 
+    def _press_on_warp(self, tile: tuple[int, int]) -> bool:
+        """Standing on a staircase / arrow-mat tile the walk just stepped onto: press the direction that fires it (East / West for the directional stairs — the Celadon Dept.
+        Store's — or the arrow's own). Stepping off and on again never fires them, and used to loop D / U on the stairs 20 times before a probe found the side. True if the map changed."""
+        if tuple(self.reader.read_player_pos()) != tuple(tile):
+            return False
+        try:
+            press = self.tilemap.warp_press(*tile)
+        except Exception:
+            return False
+        if not press:
+            return False
+        before = self.reader.read_current_map()
+        self.mgba.hold(press, 20)
+        self.mgba.tick(72)
+        return self.reader.read_current_map() != before
+
     def _probe_warp(self, warp: tuple[int, int], _seen=None) -> bool:
         """Step onto `warp` from each side (Up/Left/Right/Down into it) until the map changes. True if
         it did. Verified live: the Underground Path (Route 5) stairs at (7,4) only fire from one side."""
@@ -1118,6 +1140,8 @@ class NavMixin:
         # Already standing ON an exit mat (arrive-on-the-mat, e.g. after a gym fight): arrow warps fire
         # when you press the arrow's direction while standing on them, so try that first.
         if self.reader.read_player_pos() == (wx, wy):
+            if self._press_on_warp((wx, wy)):                   # a staircase / arrow mat: its own direction first
+                return True
             for btn in ("Down", "Left", "Right", "Up"):
                 self.mgba.hold(btn, 20)
                 self.mgba.tick(72)
@@ -1161,16 +1185,20 @@ class NavMixin:
         from game.pathfinding import door_centers
         try:
             self.tilemap.refresh()
-            centers = door_centers(self.tilemap.read_warps())
+            warps = list(self.tilemap.read_warps())
+            real = [w for w in warps if self.tilemap.is_real_warp(*w)]
         except Exception:
             return warp
+        # The warp event list can name tiles the game never warps from (the Dept. Store 1F lists (1,15) and (3,15) next to the real exit (2,14), an arrow mat): aim for the
+        # real mat — walking into the listed wall tile pressed Down about seventy times.
+        pool, reach = (real, 2) if real else (warps, 1)
+        centers = door_centers(pool)
         if not centers:
             return warp
         wx, wy = warp
         cx, cy = min(centers, key=lambda c: max(abs(c[0] - wx), abs(c[1] - wy)))
-        # Only snap within the same doormat cluster (Chebyshev ≤ 1); otherwise the
-        # graph tile is a standalone warp we should target directly.
-        return (cx, cy) if max(abs(cx - wx), abs(cy - wy)) <= 1 else warp
+        # Only snap within the same doormat cluster; otherwise the graph tile is a standalone warp we should target directly.
+        return (cx, cy) if max(abs(cx - wx), abs(cy - wy)) <= reach else warp
 
     _GYM_RETRY_LEVELS = 8          # team-level total to gain after a loss in a gym before challenge_leader will walk in again
 

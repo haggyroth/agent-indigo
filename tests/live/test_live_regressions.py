@@ -2059,3 +2059,74 @@ def test_go_to_fuchsia_rides_the_cycling_road_from_celadon_in_one_leg(live):
             break
     assert tuple(live.r.read_current_map()) == (3, 7), out
     assert (3, 33) not in seen and (3, 30) not in seen, seen               # not round by Routes 15 / 12
+
+
+def test_shop_item_buys_an_evolution_stone_on_the_dept_store_4f(live):
+    """The Celadon Dept. Store's 4F clerk (3,13) sells the elemental stones (¥2100): shop(item='Thunderstone') walks up the stairs, stands across the counter and buys."""
+    _fly_to_celadon(live)
+    live.set_money(5000)
+    had = dict(live.r.read_items_pocket()).get(96, 0)
+    out = ""
+    for _ in range(10):
+        out = live.c._execute("shop", json.dumps({"item": "Thunderstone"}))
+        if out.startswith("Bought") or live.r.detect_context() != GameContext.OVERWORLD:
+            break
+    assert out.startswith("Bought 1× Thunderstone (¥2100)"), out
+    assert dict(live.r.read_items_pocket()).get(96) == had + 1 and live.r.read_money() == 2900
+
+
+def test_shop_restock_buys_the_best_tier_this_mart_sells_and_stocks_up(live):
+    """Fuchsia's Mart sells Ultra Balls, Super Potions, Full Heals and Revives: with ¥26,000 and 5 badges the restock is Ultra Balls (not Great), Super Potions, a Full Heal and
+    Revive stock and a larger par than the old 10 — and it spends most of the money instead of leaving it."""
+    _fly_to_fuchsia(live)
+    live.set_badges(0b11111)
+    live.c.ltm.data["badges_earned"] = 5
+    live.set_money(26000)
+    bag0 = dict(live.r.read_bag())
+    out = ""
+    for _ in range(8):
+        out = live.c._execute("shop", "{}")
+        if out.startswith("Bought") or live.r.detect_context() != GameContext.OVERWORLD:
+            break
+    assert out.startswith("Bought"), out
+    bag = dict(live.r.read_bag())
+    assert bag.get(2, 0) > bag0.get(2, 0) and bag.get(22, 0) > bag0.get(22, 0) and bag.get(23, 0) > bag0.get(23, 0) and bag.get(24, 0) > bag0.get(24, 0), (bag0, bag)
+    assert live.r.read_money() < 12000, out
+
+
+def _count_shuffles(live, fn):
+    """Run fn() and return (direction presses, A-B-A reversals of the player's tile): the D / U jitter on stairs and exit mats shows as reversals."""
+    calls = []
+    m = live.m
+    orig_hold, orig_tap = m.hold, m.tap
+
+    def wrap(orig):
+        def f(btn, *a, **k):
+            out = orig(btn, *a, **k)
+            if btn in ("Up", "Down", "Left", "Right"):
+                calls.append((tuple(live.r.read_current_map()), tuple(live.r.read_player_pos())))
+            return out
+        return f
+    m.hold, m.tap = wrap(orig_hold), wrap(orig_tap)
+    try:
+        fn()
+    finally:
+        m.hold, m.tap = orig_hold, orig_tap
+    reversals = sum(1 for i in range(2, len(calls)) if calls[i] == calls[i - 2] and calls[i] != calls[i - 1])
+    return len(calls), reversals
+
+
+def test_the_dept_store_stairs_and_exit_mats_do_not_make_the_walker_shuffle(live):
+    """Watched: entering / leaving buildings and changing floors 'jittered' back and forth. Two causes, both in the Celadon Dept. Store: the directional stairs fire on a LEFT / RIGHT press
+    while standing on them (walk_to nudged Down first, stepped off, stepped back on — about twenty D / U cycles per floor), and 1F's warp list names wall tiles (1,15) / (3,15) beside the real
+    exit mat (2,14), so go_to pressed Down into a wall ~70 times. Up to 4F and back out is now a straight line."""
+    live.load("celadon_gym_door")
+    live.defeat_all_trainers()
+    live.set_money(5000)
+    out = {}
+    presses, rev = _count_shuffles(live, lambda: out.update(buy=live.c._execute("shop", json.dumps({"item": "Thunderstone"}))))
+    assert out["buy"].startswith("Bought 1× Thunderstone"), out
+    assert rev <= 12, (presses, rev)
+    presses2, rev2 = _count_shuffles(live, lambda: out.update(leave=live.c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))))
+    assert out["leave"].startswith("Arrived at Celadon City"), out
+    assert presses2 < 80 and rev2 <= 4, (presses2, rev2)             # was 259 presses / 70 reversals
