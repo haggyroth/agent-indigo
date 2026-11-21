@@ -97,3 +97,29 @@ def test_advance_to_control_bounded():
     ctx = _ctrl_client(r, mg)._advance_to_control(tries=5)
     assert ctx == GameContext.IN_MENU
     assert len(mg.taps) == 5
+
+
+def test_field_heal_uses_a_revive_then_the_smallest_potion_that_fills_the_gap():
+    """Deep in Victory Road no Center is reachable (chain run 7 looped heal() 2,800x): the Bag heals instead."""
+    from types import SimpleNamespace as NS
+    from agent.skills.items import FieldItemMixin
+
+    party = [NS(current_hp=0, max_hp=100), NS(current_hp=20, max_hp=100), NS(current_hp=100, max_hp=100)]
+    bag = {24: 1, 13: 5, 21: 3}
+    used = []
+
+    class Host(FieldItemMixin):
+        reader = NS(read_party=lambda: party, read_items_pocket=lambda: list(bag.items()))
+
+        def _field_use_item(self, item, target=""):
+            used.append(item)
+            if item == "Revive":
+                bag[24] -= 1
+                party[0].current_hp = 50
+            elif item == "Hyper Potion":
+                bag[21] -= 1
+                party[1].current_hp = 100
+            return "ok"
+
+    assert Host()._field_heal() == ["Revive", "Hyper Potion"]          # Revive first; the 80-HP gap needs more than a Potion's 20
+    assert Host()._field_heal() == []                                   # nobody is left under half

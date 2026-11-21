@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the full story chain clears without a model (#260)
+- `python tools/scripted_run.py --goal clear --chain` drives the whole story with `ChainPolicy` (`agent/scripted_policy.py`): at each free moment it runs the next open beat's `quest(...)`, prepares when a quest
+  says the team is not ready (grind, heal, shop) and hands every fight to the scripted battle rules. A **stall detector** names the first beat that cannot progress (the same failure three times, or 40
+  calls on one beat with no new badge / key item / level / *new map*) and prints `STALL: <beat>: <why>`. From the Blaine fixture it now reaches the **Hall of Fame** (1,962 steps, brute force: 17 blackouts).
+- What the first full-chain runs found and fixed: the **Pokémon Mansion** (statue press under a stale menu flag, a Mansion-aware walker, `_mansion_leave`), the **Nurse Joy tile** read from the live objects
+  (One Island's Center differs), **Bill's One Island offer** at Cinnabar (answer NO: B), the **forced replacement** (IN_MENU *or* TRANSITIONING: `switch_pokemon`), the **optional battle party screen**
+  (the SHIFT prompt: `advance_dialog` pressed A on it 4,700 times — it presses B), **`heal()` where no Center is reachable** (Victory Road: a go_to there wandered the cave pushing boulders; the Bag's
+  Revives / Potions heal instead — `_field_heal`), and the policy's order of business (levels before Potions; train the weakest on Routes 22 / 23 *before* the cave, since the Plateau has no grass).
+- Not fixed: `grind()` from the Indigo Plateau still cannot leave on foot (no Fly user in the chain), and the Plateau's Mart is not preferred over Viridian's.
+
 ### Changed — the ace no longer leads every fight outside a gym
 - **Why the ace kept a ~8-level lead** (read from the last 13 logged runs): it started 7 levels ahead and, after every `grind()`, `_restore_ace_lead` put the highest-level Pokémon back in slot 1 — so
   every quest / gym-trainer / autopilot / travel fight outside `grind` was the ace's (it led 73-95% of overworld ticks in the recent runs, 2-30% in older ones). It got ~24% of the XP against ~15% for
