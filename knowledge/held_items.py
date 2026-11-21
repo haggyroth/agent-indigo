@@ -87,3 +87,20 @@ def holding_line(party) -> str:
     """'Holding: Venusaur — Leftovers; Pikachu — Light Ball' ('' when nobody holds anything)."""
     bits = [f"{p.nickname or p.species_name} — {name(p.held_item)}" for p in party if getattr(p, "held_item", 0)]
     return "Holding: " + "; ".join(bits) if bits else ""
+
+
+EXP_SHARE = 182
+
+
+def exp_share_plan(party, owns_one: bool):
+    """(holder, target) for the adaptive Exp. Share: the Pokémon that should hold it NOW is the lowest-level one (it levels without fighting). `holder` is who carries it today (None when it is in the
+    Bag), `target` is who should. Returns None when there is nothing to do: no Exp. Share, nobody valid, or the holder is already the lowest (a tie keeps the current holder, so equal levels never
+    thrash). Fainted members count — a revived one is still the one to level."""
+    members = [p for p in party if getattr(p, "max_hp", 0)]
+    holder = next((p for p in members if getattr(p, "held_item", 0) == EXP_SHARE), None)
+    if not members or not (holder or owns_one):
+        return None
+    target = min(members, key=lambda p: (p.level, p is not holder))                # lowest level; among equals the current holder wins
+    if holder is not None and holder.level <= target.level:
+        return None
+    return holder, target

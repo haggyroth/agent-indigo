@@ -153,7 +153,8 @@ def _aide_line(t: Tick) -> str:
     claim = ready(owned, t.reader.read_flag)
     if claim:
         key, label, _need = claim[0]
-        return f"OAK'S AIDE: you have caught {owned} species — {label} is waiting: quest('{key}')."
+        extra = " (Route 15's west gatehouse, 2nd floor — it is held automatically by your lowest-level Pokémon)" if key == "exp_share" else ""
+        return f"OAK'S AIDE: you have caught {owned} species — {label} is waiting: quest('{key}'){extra}."
     nxt = next_reward(owned, t.reader.read_flag)
     if nxt and nxt[1] <= 3:
         return f"OAK'S AIDE: {nxt[1]} more species caught and an aide gives you {nxt[0]}."

@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the Exp. Share follows the lowest-level Pokémon (adaptive)
+- Once the Exp. Share is owned (Oak's Aide, Route 15's west gatehouse, 50 species caught — `quest('exp_share')`, announced in the observation's OAK'S AIDE line), `_maintain_exp_share` keeps it on the
+  **lowest-level party member** and moves it as levels change: it takes the item back from the old holder (new `_take_item`: Start → POKéMON → the Pokémon → ITEM → TAKE) and gives it to the new lowest
+  (`_give_item`). It runs once per overworld tick in `run_episode` and is a party-and-Bag read when nothing is needed; a tie keeps the current holder (no thrash), a move that fails twice for the same
+  party is dropped until the party changes. Verified on the real ROM, including a Pokémon with Cut / Strength in its sub-menu.
+
 ### Added — the Running Shoes, the bike state, rod tiers, a map-aware one-shot (#269, #272: the rest)
 - **Running**: once `FLAG_SYS_B_DASH` is set, `walk_to` / `go_to` and grass pacing hold B outdoors (`mgba.run_step`: B + direction for 4 frames, release 4 — 8 frames a tile instead of 16; 10 presses
   = 10 tiles, no overshoot). Vermilion -> Route 11 takes 360 frames instead of 704. Not indoors (the map header's `allow_running` is false there, and a press is half a step), not on a bike or Surf, not on

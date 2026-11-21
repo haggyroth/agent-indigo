@@ -274,3 +274,92 @@ class FieldItemMixin:
             return f"Couldn't give the {HELD_ITEMS[iid][0]} to {who} — check read_game_state."
         swapped = f" (its {HELD_ITEMS[mon.held_item][0]} went back to the Bag)" if mon.held_item in HELD_ITEMS else ""
         return f"{who} now holds {describe(iid)}{swapped}."
+
+
+    # ── the adaptive Exp. Share ──────────────────────────────────────────────
+    def _take_item(self, pokemon: str) -> str:
+        """Start → POKéMON → the Pokémon → ITEM → TAKE: its held item goes back to the Bag. The Pokémon's sub-menu is [SUMMARY, <field moves>, SWITCH, ITEM, CANCEL], so ITEM sits at
+        2 + (field moves); the ITEM sub-menu is [GIVE, TAKE, CANCEL]. Verified by the held item clearing."""
+        from knowledge.held_items import describe
+        from agent.skills.hm import _FIELD_MOVE_IDS
+        if self.reader.detect_context() != GameContext.OVERWORLD:
+            return "take works from the overworld (not in battle or a menu)."
+        party = self.reader.read_party()
+        slot, err = self._pick_party(str(pokemon), party)
+        if slot is None:
+            return err
+        mon = party[slot]
+        who = mon.nickname or mon.species_name
+        if not mon.held_item:
+            return f"{who} isn't holding anything."
+        item = mon.held_item
+        res = self._menus.open_menu("Pokemon")
+        if "screen open" not in res:
+            return f"Couldn't open the party screen ({res})."
+        self.mgba.tick(40)
+        try:
+            if not self._party_cursor_to(slot):
+                return "Couldn't move the party cursor to the Pokémon."
+            self.mgba.tap("A")
+            self.mgba.tick(50)
+            idx = 2 + sum(1 for m in (mon.move_ids or []) if m in _FIELD_MOVE_IDS)
+            if not self._menu_cursor_to(idx):
+                return "Couldn't reach ITEM in the Pokémon's menu."
+            self.mgba.tap("A")
+            self.mgba.tick(40)
+            if not self._menu_cursor_to(1):                          # GIVE, TAKE, CANCEL
+                return "Couldn't reach TAKE in the item menu."
+            self.mgba.tap("A")
+            for _ in range(10):                                      # "Received the X from Y." — advance until the party struct shows it
+                self.mgba.tick(30)
+                now = next((p for p in self.reader.read_party() if p.personality == mon.personality), None)
+                if now is not None and now.held_item == 0:
+                    break
+                self.mgba.tap("A")
+        finally:
+            for _ in range(4):
+                self.mgba.tick(20)
+                self.mgba.tap("B")
+            self._menus.close_menus()
+        now = next((p for p in self.reader.read_party() if p.personality == mon.personality), None)
+        if now is None or now.held_item:
+            return f"Couldn't take the {describe(item)} from {who} — check read_game_state."
+        return f"Took the {describe(item)} back from {who}."
+
+    def _menu_cursor_to(self, index: int) -> bool:
+        for _ in range(12):
+            cur = self.mgba.read8(Addr.MENU_CURSOR)
+            if cur == index:
+                return True
+            self.mgba.tap("Down" if cur < index else "Up")
+            self.mgba.tick(14)
+        return self.mgba.read8(Addr.MENU_CURSOR) == index
+
+    def _maintain_exp_share(self) -> str | None:
+        """Keep the Exp. Share on the LOWEST-level Pokémon of the party (adaptive: when levels change it moves). Cheap when nothing is needed (a party and Bag read); called once per overworld tick.
+        Returns a note when it moved the item, else None. A move that keeps failing for the same pair is dropped until the party changes."""
+        from knowledge.held_items import EXP_SHARE, exp_share_plan
+        if self.reader.detect_context() != GameContext.OVERWORLD:
+            return None
+        party = self.reader.read_party()
+        owns = any(i == EXP_SHARE and q > 0 for i, q in self.reader.read_items_pocket())
+        plan = exp_share_plan(party, owns)
+        if plan is None:
+            return None
+        holder, target = plan
+        sig = (holder.personality if holder else 0, target.personality, tuple(p.level for p in party))
+        fails = self._exp_share_fails
+        if fails.get(sig, 0) >= 2:
+            return None
+        who = target.nickname or target.species_name
+        out = ""
+        if holder is not None:
+            out = self._take_item(holder.nickname or holder.species_name)
+            if "Took" not in out:
+                fails[sig] = fails.get(sig, 0) + 1
+                return f"Exp. Share: {out}"
+        out = self._give_item("Exp. Share", who)
+        if "now holds" not in out:
+            fails[sig] = fails.get(sig, 0) + 1
+            return f"Exp. Share: {out}"
+        return f"Exp. Share → {who} L{target.level}" + (f" (from {holder.nickname or holder.species_name} L{holder.level})" if holder else "") + " — the lowest level holds it"

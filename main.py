@@ -678,6 +678,15 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             events.observe(reader)                    # books any battle that just ended (see _record_battle)
             _apply_progress(run, state, diff, reader, ltm)
 
+            # ── Adaptive Exp. Share: the lowest-level Pokémon holds it (a no-op without one) ──
+            if state.context == GameContext.OVERWORLD and not in_battle:
+                try:
+                    if (moved := client._maintain_exp_share()):
+                        events.emit("note", moved)
+                        state.party = reader.read_party()                         # the held item changed: the observation reads the fresh party
+                except Exception:
+                    log_once("main.exp_share", "main: the Exp. Share upkeep failed (continuing without it)")
+
             # ── Build observation string ─────────────────────────────────────
             obs = build_observation(state=state, diff=diff, in_battle=in_battle,
                                     run=run, reader=reader, tilemap=tilemap,

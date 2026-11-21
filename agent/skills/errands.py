@@ -243,18 +243,12 @@ class ErrandsMixin:
     def _get_exp_share(self, auto_trainers: bool = False) -> str:
         call = "quest('exp_share')"
         if self.reader.read_flag(FLAG_GOT_EXP_SHARE):
-            return "You already have the Exp. Share — give_item('Exp. Share', '<the Pokémon that lags>') if nobody holds it."
+            return "You already have the Exp. Share — the lowest-level Pokémon holds it automatically (and it moves as levels change)."
         if (msg := self._aide_reward(call, "the Exp. Share", "Route 15 West Gate 2F", ROUTE15_GATE_2F, EXP_SHARE_AIDE_SPOTS, FLAG_GOT_EXP_SHARE, 50,
                                      "Prof. Oak's Aide on Route 15", auto_trainers)):
             return msg
-        from knowledge.held_items import holder_for
-        party = self.reader.read_party()
-        who = holder_for(182, party)                              # ITEM_EXP_SHARE: the one that lags behind
-        note = ""
-        if who is not None and not any(p.held_item == 182 for p in party):
-            held = self._give_item("Exp. Share", who.nickname or who.species_name)
-            note = f" {held}"
-        return f"Got the Exp. Share from Prof. Oak's Aide.{note}"
+        note = self._maintain_exp_share()                         # the lowest-level Pokémon takes it (and the upkeep keeps moving it as levels change)
+        return "Got the Exp. Share from Prof. Oak's Aide." + (f" {note}." if note else "") + " It stays on whoever is the lowest level: nothing more to do."
 
     def _get_rod(self, which: str, auto_trainers: bool = False) -> str:
         name, dest, dest_map, flag = {"old": ("Old Rod", "Old Rod House", OLD_ROD_HOUSE, FLAG_OLD_ROD),
