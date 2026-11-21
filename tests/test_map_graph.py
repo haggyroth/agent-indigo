@@ -118,7 +118,7 @@ def test_door_centers_collapses_doormat():
 
 def test_the_indigo_plateaus_center_counts_as_a_mart_from_the_plateau():
     """Chain run: shop() from the Indigo Plateau walked back for Viridian's Mart; the Plateau's Center has a clerk of its own."""
-    from agent.skills.nav import nearest_mart
+    from knowledge.navigation import nearest_mart
     from knowledge.map_graph import nearest_of_kind
     assert nearest_mart((3, 9))[0] == (13, 0)                       # the Plateau: its own Center sells
     assert nearest_mart((3, 4)) == nearest_of_kind((3, 4), "mart")   # Pallet-side Viridian-area start: an ordinary Mart still wins

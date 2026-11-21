@@ -8,24 +8,13 @@ import logging
 from rich.console import Console
 
 from agent.skills.base import log_once
-from knowledge.navigation import MAP_NAMES
+from knowledge.navigation import MAP_NAMES, nearest_mart
 from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
 FLAG_B_DASH = 0x82F                      # FLAG_SYS_B_DASH: the Running Shoes (Oak's Aide, Pewter City)
 FLAG_SYS_ON_CYCLING_ROAD = 0x830        # SYS_FLAGS (0x800) + 0x30: set on Route 16's lower road and Routes 17-18; the game keeps you on the Bicycle there
 console = Console()
 logger = logging.getLogger(__name__)
-
-
-def nearest_mart(cur):
-    """The nearest place to SHOP: a Mart, or a Pokémon Center with a clerk of its own (the Indigo Plateau's) — whichever the route reaches first. The map graph has one kind per
-    map, so the Plateau's Center was only ever a Center and a shop() from the League walked back through Victory Road to Viridian's Mart."""
-    from knowledge.map_graph import nearest_of_kind
-    from knowledge.shop_stock import SHOPS
-    mart, center = nearest_of_kind(cur, "mart"), nearest_of_kind(cur, "pokecenter")
-    if center and (center[0] in {(b, m) for b, m, *_ in SHOPS}) and (mart is None or len(center[1]) < len(mart[1])):
-        return center
-    return mart
 
 
 class NavMixin:

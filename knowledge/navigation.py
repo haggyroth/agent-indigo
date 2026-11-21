@@ -488,3 +488,14 @@ def get_building_guidance(bank: int, id: int) -> str | None:
         return BUILDING_DETAIL[(bank, id)]
     t = infer_building_type(bank, id)
     return BUILDING_TYPE_GUIDE.get(t) if t else None
+
+
+def nearest_mart(cur):
+    """The nearest place to SHOP: a Mart, or a Pokémon Center with a clerk of its own (the Indigo Plateau's) — whichever the route reaches first. The map graph has one kind per
+    map, so the Plateau's Center was only ever a Center and a shop() from the League walked back through Victory Road to Viridian's Mart."""
+    from knowledge.map_graph import nearest_of_kind
+    from knowledge.shop_stock import SHOPS
+    mart, center = nearest_of_kind(cur, "mart"), nearest_of_kind(cur, "pokecenter")
+    if center and (center[0] in {(b, m) for b, m, *_ in SHOPS}) and (mart is None or len(center[1]) < len(mart[1])):
+        return center
+    return mart
