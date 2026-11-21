@@ -63,25 +63,6 @@ class MoveLearnMixin:
         self._decline_at_box()
         return f"declined {new_name} (not better than what {cur[0] if cur else 'it'} already knows)"
 
-    def _press_until_lms_leaves(self, button: str, val: int, cap: int = 8) -> bool:
-        """Press `button` at an interactive box until learnMoveState leaves `val` — i.e.
-        until that box consumed the input — then return IMMEDIATELY. After pressing we
-        poll frame by frame and bail the instant the state changes, so we never keep
-        pressing into the NEXT box (the following prompt is also lms==1: e.g. the give-up
-        box and the next move's delete box both read 1; over-pressing A there would
-        accept the next move). Retries only if the press was dropped (lms still == val)."""
-        from game.constants import Addr
-        for _ in range(cap):
-            self._wait_idle()
-            if self.mgba.read8(Addr.LEARN_MOVE_STATE) != val:
-                return True
-            self.mgba.tap(button)
-            for _ in range(8):
-                self.mgba.tick(1)
-                if self.mgba.read8(Addr.LEARN_MOVE_STATE) != val:
-                    return True
-        return self.mgba.read8(Addr.LEARN_MOVE_STATE) != val
-
     def _decline_at_box(self) -> None:
         """Decline the learn from a live delete box, per the decomp flow (verified
         live): B at the 'Delete a move?' box (cursor default YES) → learnMoveState 4 →
