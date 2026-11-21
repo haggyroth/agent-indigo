@@ -39,6 +39,7 @@ class MoveLearnMixin:
         from game.constants import Addr
         return (self.mgba.read8(Addr.LEARN_MOVE_STATE) == 1
                 and self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_BATTLE
+                and self.mgba.read32(Addr.BATTLE_SCRIPT_PTR) == Addr.SCRIPT_LEARN_DELETE      # the script is WAITING on this box (lms alone lingers)
                 and self._offered_move() != 0)
 
     def _resolve_move_learn(self) -> str | None:
@@ -134,12 +135,22 @@ class MoveLearnMixin:
         backing out with B + 'stop learning?' YES) if the cursor can't be placed."""
         from game.constants import Addr
         offered = self._offered_move()
-        self._press_until_lms_leaves("A", 1)          # accept the delete box → lms 2
-        for _ in range(15):                           # wait for the summary (callback2 leaves the battle main)
+        for _ in range(8):                            # accept the delete box → lms 2 (A only while the script is really waiting on it)
+            self._wait_idle()
+            if self.mgba.read8(Addr.LEARN_MOVE_STATE) != 1 or self.mgba.read32(Addr.BATTLE_SCRIPT_PTR) != Addr.SCRIPT_LEARN_DELETE:
+                break
+            self.mgba.tap("A")
+            for _ in range(8):
+                self.mgba.tick(1)
+                if self.mgba.read8(Addr.LEARN_MOVE_STATE) != 1:
+                    break
+        for _ in range(40):                           # wait for the summary (callback2 leaves the battle main)
             if self.mgba.read32(Addr.GMAIN_CALLBACK2) != Addr.CB2_BATTLE:
                 break
             self._wait_idle()
             self.mgba.tick(4)
+        if self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_BATTLE:
+            return False                              # the summary never opened (the box was not there): press nothing else into the battle menu
         self.mgba.tick(40)                            # settle the fade-in (input ignored mid-fade)
         for _ in range(14):
             cur = self.mgba.read8(Addr.SUMMARY_MOVE_CURSOR)
@@ -149,9 +160,13 @@ class MoveLearnMixin:
             self.mgba.tick(30)
         if self.mgba.read8(Addr.SUMMARY_MOVE_CURSOR) != slot:
             self.mgba.tap("B")                        # back out: "Stop learning?" → YES keeps the old moves
-            self.mgba.tick(30)
-            self.mgba.tap("A")
-            self.mgba.tick(30)
+            for _ in range(30):                       # A only once the script is on that box
+                self.mgba.tick(4)
+                if self.mgba.read32(Addr.BATTLE_SCRIPT_PTR) == Addr.SCRIPT_LEARN_GIVEUP and self.mgba.read8(Addr.LEARN_MOVE_STATE) == 1:
+                    self._wait_idle()
+                    self.mgba.tap("A")
+                    self.mgba.tick(30)
+                    break
             return False
         # A selects the move; then advance the "1, 2 and… Poof! forgot X / learned Y" text until the new move is
         # actually in the moveset (the party struct updates only when that text finishes).
@@ -241,8 +256,12 @@ class MoveLearnMixin:
         # end on the overworld (wild battle) or, for a battle that continues (trainer),
         # when no further box has appeared for a while — the learn flow is over.
         idle = 0
+        resolves = 0
         for _ in range(300):
             if self._delete_box_live():
+                resolves += 1
+                if resolves > 3:                      # three tries at one prompt and it still stands: stop pressing (a watched run looped on it for 13 min)
+                    return f"{note + '; ' if note else ''}the move-learn prompt would not resolve — left alone"
                 n = self._resolve_move_learn()
                 note = f"{note}; {n}" if note else n
                 idle = 0
