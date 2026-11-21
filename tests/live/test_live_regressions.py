@@ -2131,3 +2131,22 @@ def test_the_dept_store_stairs_and_exit_mats_do_not_make_the_walker_shuffle(live
     presses2, rev2 = _count_shuffles(live, lambda: out.update(leave=live.c._execute("go_to", json.dumps({"destination": "Celadon City", "force": True}))))
     assert out["leave"].startswith("Arrived at Celadon City"), out
     assert presses2 < 80 and rev2 <= 4, (presses2, rev2)             # was 259 presses / 70 reversals
+
+
+def test_a_lingering_learn_state_in_the_battle_menu_does_not_make_the_driver_press_a(live):
+    """A watched run: learnMoveState read 1 in the ordinary battle menu, the driver pressed A into FIGHT -> move 1 (Foresight) about 24 times (HP 40 -> 0) and four watchdogs fired.
+    Simulate it: arm the driver and plant lms == 1 with a move on offer; nothing may be pressed and the battle must be untouched."""
+    live.load("threemon")
+    if live.r.detect_context() == GameContext.IN_BATTLE:
+        live.c._flee_battle()
+        live.m.tick(60)
+    live.patch_mon(0, [193, 48, 93, 77], [40, 35, 10, 35], level=24, exp=13900)
+    assert live.wild_battle()
+    live.m.tick(300)
+    live.c._wait_idle()
+    live.m.write8(Addr.LEARN_MOVE_STATE, 1)
+    live.m.write16(Addr.MOVE_TO_LEARN, 141)                     # Leech Life, which it does not know
+    live.c._learn_armed = True
+    hp, pp = live.r.read_party()[0].current_hp, live.r.read_active_battle_moves()[2]
+    assert live.c._maybe_drive_learn() is None
+    assert live.r.read_party()[0].current_hp == hp and live.r.read_active_battle_moves()[2] == pp and live.r.detect_context() == GameContext.IN_BATTLE

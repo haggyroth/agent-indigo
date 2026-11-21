@@ -34,6 +34,16 @@ All notable changes to this project are documented here. Format loosely follows
 - **Exit mats**: a map's warp-event list can name tiles the game never warps from — the Dept. Store 1F lists (1,15) and (3,15) (walls) beside the real arrow mat (2,14). `go_to` aimed at the wall and
   pressed Down into it ~70 times. `_warp_exit_tile` now prefers tiles whose metatile behavior is a real warp (`is_real_warp`). Up to 4F and back out: 297 + 259 presses -> 150 + 41.
 
+### Fixed — a lingering move-learn state made the driver press A into the battle menu
+- A watched run (Venonat L25, Leech Life on offer) lost ~13 minutes of game time and four watchdogs: the Pokémon used Foresight (move 1) about 24 times, from 40 HP to fainting, while
+  `use_move`, `grind` and `advance_dialog` all stalled. `learnMoveState` LINGERS at 1 after a decline, and the "is a delete box up?" check read exactly that (plus a move on offer), so the driver
+  pressed A at the ordinary battle menu — FIGHT, then slot 0 — and re-resolved the same "prompt" until the watchdog fired. Reproduced live (7 resolves, PP 40 → 16, HP 27 → 0).
+- The box is now live only while the battle script is WAITING on it: `gBattlescriptCurrInstr` sits on the "Delete a move?" command (`SCRIPT_LEARN_DELETE` 0x081D8A08) — and, for the give-up box,
+  on 0x081D8A17 (both read from the real prompt). `_accept_forget_slot` presses A only while the pointer is there, waits for the summary before steering, and backs out with B / A only when the
+  script is on the give-up box; the drive loop stops after three resolves of one prompt instead of 300 iterations. Real prompts (forget slot 0-3, decline, back-to-back) still work.
+- The suite caught a regression in the first cut of this fix: while the "is trying to learn X" texts print, `learnMoveState` can already read 1 (stale) with the script still before the box, so nothing advanced
+  the text and other code mashed A at the real box (Ivysaur forgot Tackle for Sweet Scent in the SS-ticket quest). Those texts are now advanced with the policy's own button — B to decline, A to learn.
+
 ### Added — the Cycling Road: Route 16's Snorlax and bike-aware routing (#272 / #269, the rest)
 - **`quest('snorlax_16')`** (optional beat): the second Snorlax at Route 16 (31,13), Celadon's side. Same flute-and-fight script as Route 12's — the fight goes to the model under the one-shot protocol, never
   the autopilot — and `FLAG_HIDE_ROUTE_16_SNORLAX` (0x080, set when the fight starts) is the proof. Verified live from the stalled run's Route 16 state.
