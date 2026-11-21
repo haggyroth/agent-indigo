@@ -122,3 +122,16 @@ def test_the_indigo_plateaus_center_counts_as_a_mart_from_the_plateau():
     from knowledge.map_graph import nearest_of_kind
     assert nearest_mart((3, 9))[0] == (13, 0)                       # the Plateau: its own Center sells
     assert nearest_mart((3, 4)) == nearest_of_kind((3, 4), "mart")   # Pallet-side Viridian-area start: an ordinary Mart still wins
+
+
+def test_nearest_center_skips_one_a_trip_could_not_reach_and_finds_the_next_across_the_water():
+    """Route 23 (south of Victory Road): the graph's nearest Center is the Indigo Plateau's via the North edge, which is not walkable from there; the next one is Viridian's,
+    reached across Route 23's Surf gap."""
+    from knowledge.map_graph import nearest_of_kind, node_for
+    cur = node_for(3, 42, 10, 72)
+    first = nearest_of_kind(cur, "pokecenter")
+    assert first[0] == (13, 0)
+    second = nearest_of_kind(cur, "pokecenter", exclude=[first[0]])
+    assert second[0] == (5, 4) and any(s[0] == "surf" for s in second[1])
+    assert nearest_of_kind(cur, "pokecenter", exclude=[(13, 0), (5, 4)])[0] not in {(13, 0), (5, 4)}
+    assert nearest_of_kind((3, 4), "pokecenter") == nearest_of_kind((3, 4), "pokecenter", exclude=[])   # no exclusion: unchanged

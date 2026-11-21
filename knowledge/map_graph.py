@@ -812,15 +812,23 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True
     return hit[1] if hit else None
 
 
-def nearest_of_kind(start, kind):
+def nearest_of_kind(start, kind, exclude=()):
     """Route to the nearest map of a kind ("pokecenter"/"mart"/"gym").
     Returns (goal_map, steps) or None. Region-aware with a coarse fallback; the returned
-    goal_map is the plain (bank, id) of the destination."""
-    if MAP_KIND.get(start[:2]) == kind:
+    goal_map is the plain (bank, id) of the destination.
+    `exclude`: goal maps to skip — ones a trip already failed to reach. The next-nearest is then also searched
+    with Cut and Surf (a Center only across water — Route 23's Surf gap to Viridian — is still a Center)."""
+    exclude = {tuple(m[:2]) for m in exclude}
+    if MAP_KIND.get(start[:2]) == kind and start[:2] not in exclude:
         return (start[:2], [])
-    hit = _search(start, _R_CONN, _R_WARP, lambda n, s: MAP_KIND.get(n[:2]) == kind)
+
+    def ok(n, s):
+        return MAP_KIND.get(n[:2]) == kind and tuple(n[:2]) not in exclude
+    hit = _search(start, _R_CONN, _R_WARP, ok)
+    if hit is None and exclude:
+        hit = _search(start, _R_CONN, _R_WARP, ok, blk=_R_BLK, srf=_R_SRF)
     if hit is None:
-        hit = _search(start[:2], _C_CONN, _C_WARP, lambda n, s: MAP_KIND.get(n[:2]) == kind)
+        hit = _search(start[:2], _C_CONN, _C_WARP, ok)
     return (hit[0][:2], hit[1]) if hit else None
 
 

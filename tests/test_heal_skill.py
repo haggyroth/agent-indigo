@@ -123,3 +123,45 @@ def test_field_heal_uses_a_revive_then_the_smallest_potion_that_fills_the_gap():
 
     assert Host()._field_heal() == ["Revive", "Hyper Potion"]          # Revive first; the 80-HP gap needs more than a Potion's 20
     assert Host()._field_heal() == []                                   # nobody is left under half
+
+
+class _Where:
+    def __init__(self, mp, pos, party):
+        self.mp, self.pos, self._party = mp, pos, party
+
+    def read_current_map(self):
+        return self.mp
+
+    def read_player_pos(self):
+        return self.pos
+
+    def read_party(self):
+        return self._party
+
+    def read_objects_by_gfx(self, ids):
+        return []
+
+
+def test_heal_falls_back_to_the_next_center_when_the_nearest_is_unreachable():
+    """Route 23 with a fainted party: the graph's nearest Center (the Indigo Plateau's) is not reachable, so heal() must try the next one (Viridian's) instead of giving up —
+    the chain stalled on this for 2,000+ calls."""
+    c = AgentClient.__new__(AgentClient)
+    c.reader = _Where((3, 42), (10, 72), [_mon(0, 100)])
+    c.mgba = c.reader
+    trips = []
+
+    def go_to(dest, mode="yield", auto_trainers=False, resume_call=None):
+        trips.append(dest)
+        return ("Heading to Pokemon Center: stuck at Route 23 (Couldn't get to the North edge)." if len(trips) == 1
+                else "Arrived at the Pokémon Center (5, 4).")
+    c._go_to = go_to
+    c._field_heal = lambda: ["never"]
+    out = c._heal()
+    assert trips == ["Pokemon Center", "map:5,4"], trips            # first the nearest, then Viridian's by exact map
+    assert "healed from the Bag" not in out
+
+
+def test_a_map_destination_resolves_to_that_exact_map():
+    c = AgentClient.__new__(AgentClient)
+    assert c._resolve_destination("map:5,4")[0] == (5, 4)
+    assert c._resolve_destination("map:oops")[0] is None

@@ -149,6 +149,14 @@ class OverworldMixin:
             return (jx, jy + 2)
         return self._NURSE_TILE
 
+    def _next_center(self, tried):
+        """The nearest Pokémon Center from here that is not in `tried` — the ones a heal trip already failed to reach (None if there is no other)."""
+        from knowledge.map_graph import nearest_of_kind, node_for
+        bank, mid = self.reader.read_current_map()
+        px, py = self.reader.read_player_pos()
+        found = nearest_of_kind(node_for(bank, mid, px, py), "pokecenter", exclude=tried)
+        return found[0] if found else None
+
     def _heal(self, force: bool = False) -> str:
         """Heal the whole party at a Pokémon Center. Travels to the nearest one if
         not already inside, walks to Nurse Joy, and advances the heal dialogue
@@ -168,7 +176,17 @@ class OverworldMixin:
                     "(quest('victory_road') resumes) instead of walking back.")
         # Get inside a Pokémon Center first (resumable travel).
         if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
+            tried = [self._resolve_destination("Pokemon Center")[0]]       # the Center the trip heads for first
             res = self._go_to("Pokemon Center", mode="flee", resume_call="heal()")
+            while (MAP_KIND.get(self.reader.read_current_map()) != "pokecenter" and len(tried) < 3
+                   and ("blocked" in res or "stuck at" in res or "Can't reach" in res)):
+                # The nearest Center on paper may not be reachable (Route 23: the graph walks its North edge to the Indigo Plateau's Center, but the way is
+                # a Surf gap / the League's own gate): try the next-nearest — Viridian's, across the water — before giving up on a Center.
+                alt = self._next_center(tried)
+                if alt is None:
+                    break
+                tried.append(alt)
+                res = self._go_to(f"map:{alt[0]},{alt[1]}", mode="flee", resume_call="heal()")
             if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
                 if "blocked" in res or "stuck at" in res or "Can't reach" in res:
                     used = self._field_heal()          # no Center reachable from here (a cave, a Surf gap): the Bag has to do

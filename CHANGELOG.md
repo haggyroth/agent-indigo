@@ -15,7 +15,7 @@ All notable changes to this project are documented here. Format loosely follows
   Revives / Potions heal instead — `_field_heal`), and the policy's order of business (levels before Potions; train the weakest on Routes 22 / 23 *before* the cave, since the Plateau has no grass).
 - The Indigo Plateau no longer strands the chain: the policy takes the optional `fly` beat (HM02) and teaches Fly to the lowest-level Pokémon that can learn it, so `grind()` can fly out of the Plateau; `shop()` treats a Pokémon Center with its own clerk (the Plateau's) as a Mart, so it buys there instead of walking to Viridian.
 - `flee_battle` backs out of the FIGHT move menu with B and honours the later-turn action-menu value — a zero-PP move picked ("There's no PP left for this move!") made it re-pick the move forever (a 2,466-call loop in a chain run).
-- Not fixed: with the whole party fainted on Route 23 and an empty Bag, `heal()` still targets the Plateau Center via the North edge (not walkable from there) instead of falling back to Viridian's.
+- `heal()` falls back to the next-nearest Pokémon Center when the nearest one can't be reached: from Route 23 the graph's nearest is the Indigo Plateau's (via a North edge that isn't walkable), so it now goes round to Viridian's across the Surf gap (`nearest_of_kind(..., exclude=)`, and a `go_to('map:<bank>,<id>')` destination for Centers, which have no names). A chain run with the whole party fainted there had looped 700 calls.
 
 ### Changed — the ace no longer leads every fight outside a gym
 - **Why the ace kept a ~8-level lead** (read from the last 13 logged runs): it started 7 levels ahead and, after every `grind()`, `_restore_ace_lead` put the highest-level Pokémon back in slot 1 — so
