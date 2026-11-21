@@ -124,7 +124,7 @@ class NavMixin:
                 return ""
         return "cut" if self._use_hm("cut").startswith("Used Cut") else ""
 
-    def _press_on_tile(self, stand: tuple, face: str, yesno: bool = False) -> bool:
+    def _press_on_tile(self, stand: tuple, face: str, yesno: bool = False, idle: bool = False) -> bool:
         """Walk to `stand`, face `face`, press A, then clear the result (a 'press the switch?' YES/NO,
         or just text)."""
         from game.state import GameContext
@@ -145,17 +145,17 @@ class NavMixin:
         self.mgba.tick(8)
         self.mgba.tap("A")
         self.mgba.tick(30)
-        if yesno:
-            # A switch/statue/door script: text, then 'Press it?' (the cursor starts on YES), then the result.
+        if idle:
+            # A switch/statue script (the Mansion): text, then 'Press it?' (the cursor starts on YES), then the result.
             # Don't probe for the choice — a stale menu flag makes this dialogue read IN_MENU and the probe's
             # Down/Up presses ate the budget. Press A until the script engine goes idle.
             from game.constants import Addr
             for _ in range(10):
-                if self.mgba.read8(Addr.SCRIPT_RAM) == 0:
+                if self.mgba.read8(Addr.SCRIPT_RAM) == 0 or self.reader.detect_context() == GameContext.IN_BATTLE:
                     break
                 self.mgba.tap("A")
                 self.mgba.tick(30)
-        elif self._menus.choice_live():
+        elif yesno or self._menus.choice_live():
             for _ in range(4):
                 if self._menus.choice_live():
                     self._menus.answer_prompt("yes")
@@ -219,7 +219,7 @@ class NavMixin:
                 nx, ny = sx + dx, sy + dy              # stand below the statue and face Up, etc.
                 if 0 <= nx < w and 0 <= ny < h and grid[ny][nx] and (
                         (nx, ny) == tuple(start) or find_path(start, (nx, ny), passable(()), w, h)):
-                    return self._press_on_tile((nx, ny), face, yesno=True)
+                    return self._press_on_tile((nx, ny), face, yesno=True, idle=True)
         return False
 
     def _engage_blocking_npc(self, start, goal, grid, w, h, npcs, blocked) -> bool:

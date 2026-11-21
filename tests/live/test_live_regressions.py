@@ -2160,7 +2160,7 @@ def test_the_mansion_statue_press_flips_the_switch_even_when_a_stale_menu_flag_m
     From that exact state the press must flip FLAG_POKEMON_MANSION_SWITCH_STATE."""
     live.load("mansion3f_statue")
     assert tuple(live.r.read_current_map()) == (1, 61) and not live.r.read_flag(0x26C)
-    assert live.c._press_on_tile((12, 6), "Up", yesno=True) is True
+    assert live.c._press_on_tile((12, 6), "Up", yesno=True, idle=True) is True
     assert live.r.read_flag(0x26C)
 
 

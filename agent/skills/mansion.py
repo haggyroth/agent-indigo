@@ -77,7 +77,7 @@ class MansionMixin:
                 if kind == "goto":
                     self._walk_far(actions[0][2])
                 elif kind == "press":
-                    self._press_on_tile(actions[0][2], actions[0][3], yesno=True)
+                    self._press_on_tile(actions[0][2], actions[0][3], yesno=True, idle=True)
                 else:
                     _k, _floor, tile, button = actions[0]
                     self._take_warp(pos, tile, button, here)
@@ -139,7 +139,7 @@ class MansionMixin:
                     stuck += 1
             elif kind == "press":
                 _f, _floor, stand, face = actions[0][1], actions[0][1], actions[0][2], actions[0][3]
-                self._press_on_tile(stand, face, yesno=True)
+                self._press_on_tile(stand, face, yesno=True, idle=True)
             else:                                                            # warp: step onto the tile, then press its button ON it
                 _k, _floor, tile, button = actions[0]
                 self._take_warp(pos, tile, button, here)
