@@ -539,6 +539,18 @@ from knowledge.map_regions import BLOCKER_LINKS, CONN_LINKS, LEDGE_LINKS, REGION
 SPLIT_MAPS: frozenset = frozenset(REGION_GRIDS)
 
 
+# Route 20 is NOT one open sea. Collision tiles seal its east half from its west half (a wall at x=50-51 and blocks at x=80-85 on rows 15-16, read from the decomp's map.bin and
+# confirmed by walking into it): the east sea, Route 19's, reaches only the Seafoam island's north shore; the west corridor (the south channel and everything west of x=51, to Cinnabar)
+# is reachable only from the sandbar below the island: the way across is the Seafoam cave (island door (60,8) -> 1F -> B1F -> B2F -> B1F -> 1F -> sandbar door (72,14)). The generated
+# region grids cover land only, so the two seas are hand data: nodes (3,38,'E') and (3,38,'W') (see _patch_route_20).
+ROUTE_20 = (3, 38)
+
+
+def route20_west(x: int, y: int) -> bool:
+    """Is sea tile (x, y) on Route 20 in the WEST half (the corridor that leads to Cinnabar)? Else it is the east sea (Route 19's)."""
+    return x <= 51 or (y >= 14 and x <= 79)
+
+
 def region_at(mp: tuple, x: int, y: int) -> str | None:
     """Region tag of tile (x, y) on a split map (a door/warp tile borrows a walkable
     neighbour). None for a plain map or an unwalkable/pocket tile."""
@@ -546,6 +558,8 @@ def region_at(mp: tuple, x: int, y: int) -> str | None:
     if rows is None:
         return None
     h, w = len(rows), len(rows[0])
+    if tuple(mp[:2]) == ROUTE_20:                              # land is region 0 (the island) / 1 (the sandbar); every other tile is sea, in one of two sealed halves
+        return rows[y][x] if 0 <= x < w and 0 <= y < h and rows[y][x] != "#" else ("W" if route20_west(x, y) else "E")
     for nx, ny in ((x, y), (x, y + 1), (x, y - 1), (x + 1, y), (x - 1, y)):
         if 0 <= nx < w and 0 <= ny < h and rows[ny][nx] != "#":
             return rows[ny][nx]
@@ -640,6 +654,22 @@ def _drop_one_way(conn: dict) -> dict:
 _R_CONN = _drop_one_way(_R_CONN)
 
 
+def _patch_route_20() -> None:
+    """Split Route 20's sea into its two sealed halves (see ROUTE_20): the east sea (Route 19's) and the west corridor (Cinnabar's) are different nodes with no edge between them.
+    The island and the sandbar are deliberately NOT linked to either sea: crossing by the cave means solving Seafoam's boulders / currents, which go_to cannot drive (a live attempt
+    walked into B2F with no walkable path to the far warp and ended wandering B3F). Until a crossing driver exists, Fuchsia <-> Cinnabar goes the long way round through Pallet and
+    Route 21 (or Fly to Pallet) — as the watched run ended up doing after three failed tries at Route 20's east end."""
+    e, w = (3, 38, "E"), (3, 38, "W")
+    _R_CONN.pop(ROUTE_20, None)                                   # the plain node's East / West edges would still join the halves
+    _R_CONN[e] = [("East", (3, 37))]
+    _R_CONN[w] = [("West", (3, 8))]
+    _R_CONN[(3, 37)] = [(d, e if tuple(dest[:2]) == ROUTE_20 else dest) for d, dest in _R_CONN.get((3, 37), [])]
+    _R_CONN[(3, 8)] = [(d, w if tuple(dest[:2]) == ROUTE_20 else dest) for d, dest in _R_CONN.get((3, 8), [])]
+
+
+_patch_route_20()
+
+
 def _build_blocker_graph():
     """node -> [(x, y, dest node)]: cross a Cut tree / Rock Smash rock from one region of a split map into the next (two-way). (x, y) is the tile on the FAR side:
     walk_to there and it cuts the tree on the way (nav._go_to does the walk). Only used by route_to's second strict pass."""
@@ -689,6 +719,8 @@ def _build_snorlax_graph():
 _R_SNZ = _build_snorlax_graph()
 # Coarse (region-blind) graph — the optimistic fallback.
 _C_CONN = _drop_one_way({m: sorted(d.items()) for m, d in MAP_CONNECTIONS.items()})
+_C_CONN[(3, 38)] = [(d, dest) for d, dest in _C_CONN.get((3, 38), []) if dest != (3, 8)]       # the sea between Route 20 and Cinnabar is sealed (see ROUTE_20)
+_C_CONN[(3, 8)] = [(d, dest) for d, dest in _C_CONN.get((3, 8), []) if dest != (3, 38)]
 _C_WARP = MAP_WARPS
 
 

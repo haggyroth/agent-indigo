@@ -86,6 +86,7 @@ class LeagueMixin:
                 if self.reader.read_flag(flag):
                     self._walk_to(*exit_tile)                      # the door opened when they fell: through it
                 else:
+                    self._set_boss_lead()                          # the strongest leads each Elite Four / Champion fight
                     self._walk_to(*stand)
                     if tuple(self.reader.read_player_pos()) == stand:
                         self.mgba.tap("Up")

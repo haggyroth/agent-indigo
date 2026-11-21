@@ -196,7 +196,7 @@ def better_matchup(party, active_species: int, foe_name: str = "", foe_level: in
         take = foe_pressure(foe.types, p, foe.moves)
         if not move or mult < max(my_mult, 1) or take > max(my_take, 1) or (mult <= my_mult and take >= my_take):
             continue
-        key = (mult, -take, bool(_outspeeds(p, foe)), p.level)
+        key = (mult, -take, bool(_outspeeds(p, foe)), -p.level)          # level only breaks a full tie, and the LOWER one wins: the same kill pays the same XP, so it levels the team evenly
         if best is None or key > best[0]:
             best = (key, p, move, mult, take)
     if best is None:
