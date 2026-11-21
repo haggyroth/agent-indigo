@@ -1081,6 +1081,7 @@ def test_silph_co_quest_clears_the_building(live):
     c = live.c
     c._execute("go_to", json.dumps({"destination": "Celadon City"}))
     live.fly_to("saffron city", flags=(0x23C, 0x2A6))                  # Fuji rescued: the Rocket guard at the Silph door falls asleep
+    live.strong_lead()                                           # a L60 lead (like the Victory Road test): the fixture's L36 lost the 7F rival fight whenever the frame timing shifted its dice
     out = ""
     for _ in range(80):
         live.boost_party()                                       # the fixture party is far under the Rockets / rival / Giovanni
