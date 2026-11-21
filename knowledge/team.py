@@ -53,7 +53,7 @@ def place(bank: int, mid: int) -> str:
 def where_to_find(species_id: int, limit: int = 2) -> str:
     """'Route 4 (grass L10-12), Diglett's Cave B1F (grass L15-31)' — straight from the encounter tables."""
     rows = WILD_LOCATIONS.get(species_id, [])
-    rows = sorted(rows, key=lambda r: ({"grass": 0, "surf": 1, "rock smash": 2, "fish": 3}.get(r[2], 4), r[3]))
+    rows = sorted(rows, key=lambda r: ({"grass": 0, "surf": 1, "rock smash": 2, "old rod": 3, "good rod": 4, "super rod": 5}.get(r[2], 6), r[3]))
     seen, out = set(), []
     for b, i, method, lo, hi in rows:
         name = place(b, i)

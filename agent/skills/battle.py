@@ -1305,7 +1305,7 @@ class BattleMixin:
         from game.state import GameContext
         from knowledge.one_shot import is_one_shot
         foe = self.reader.read_enemy_lead() if self.reader.detect_context() == GameContext.IN_BATTLE else None
-        if foe and foe.max_hp and foe.current_hp > 0 and is_one_shot(foe.species_id) \
+        if foe and foe.max_hp and foe.current_hp > 0 and is_one_shot(foe.species_id, self.reader.read_current_map()) \
                 and not self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
             return                             # a Snorlax / a legend: the autopilot would knock it out — leave it to the model (callers hand a battle that is still on to it)
         potions_used: list = []

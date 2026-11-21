@@ -105,6 +105,7 @@ USE_VISION        = os.getenv("USE_VISION", "true").lower() == "true"
 # ── Live viewer (native backend only) ─────────────────────────────────────────
 # Show a window rendering the game as the agent plays. Requires pygame.
 SHOW_WINDOW       = os.getenv("SHOW_WINDOW",  "false").lower() == "true"
+USE_RUNNING_SHOES = os.getenv("USE_RUNNING_SHOES", "true").lower() != "false"   # hold B while walking once the Running Shoes are owned (twice the speed); false = always walk
 VIEWER_SCALE      = _env_int("VIEWER_SCALE", 3, minimum=1)    # 240x160 -> 720x480
 VIEWER_FPS        = _env_int("VIEWER_FPS", 120, minimum=0)    # playback pace cap; 0 = uncapped
 

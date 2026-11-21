@@ -111,7 +111,8 @@ class TowerMixin:
             if self.reader.read_flag(FLAG_HIDE_ROUTE16_SNORLAX):
                 got = bool(self.reader.read_dex_owned(143))
                 return ("The Snorlax woke up and is gone from the road" + (" — and you CAUGHT it: a L30 Snorlax is one of the best team members. " if got else
-                        " (beaten or fled — it is in your Pokédex only if you caught it). ")
+                        " (beaten or fled — it is in your Pokédex only if you caught it: load_state(9) goes back to the start of that fight for another try at the catch, "
+                        "the one-shot battle-start save). ")
                         + "The way to the Cycling Road's gate house is open; Route 17 itself needs the Bicycle (quest('bike')).")
             if tuple(self.reader.read_current_map()) != ROUTE_16:
                 if (msg := self._hideout_travel("Route 16", ROUTE_16, call, auto_trainers)):
@@ -145,7 +146,8 @@ class TowerMixin:
             if self.reader.read_flag(FLAG_WOKE_ROUTE12):
                 got = bool(self.reader.read_dex_owned(143))
                 return ("The Snorlax woke up and is gone from the road" + (" — and you CAUGHT it: a L30 Snorlax is one of the best team members. " if got else
-                        " (beaten or fled — it is in your Pokédex only if you caught it; Route 16 has a second one). ")
+                        " (beaten or fled — it is in your Pokédex only if you caught it: load_state(9) goes back to the start of that fight for another try at the catch, "
+                        "the one-shot battle-start save; Route 16 has a second Snorlax: quest('snorlax_16')). ")
                         + "Route 12 leads south: Routes 13, 14, 15 → Fuchsia City (Koga's gym: quest('koga')).")
             if tuple(self.reader.read_current_map()) != ROUTE_12:
                 if (msg := self._hideout_travel("Route 12", ROUTE_12, call, auto_trainers)):

@@ -1081,6 +1081,7 @@ def test_silph_co_quest_clears_the_building(live):
     c = live.c
     c._execute("go_to", json.dumps({"destination": "Celadon City"}))
     live.fly_to("saffron city", flags=(0x23C, 0x2A6))                  # Fuji rescued: the Rocket guard at the Silph door falls asleep
+    live.strong_lead()                                           # a L60 lead (like the Victory Road test): the fixture's L36 lost the 7F rival fight whenever the frame timing shifted its dice
     out = ""
     for _ in range(80):
         live.boost_party()                                       # the fixture party is far under the Rockets / rival / Giovanni
@@ -2150,3 +2151,39 @@ def test_a_lingering_learn_state_in_the_battle_menu_does_not_make_the_driver_pre
     hp, pp = live.r.read_party()[0].current_hp, live.r.read_active_battle_moves()[2]
     assert live.c._maybe_drive_learn() is None
     assert live.r.read_party()[0].current_hp == hp and live.r.read_active_battle_moves()[2] == pp and live.r.detect_context() == GameContext.IN_BATTLE
+
+
+def test_running_with_the_shoes_halves_the_frames_and_lands_on_the_same_tiles(live):
+    """#269: with FLAG_SYS_B_DASH, walk_to / go_to hold B outdoors (8 frames a tile instead of 16). The same trips with and without the shoes end on the same tiles — through doors, an
+    arrow-mat exit and a Pokémon Center — and the outdoor leg takes far fewer frames. Indoors B does nothing, so nothing runs there."""
+    frames = {"n": 0}
+    orig = live.m.run_frames
+
+    def counted(n):
+        frames["n"] += n
+        return orig(n)
+    live.m.run_frames = counted
+    try:
+        result = {}
+        for shoes in (False, True):
+            result[shoes] = []
+            for dest in ("Route 11", "Pokemon Center"):
+                live.load("vermilion")
+                live.defeat_all_trainers()
+                live.set_flag(0x82F, shoes)
+                frames["n"] = 0
+                out = ""
+                for _ in range(6):
+                    if live.r.detect_context() == GameContext.IN_BATTLE:
+                        live.c._execute("flee_battle", "{}")
+                        continue
+                    out = live.c._execute("go_to", json.dumps({"destination": dest, "force": True}))
+                    if "Arrived" in out:
+                        break
+                result[shoes].append((tuple(live.r.read_current_map()), tuple(live.r.read_player_pos()), frames["n"]))
+    finally:
+        live.m.run_frames = orig
+    for walk, run in zip(result[False], result[True]):
+        assert walk[:2] == run[:2], (walk, run)                                  # same arrival tile
+    assert result[True][0][2] < result[False][0][2] * 0.65, result               # Vermilion -> Route 11 (all outdoors): about half
+    assert result[True][1][2] < result[False][1][2], result

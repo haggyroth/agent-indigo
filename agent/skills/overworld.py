@@ -517,9 +517,10 @@ class OverworldMixin:
         for d in ("Up", "Down", "Left", "Right"):
             if d not in order:
                 order.append(d)
+        run = self._can_run(self.reader.read_current_map())          # the Running Shoes: twice the steps (so encounters) per frame
         for mv in order:
             before = self.reader.read_player_pos()
-            self.mgba.tap(mv)
+            (self.mgba.run_step if run else self.mgba.tap)(mv)
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 self._wander_dir = mv
                 return True
