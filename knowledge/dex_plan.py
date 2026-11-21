@@ -15,6 +15,7 @@ SPECIAL: dict[int, tuple[str, str]] = {
     7: ("starter: one of the three Oak offers at the start", ""),
     35: ("Game Corner prize (Celadon, coins)", ""), 63: ("Game Corner prize (Celadon, coins)", ""), 127: ("Game Corner prize (Celadon, coins)", ""),
     137: ("Game Corner prize (Celadon, coins)", ""), 147: ("Game Corner prize (Celadon, coins)", ""),
+    101: ("Power Plant: the static Electrodes (L34, one-shot — weaken without fainting, then a ball; the only wild ones are in Cerulean Cave at L58+)", "zapdos"),
     106: ("Saffron Dojo: after Master Koichi, choose ONE of Hitmonlee / Hitmonchan", "hitmon"), 107: ("Saffron Dojo: after Master Koichi, choose ONE of Hitmonlee / Hitmonchan", "hitmon"),
     129: ("Route 4 Pokémon Center salesman for ¥500 (or fishing)", "magikarp"),
     131: ("Silph Co. 7F: the worker gives a Lapras once the Rockets are gone", "silph_co"),
@@ -33,13 +34,21 @@ def name(sid: int) -> str:
     return SPECIES_NAMES.get(sid, f"#{sid}").title()
 
 
-def wild_spot(sid: int):
-    """'Route 24 (grass L8-12)' for the lowest-level wild spot of species `sid`, or None."""
+ROD_QUEST = {"old rod": "old_rod", "good rod": "good_rod", "super rod": "super_rod"}      # a spot that needs a rod: the quest that gets it
+
+
+def _wild_row(sid: int):
     rows = WILD_LOCATIONS.get(sid) or []
-    if not rows:
+    return min(rows, key=lambda r: (r[3], r[4])) if rows else None
+
+
+def wild_spot(sid: int):
+    """'Route 24 (grass L8-12)' for the lowest-level wild spot of species `sid`, or None. A fishing spot names the rod it needs ('Route 12 (super rod L15-35)')."""
+    row = _wild_row(sid)
+    if row is None:
         return None
-    bank, mid, method, lo, hi = min(rows, key=lambda r: (r[3], r[4]))
-    where = MAP_LABELS.get((bank, mid)) or MAP_NAMES.get((bank, mid)) or f"map {bank}/{mid}"
+    bank, mid, method, lo, hi = row
+    where = MAP_NAMES.get((bank, mid)) or MAP_LABELS.get((bank, mid)) or f"map {bank}/{mid}"
     return f"{where} ({method} L{lo}" + (f"-{hi}" if hi != lo else "") + ")"
 
 
@@ -47,7 +56,7 @@ def sources(sid: int, owned) -> list:
     """[(priority, text, quest)] for species `sid` — lower priority = easier now. Empty when the data knows no source."""
     out = []
     if (spot := wild_spot(sid)):
-        out.append((0, f"wild: {spot}", ""))
+        out.append((0, f"wild: {spot}", ROD_QUEST.get(_wild_row(sid)[2], "")))
     if sid in EVOLVES_FROM:
         pre, how = EVOLVES_FROM[sid]
         out.append((1 if pre in owned else 4, f"evolve {name(pre)} ({how})" + ("" if pre in owned else " — catch it first"), ""))

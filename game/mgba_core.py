@@ -31,6 +31,10 @@ _KEY_BIT = {
 # enough for the walk animation to commit a tile.
 TAP_HOLD_FRAMES = 8
 TAP_RELEASE_FRAMES = 8
+# A running step (B held with the direction): a tile takes 8 frames instead of 16. Held for under one step, so the key is up at the tile boundary and no second step starts
+# (measured: 10 presses = 10 tiles, 100 frames against 180).
+RUN_HOLD_FRAMES = 4
+RUN_RELEASE_FRAMES = 4
 IDLE_TICK_FRAMES = 6  # advanced by main loop each iteration (animations/fades)
 
 
@@ -152,6 +156,13 @@ class NativeMGBAClient:
 
     def tap(self, button: str) -> None:
         self._press(_mask([button]))
+
+    def run_step(self, button: str) -> None:
+        """One step with the Running Shoes (B held with the direction): half the frames of tap()."""
+        lib.pycore_set_keys(self._h, _mask([button, "B"]))
+        self.run_frames(RUN_HOLD_FRAMES)
+        lib.pycore_set_keys(self._h, 0)
+        self.run_frames(RUN_RELEASE_FRAMES)
 
     def hold(self, button: str, duration_frames: int) -> None:
         lib.pycore_set_keys(self._h, _mask([button]))

@@ -44,7 +44,15 @@ from game.state import GameContext                 # noqa: E402
 def test_the_autopilot_leaves_a_wild_snorlax_to_the_model():
     c = AgentClient.__new__(AgentClient)
     foe = NS(species_id=143, max_hp=143, current_hp=143)
-    c.reader = NS(read_enemy_lead=lambda: foe, detect_context=lambda: GameContext.IN_BATTLE, read_party=lambda: pytest.fail("autopilot started"))
+    c.reader = NS(read_enemy_lead=lambda: foe, detect_context=lambda: GameContext.IN_BATTLE, read_current_map=lambda: (3, 30), read_party=lambda: pytest.fail("autopilot started"))
     c.mgba = NS(read32=lambda a: 0)                                           # not a trainer battle
     c._send_next_mon = lambda: pytest.fail("autopilot started")
     c._auto_fight()                                                          # returns at once
+
+
+def test_a_static_electrode_in_the_power_plant_is_one_shot_but_a_wild_one_elsewhere_is_not():
+    from knowledge.one_shot import is_one_shot, one_shot_name, protocol
+    assert is_one_shot(101, (1, 95)) and one_shot_name(101, (1, 95)) == "Electrode"
+    assert not is_one_shot(101, (1, 72)) and not is_one_shot(101) and not is_one_shot(100, (1, 95))      # Voltorb there is ordinary wild
+    assert "ONE-SHOT: Electrode appears once" in protocol(101, 80, 80, {2: 5}, map_key=(1, 95))
+    assert protocol(101, 80, 80, {2: 5}, map_key=(1, 72)) == ""

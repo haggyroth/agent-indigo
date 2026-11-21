@@ -11,6 +11,7 @@ from agent.skills.base import log_once
 from knowledge.navigation import MAP_NAMES
 from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
+FLAG_B_DASH = 0x82F                      # FLAG_SYS_B_DASH: the Running Shoes (Oak's Aide, Pewter City)
 FLAG_SYS_ON_CYCLING_ROAD = 0x830        # SYS_FLAGS (0x800) + 0x30: set on Route 16's lower road and Routes 17-18; the game keeps you on the Bicycle there
 console = Console()
 logger = logging.getLogger(__name__)
@@ -266,6 +267,23 @@ class NavMixin:
                     "Use go_to / go_to_map to leave the map.")
         return self._walk_to(tx, ty)
 
+    # Floors where every step must be exact (boulders pushed one tile, switches, card-key doors, spinners, ice): never run there.
+    _NO_RUN_MAPS = frozenset({(1, 39), (1, 40), (1, 41), (1, 83), (1, 84), (1, 85), (1, 86), (1, 87)})        # Victory Road 1F-3F, Seafoam Islands 1F-B4F
+
+    def _can_run(self, here) -> bool:
+        """Hold B while walking? Only with the Running Shoes (FLAG_SYS_B_DASH), on foot (a bike or Surf ignore it), off the puzzle floors, and unless USE_RUNNING_SHOES=false."""
+        from config import USE_RUNNING_SHOES
+        from knowledge.map_dims import RUN_ALLOWED
+        from knowledge.puzzle_tiles import PUZZLE_TILES
+        if not USE_RUNNING_SHOES or not hasattr(self.mgba, "run_step") or tuple(here[:2]) not in RUN_ALLOWED:      # indoors B does nothing: a press is half a step, and walking reads as "stuck"
+            return False
+        if tuple(here[:2]) in self._NO_RUN_MAPS or tuple(here[:2]) in PUZZLE_TILES or self._in_puzzle:
+            return False
+        try:
+            return bool(self.reader.read_flag(FLAG_B_DASH)) and not self.reader.is_biking() and not self._surfing()
+        except Exception:
+            return False
+
     def _walk_to(self, tx: int, ty: int) -> str:
         """Deterministically walk the player to tile (tx, ty) on the current map
         via A* over the tilemap. Replans if a step is unexpectedly blocked and
@@ -417,6 +435,7 @@ class NavMixin:
                 self.mgba.tick(8)
                 continue
             saw_path = True
+            run = expected is None and not spin_dirs and self._can_run(start_map)
             for step_i, mv in enumerate(path):
                 before = self.reader.read_player_pos()
                 # Gen III turn-vs-step: the FIRST press of a direction you aren't
@@ -424,7 +443,10 @@ class NavMixin:
                 # steps. So press up to twice before deciding the tile is blocked —
                 # otherwise every corner in the path reads as an obstacle.
                 for _ in range(2):
-                    self.mgba.tap(mv)
+                    if run:
+                        self.mgba.run_step(mv)
+                    else:
+                        self.mgba.tap(mv)
                     if expected is not None:
                         self._settle_spin()          # an arrow slide ignores input until it ends
                     if self.reader.read_current_map() != start_map:

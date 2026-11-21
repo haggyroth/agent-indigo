@@ -94,6 +94,13 @@ def _header(t: Tick) -> list[str]:
         hint = MenuDriver(t.reader.client, t.reader).describe()                   # read-only
         if hint:
             out.append(f"MENU: {hint}")
+    if t.overworld:                                                                    # how the player is travelling right now
+        if _safe("biking", t.reader.is_biking, False):
+            on_road = _safe("cycling_road", lambda: bool(t.reader.read_flag(0x830)), False)         # FLAG_SYS_ON_CYCLING_ROAD
+            out.append("Travelling: riding the Bicycle (twice walking speed; " + ("the Cycling Road keeps you on it, one way: south)" if on_road
+                       else "walk_to / go_to get off it when they must; use_item('Bicycle') toggles it)"))
+        elif _safe("surfing", t.reader.is_surfing, False):
+            out.append("Travelling: surfing (walk_to / go_to_map cross water; step onto land to stop)")
     prev = t.run.prev_state
     if prev is not None:
         dx, dy = t.state.player_x - prev.player_x, t.state.player_y - prev.player_y
@@ -382,7 +389,7 @@ def _one_shot(t: Tick, enemy, move_names, pp_view) -> str:
     """The ONE-SHOT protocol for a Snorlax / legendary foe (knowledge.one_shot), and the battle-start save it promises (slot 9, once per encounter)."""
     from knowledge.leafgreen_data import MOVE_POWER
     from knowledge.one_shot import SAVE_SLOT, gentlest_move, is_one_shot, protocol
-    if not enemy or not enemy.max_hp or not is_one_shot(enemy.species_id):
+    if not enemy or not enemy.max_hp or not is_one_shot(enemy.species_id, t.map_key):
         return ""
     key = (enemy.species_id, tuple(t.map_key))
     if getattr(t.run, "one_shot_saved", None) != key:
@@ -391,7 +398,7 @@ def _one_shot(t: Tick, enemy, move_names, pp_view) -> str:
     balls = {b: n for b, n in t.reader.read_bag().items() if b in BALL_IDS}
     asleep = any(w in (enemy.status or "") for w in ("asleep", "paraly"))
     return protocol(enemy.species_id, enemy.current_hp, enemy.max_hp, balls, catch_setup_hint(move_names, pp_view),
-                    gentlest_move(move_names, pp_view, MOVE_POWER), asleep)
+                    gentlest_move(move_names, pp_view, MOVE_POWER), asleep, map_key=t.map_key)
 
 
 def _volatiles(v: dict) -> list[str]:
