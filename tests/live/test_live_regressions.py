@@ -2206,3 +2206,53 @@ def test_the_exp_share_follows_the_lowest_level_pokemon(live):
     note = live.c._maintain_exp_share() or ""
     assert "from BULBASAUR L60" in note and holder() in ("Pikachu", "Caterpie"), (note, holder())
     assert dict(live.r.read_items_pocket()).get(182, 0) == 0 and live.c._maintain_exp_share() is None      # in hand, in the right place: quiet
+
+
+def test_the_lowest_viable_pokemon_leads_outside_a_gym_and_the_strongest_inside_one(live):
+    """The ace led every fight after each grind() (a ~8-level lead that equal XP shares never closed). The travel lead is now the lowest healthy Pokémon near the top; _set_boss_lead puts the
+    strongest back in front for a gym leader / Elite Four fight. Real Start -> POKéMON -> SWITCH menus."""
+    live.load("threemon")
+    if live.r.detect_context() == GameContext.IN_BATTLE:
+        live.c._flee_battle()
+        live.m.tick(60)
+    live.patch_mon(0, None, None, level=24, exp=13824)                                      # Bulbasaur L24: the top
+    live.patch_mon(1, None, None, level=15, exp=3375)                                       # Pikachu L15
+    live.patch_mon(2, None, None, level=14, exp=2744)                                       # Caterpie L14: the lowest within 12 of the top
+    live.heal_hp()
+    names = lambda: [p.species_name for p in live.r.read_party()]  # noqa: E731
+    live.c._restore_ace_lead()
+    assert names()[0] == "Caterpie", names()
+    live.c._set_boss_lead()
+    assert names()[0] == "Bulbasaur", names()
+    live.c._restore_ace_lead()
+    assert names()[0] == "Caterpie", names()
+
+
+def test_fuchsia_to_cinnabar_goes_round_by_pallet_not_into_route_20s_walled_sea(live):
+    """A watched run: go_to('Cinnabar Island') surfed Route 19 -> Route 20's east end, answered "Reached the West edge but could not cross" three times (it was the EAST end; collision tiles seal
+    the two halves of the sea, the way across is the Seafoam cave) and then looped back round through Lavender, Vermilion and Pallet. The map graph now models the two seas, so the trip goes
+    round at once and never enters Route 20."""
+    live.load("vermilion")
+    live.patch_mon(0, moves=[19, 57, 70, 15], pps=[15, 15, 15, 30])                       # Fly, Surf, Strength, Cut
+    live.set_badges(0b11111111)
+    for f in (0x897, 0x253, 0x080, 0x23C, 0x23D, 0x2A6):                                   # Fuchsia visited, both Snorlaxes gone, the flute, Tea
+        live.set_flag(f)
+    assert live.r.read_current_map() == (3, 5)
+    out = live.c._execute("fly_to", json.dumps({"town": "Fuchsia"}))
+    assert tuple(live.r.read_current_map()) == (3, 7), out
+    live.defeat_all_trainers()
+    live.strong_lead()
+    seen, out = [], ""
+    for _ in range(80):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            live.c._execute("flee_battle", "{}")
+            if live.r.detect_context() == GameContext.IN_BATTLE:                           # Diglett's Arena Trap: no running
+                live.c._auto_fight()
+            continue
+        out = live.c._execute("go_to", json.dumps({"destination": "Cinnabar Island"}))
+        here = tuple(live.r.read_current_map())
+        if here not in seen:
+            seen.append(here)
+        if "Arrived" in out:
+            break
+    assert tuple(live.r.read_current_map()) == (3, 8) and (3, 38) not in seen and (3, 39) in seen, (seen, out)

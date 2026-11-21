@@ -5,6 +5,23 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — the ace no longer leads every fight outside a gym
+- **Why the ace kept a ~8-level lead** (read from the last 13 logged runs): it started 7 levels ahead and, after every `grind()`, `_restore_ace_lead` put the highest-level Pokémon back in slot 1 — so
+  every quest / gym-trainer / autopilot / travel fight outside `grind` was the ace's (it led 73-95% of overworld ticks in the recent runs, 2-30% in older ones). It got ~24% of the XP against ~15% for
+  each other member, and equal shares can never close a gap.
+- `knowledge.party.travel_lead`: the **lowest-level healthy attacker within 12 levels of the top** leads (a kill pays the same XP whoever lands it); the strongest only when nobody else is close or healthy.
+  `grind()` ends by setting it. `boss_lead` (the strongest healthy attacker) is set by `challenge_leader` and in each Elite Four / Champion room (`_set_boss_lead`), so bosses are still the ace's.
+- `better_matchup` breaks a full tie by the LOWER level (it picked the highest). Real menus verified: Caterpie leads after a grind, Bulbasaur for a leader, Caterpie again.
+- Not done: tag-switching in the autopilot's trainer fights (the way `grind` does for wild ones) — the next lever if the gap persists.
+
+### Fixed — Fuchsia -> Cinnabar planned a crossing that does not exist
+- **Route 20 is two seas, not one**: collision tiles (a wall at x=50-51, blocks at x=80-85 on rows 15-16 — decoded from the decomp's map.bin and confirmed by walking into them) seal its east half (Route 19's)
+  from its west corridor (Cinnabar's); the way across is the Seafoam cave. The graph had a plain West connection, so `go_to` surfed to Route 20's east end, said "Reached the West edge but could not cross" (it
+  was the EAST end) three times, and only then looped round through Lavender, Vermilion and Pallet. The graph now has separate east / west sea nodes (`knowledge/map_graph.py`, `route20_west`), so the trip goes round
+  at once (live: 18 calls, ~17 s, Route 20 never entered).
+- Not automated: the cave crossing itself (a live attempt found "no walkable path" inside B2F and ended wandering B3F); until a Seafoam driver exists the long way (or Fly to Pallet) is the route.
+- `_go_to_map` no longer says "Reached the X edge" when it never got there. The gate loop now bans maps whose Snorlax is still asleep when the region-blind fallback proposes them, and searches again.
+
 ### Added — the Exp. Share follows the lowest-level Pokémon (adaptive)
 - Once the Exp. Share is owned (Oak's Aide, Route 15's west gatehouse, 50 species caught — `quest('exp_share')`, announced in the observation's OAK'S AIDE line), `_maintain_exp_share` keeps it on the
   **lowest-level party member** and moves it as levels change: it takes the item back from the old holder (new `_take_item`: Start → POKéMON → the Pokémon → ITEM → TAKE) and gives it to the new lowest

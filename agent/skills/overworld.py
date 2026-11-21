@@ -5,6 +5,7 @@ battles, and pick up item balls. See agent.lm_studio_client.AgentClient
 from agent.skills.base import log_once
 from game.state import GameContext
 from knowledge.navigation import MAP_NAMES
+from knowledge.party import boss_lead as boss_lead_slot, travel_lead as travel_lead_slot
 from knowledge.travel_rules import no_walk_reason
 
 
@@ -886,8 +887,12 @@ class OverworldMixin:
         return False
 
     def _restore_ace_lead(self) -> None:
-        """After training: the highest-level living Pokémon goes back to slot 1 (retried — menus after an abort
-        can be mid-fade, and a dropped input must not leave a Level-7 trainee leading the party)."""
+        """After training: the TRAVEL lead goes to the front (knowledge.party.travel_lead — the lowest-level healthy Pokémon close to the top, so the ace is no longer in front of every
+        fight outside a gym; retried — menus after an abort can be mid-fade, and a dropped input must not leave a Level-7 trainee leading the party)."""
+        self._set_lead_by(travel_lead_slot)
+
+    def _set_lead_by(self, pick) -> None:
+        """Put the Pokémon `pick(party)` chooses in slot 1 (retried; never auto-plays a battle)."""
         from game.state import GameContext
         for _ in range(4):
             if self.reader.detect_context() == GameContext.IN_BATTLE:
@@ -901,14 +906,14 @@ class OverworldMixin:
                 self.mgba.tick(30)
             if self.reader.detect_context() != GameContext.OVERWORLD:
                 continue
-            party = self.reader.read_party()
-            alive = [(p.level, -i) for i, p in enumerate(party) if p.current_hp > 0]
-            if not alive:
-                return
-            best = -max(alive)[1]
-            if best == 0:
+            best = pick(self.reader.read_party())
+            if best is None or best == 0:
                 return
             self._set_lead(str(best + 1))
+
+    def _set_boss_lead(self) -> None:
+        """The strongest healthy Pokémon leads a gym leader / Elite Four fight."""
+        self._set_lead_by(boss_lead_slot)
 
     # ── grind(): resumable sessions that hand encounters to the model ─────────────────────────────
     _GRIND_MAX_BATTLES = 150          # encounters (handed over or automatic) one session may take before it reports

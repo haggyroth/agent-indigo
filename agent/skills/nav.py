@@ -813,6 +813,7 @@ class NavMixin:
         Strength, badges), look for a route that avoids it; else return (route, hint) so go_to explains
         what to get first instead of walking into a locked road. Returns (route, None) when fine."""
         from knowledge.gates import unmet_gates
+        from knowledge.gates import SNORLAX_REQ
         from knowledge.map_graph import SNORLAX_LINKS, route_to
         blocked = set(avoid)
         banned_maps: set = set()
@@ -831,10 +832,18 @@ class NavMixin:
             # and the region-blind fallback then planned straight through the other Snorlax.)
             if tuple(route[idx][2][:2]) != tuple(prev[:2]):
                 banned_maps.add(tuple(route[idx][2][:2]))
-            alt = route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps, coarse=False) \
-                or route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps)
-            if alt and any(tuple(st[2][:2]) in SNORLAX_LINKS for st in alt) and not any(st[0] == "snorlax" for st in alt):
-                alt = None             # the region-blind fallback cannot see a Snorlax in the road: it would walk into Route 12 / 16 and stall ("could not cross")
+            alt = None
+            for _try in range(4):
+                alt = route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps, coarse=False) \
+                    or route_to(cur_node, target_map, avoid_edges=blocked, avoid_maps=banned_maps)
+                if not alt or any(st[0] == "snorlax" for st in alt):
+                    break
+                # The region-blind fallback cannot see a Snorlax in the road: a plan through Route 12 / 16 with the Snorlax still asleep would stall ("could not cross"). Ban those maps and look again.
+                asleep = {tuple(st[2][:2]) for st in alt if tuple(st[2][:2]) in SNORLAX_LINKS and not self._gate_ok(SNORLAX_REQ[tuple(st[2][:2])])}
+                if not asleep:
+                    break
+                banned_maps |= asleep
+                alt = None
             if not alt:
                 return route, first_hint
             route = alt
@@ -1280,6 +1289,7 @@ class NavMixin:
                 return res
         if (msg := self._gym_puzzle(cur, approach)):
             return msg
+        self._set_boss_lead()                       # the strongest leads the leader's fight (everywhere else the lowest viable one does)
         self._walk_to(*approach)
         # Face the Leader (they stand just NORTH of the approach tile) and talk.
         for _ in range(5):
@@ -1344,6 +1354,7 @@ class NavMixin:
         # Try tiles spread along the edge (the arrival tile in the next map may be blocked —
         # e.g. Cinnabar's north coast — so neighbouring tiles all fail together).
         tried: list = []
+        reached_edge = False
         for ex, ey in edge:
             if any(abs(ex - tx) + abs(ey - ty) <= 2 for tx, ty in tried):
                 continue
@@ -1360,6 +1371,7 @@ class NavMixin:
                 return f"Interrupted while walking to the {direction} edge (context {self.reader.detect_context().name})."
             if self.reader.read_player_pos() != (ex, ey):
                 continue         # never reached this edge tile: don't mash the step key from wherever we are
+            reached_edge = True
             for _ in range(5):   # step off the edge into the connected map
                 self.mgba.tap(step)
                 if self.reader.read_current_map() != start_map:
@@ -1375,4 +1387,6 @@ class NavMixin:
                     return self._go_to_map(direction, dest)
             finally:
                 self._surf_retry = False
+        if not reached_edge:      # a watched run read "Reached the West edge" while standing at Route 20's EAST end: the sea is walled off in the middle
+            return (f"Couldn't get to the {direction} edge from {self.reader.read_player_pos()}: no walkable path to any of its tiles (something splits this map — water, a wall, a boulder).")
         return f"Reached the {direction} edge but could not cross."

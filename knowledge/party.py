@@ -143,3 +143,30 @@ def pick_shift_trainee(party, active_idx: int, foe_levels_left=()):
     fit = [(i, p) for i, p in enumerate(party)
            if i in lag and p.max_hp and p.current_hp > 0 and p.current_hp / p.max_hp >= 0.6 and p.level + TRAINEE_SLACK >= toughest]
     return max(fit, key=lambda ip: (ip[1].level, -ip[0]))[0] if fit else None
+
+
+TRAVEL_BAND = 12             # a Pokémon this close to the top level (or closer) is fine to lead the ordinary fights; further behind it is "lagging" and grind() trains it
+LEAD_HP = 0.5                # …and healthy enough to start a fight
+
+
+def _can_lead(p) -> bool:
+    return bool(getattr(p, "max_hp", 0)) and p.current_hp / p.max_hp >= LEAD_HP and can_attack(p)
+
+
+def travel_lead(party) -> int | None:
+    """Slot of the Pokémon that should LEAD outside the boss fights: the LOWEST-level healthy attacker within TRAVEL_BAND of the top level. A kill's XP is the same whoever lands it, so leading with
+    the lower level levels the team evenly; the ace was in front of every encounter after each grind() (it kept a lead of ~8 levels that equal XP shares could never close). When nobody else is
+    close enough or healthy, the strongest leads. None when nobody can fight. A tie keeps the earlier slot."""
+    able = [(i, p) for i, p in enumerate(party) if _can_lead(p)]
+    if not able:
+        return None
+    top = max(p.level for p in party)
+    close = [(i, p) for i, p in able if p.level >= top - TRAVEL_BAND]
+    pool = close or able
+    return min(pool, key=lambda ip: (ip[1].level, ip[0]))[0]
+
+
+def boss_lead(party) -> int | None:
+    """Slot of the Pokémon that should lead a gym leader / Elite Four / Champion fight: the highest-level healthy attacker (a tie keeps the earlier slot). None when nobody can fight."""
+    able = [(i, p) for i, p in enumerate(party) if _can_lead(p)]
+    return max(able, key=lambda ip: (ip[1].level, -ip[0]))[0] if able else None
