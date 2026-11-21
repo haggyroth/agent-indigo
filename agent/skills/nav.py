@@ -8,7 +8,7 @@ import logging
 from rich.console import Console
 
 from agent.skills.base import log_once
-from knowledge.navigation import MAP_NAMES
+from knowledge.navigation import MAP_NAMES, nearest_mart
 from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
 FLAG_B_DASH = 0x82F                      # FLAG_SYS_B_DASH: the Running Shoes (Oak's Aide, Pewter City)
@@ -568,7 +568,7 @@ class NavMixin:
             # to Viridian's gym (locked until 7 badges), instead of onward (#92).
             return self._resolve_next_gym()
         if kind:
-            found = nearest_of_kind(cur, kind)
+            found = nearest_mart(cur) if kind == "mart" else nearest_of_kind(cur, kind)
             if not found:
                 return None, f"No {dest} reachable from here."
             target_map = found[0]

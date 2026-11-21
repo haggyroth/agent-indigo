@@ -209,3 +209,48 @@ def test_heal_travels_in_flee_mode():
     c._go_to = lambda d, mode="yield", **kw: modes.append(mode) or "Stopped"
     c._heal()
     assert modes == ["flee"]
+
+
+# ── flee_battle must back out of the FIGHT move menu and honour the later-turn action-menu value
+#    (the 2026-11-21 chain: a zero-PP move picked -> "There's no PP left" -> 2,466 failed flees)
+
+class _Menu(_Fake):
+    def __init__(self, ctrl):
+        super().__init__(GameContext.IN_BATTLE)
+        self.ctrl, self.acts = ctrl, []
+
+    def read32(self, addr):
+        return self.ctrl if addr == Addr.BATTLE_CTRL_FUNC else 0
+
+    def write8(self, addr, v):
+        self.acts.append(("write", addr, v))
+
+    def hold(self, b, n):
+        self.acts.append(("hold", b))
+        if b == "A" and any(a[0] == "write" and a[2] == Addr.ACTION_RUN for a in self.acts):
+            self.ctx = GameContext.OVERWORLD       # the escape worked
+
+    def tick(self, n):
+        pass
+
+
+def _menu_client(ctrl):
+    f = _Menu(ctrl)
+    c = AgentClient.__new__(AgentClient)
+    c.reader = c.mgba = f
+    c._wait_idle = lambda: None
+    c._battle_trapped = lambda: False
+    return c, f
+
+
+def test_flee_presses_b_in_the_move_menu_never_a():
+    c, f = _menu_client(Addr.CTRL_CHOOSE_MOVE)
+    assert "Couldn't get away" in c._flee_battle()
+    holds = [a[1] for a in f.acts if a[0] == "hold"]
+    assert holds and set(holds) == {"B"}            # A would re-pick the zero-PP move forever
+
+
+def test_flee_runs_from_the_later_turn_action_menu():
+    c, f = _menu_client(Addr.CTRL_CHOOSE_ACTION_ALT)
+    assert "Got away" in c._flee_battle()
+    assert ("write", Addr.ACTION_CURSOR, Addr.ACTION_RUN) in f.acts

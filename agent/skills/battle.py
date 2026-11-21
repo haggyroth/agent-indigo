@@ -347,9 +347,14 @@ class BattleMixin:
             if self.reader.detect_context() != GameContext.IN_BATTLE:
                 return "Got away safely — fled the wild battle."
             self._wait_idle()
-            if self.mgba.read32(Addr.BATTLE_CTRL_FUNC) in (Addr.CTRL_CHOOSE_ACTION, *Addr.SAFARI_MENU):
+            ctrl = self.mgba.read32(Addr.BATTLE_CTRL_FUNC)
+            if ctrl in (Addr.CTRL_CHOOSE_ACTION, Addr.CTRL_CHOOSE_ACTION_ALT, *Addr.SAFARI_MENU):
                 self.mgba.write8(Addr.ACTION_CURSOR, Addr.ACTION_RUN)   # select RUN
                 self.mgba.hold("A", 20)                                 # commit
+            elif ctrl == Addr.CTRL_CHOOSE_MOVE:
+                # The FIGHT move menu is up (a zero-PP move was picked: "There's no PP left for this move!"
+                # — the 2026-11-21 chain's 2,466-call loop). A would re-pick a move; B backs out to the action menu.
+                self._battle_press("B")
             else:
                 self._battle_press("A")   # advance intro / result / escape text
         if self.reader.detect_context() != GameContext.IN_BATTLE:

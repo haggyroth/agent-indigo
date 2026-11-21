@@ -147,3 +147,16 @@ def test_chain_policy_levels_the_team_before_victory_road_then_goes_in():
     p.stall, p._pending, p._fails, p._skip_heal, p._prepped, p.history = "", "", [], 0, False, ["grind({})"]
     p.on_result("Party is balanced (nobody under L40, the floor for this stage): Charizard L50")
     assert p._prepped is True
+
+
+def test_chain_policy_teaches_fly_once_hm02_is_in_hand():
+    """The League is a dead end on foot (no grass, Victory Road behind): once HM02 is owned, a Pokémon that can learn Fly gets it — once."""
+    from agent.scripted_policy import ChainPolicy
+    from game.state import PokemonStatus
+    flags = {0x238: True}
+    pidgeot = PokemonStatus(slot=0, level=40, current_hp=30, max_hp=30, status="healthy", species_id=18, species_name="Pidgeot", move_names=["Gust"], pp=[30])
+    p = ChainPolicy.__new__(ChainPolicy)
+    p._fly_taught = False
+    p.r = SimpleNamespace(read_flag=lambda f: flags.get(f, False), read_badges=lambda: (8, 255), read_party=lambda: [pidgeot])
+    assert p._teach_fly() == ("teach_move", {"tm": "Fly", "pokemon": "Pidgeot"})
+    assert p._teach_fly() is None                       # one try only

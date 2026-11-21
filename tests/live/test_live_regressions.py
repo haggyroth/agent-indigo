@@ -2289,3 +2289,12 @@ def test_leaving_cinnabars_gym_after_blaine_declines_bills_one_island_offer(live
     assert here[0] != 32 and here != (3, 12), f"sailed to One Island: {here} / {out}"
     assert out.startswith("Arrived") and here == (12, 5), (here, out)
     assert live.r.read_var(0x4071) == 2                      # Bill 'will wait in the Pokémon Center'
+
+
+def test_flee_battle_escapes_when_the_move_menu_is_the_screen(live):
+    """The 2026-11-21 chain sat 2,466 calls on 'There's no PP left for this move!': flee_battle pressed A in the FIGHT menu (re-picking the zero-PP Surf) instead of backing out to RUN.
+    The fixture is that exact wild Spearow battle (Lapras, every attacking move at 0 PP)."""
+    live.load("zeropp_move_menu")
+    assert live.r.detect_context() == GameContext.IN_BATTLE
+    out = live.c._execute("flee_battle", "{}")
+    assert "Got away" in out and live.r.detect_context() != GameContext.IN_BATTLE, out
