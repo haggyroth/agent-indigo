@@ -236,9 +236,18 @@ class MenuDriver:
             if c == GameContext.IN_MENU and self.choice_live():
                 return (f"A choice/menu is waiting (cursor {self.menu_cursor()}). "
                         f"answer_prompt('yes'/'no') for Yes/No, or navigate it.")
+            if self._optional_battle_party_screen():
+                self.mgba.tap("B"); pressed += 1            # the trainer's "Will you change Pokémon?" opened the party screen: A on the lead does nothing — B declines
+                self.mgba.tick(25)
+                continue
             self.mgba.tap("A"); pressed += 1
             self.mgba.tick(25)
         return f"Dialogue still open after {pressed} presses (state={self.ctx().name})."
+
+    def _optional_battle_party_screen(self) -> bool:
+        """The party screen is up inside a live battle but nothing forces a pick (the SHIFT prompt before the foe's next Pokémon): a chain run pressed A on it 4,700 times."""
+        return (self.mgba.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_PARTY_MENU and self.mgba.read8(Addr.BATTLE_OUTCOME) == 0
+                and bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS)) and not forced_party_screen(self.mgba, self.reader))
 
     def close_menus(self, max_presses: int = 14) -> str:
         """Back out of every menu/prompt/dialogue to the free field with B."""

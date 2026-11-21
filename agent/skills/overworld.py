@@ -17,6 +17,9 @@ def _safe_call(fn, default=None):
         return default
 
 
+_VICTORY_ROAD = {(1, 39), (1, 40), (1, 41)}          # 1F / 2F / 3F: a cave with no Pokémon Center
+
+
 class OverworldMixin:
 
 
@@ -155,10 +158,22 @@ class OverworldMixin:
         from knowledge.map_graph import MAP_KIND
         if not force and not self._party_needs_heal():
             return "Party is already at full HP and PP — no need to heal."
+        # Inside Victory Road no Center is reachable (the way out south needs Surf over Route 23, the way on is the puzzle itself): a go_to from there only
+        # wandered the cave pushing boulders out of place (chain run 8). Heal from the Bag and push on.
+        if tuple(self.reader.read_current_map()) in _VICTORY_ROAD:
+            used = self._field_heal()
+            if used:
+                return f"Victory Road has no Pokémon Center — healed from the Bag instead: {', '.join(used)}."
+            return ("Victory Road has no Pokémon Center and the Bag has nothing to heal with — push on to the Indigo Plateau Center "
+                    "(quest('victory_road') resumes) instead of walking back.")
         # Get inside a Pokémon Center first (resumable travel).
         if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
             res = self._go_to("Pokemon Center", mode="flee", resume_call="heal()")
             if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
+                if "blocked" in res or "stuck at" in res or "Can't reach" in res:
+                    used = self._field_heal()          # no Center reachable from here (a cave, a Surf gap): the Bag has to do
+                    if used:
+                        return f"No Pokémon Center is reachable from here ({res}) — healed from the Bag instead: {', '.join(used)}."
                 return f"On the way to a Pokémon Center to heal: {res}"
         # Walk to the nurse's counter and face her.
         nx, ny = self._nurse_tile()
@@ -610,6 +625,16 @@ class OverworldMixin:
         from knowledge.grind_routes import best_grass
         if level is None:
             level = (self._grind_run or {}).get("lvl") or 0
+        # From the Indigo Plateau or inside Victory Road the road back south is the cave's puzzle run in reverse (and Route 23's Surf gap): chain run 10 got wedged on
+        # Victory Road 2F looking for grass. Fly out instead when someone can.
+        if tuple(self.reader.read_current_map()) in (_VICTORY_ROAD | {(3, 9)}):
+            from knowledge.team import hm_status
+            try:
+                knower, _cap = hm_status(self.reader.read_party(), "Fly")
+                if knower and self.reader.read_badges()[1] >> 2 & 1 and self.reader.detect_context() == GameContext.OVERWORLD:
+                    self._fly_to("Viridian")
+            except Exception:
+                log_once("overworld._relocate_to_grass.fly", "overworld._relocate_to_grass: fly-out failed (walking instead)")
         bank, mid = self.reader.read_current_map()
         self._gate_why = ""                                 # only the reasons from THIS search may be told to the model
         # Routes whose way in already beat us twice are off the list for the whole session.

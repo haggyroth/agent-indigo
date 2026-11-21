@@ -88,3 +88,62 @@ def test_a_forced_replacement_reads_in_menu_and_is_answered_with_switch_pokemon_
     monkeypatch.setattr(gm, "forced_party_screen", lambda m, r: True)
     party = [mon(30, hp=0), mon(30)]
     assert policy(GameContext.IN_MENU, party).decide() == ("switch_pokemon", {"target": "2"})
+
+
+def test_chain_policy_grinds_when_a_quest_says_train_first_not_repeating_the_quest():
+    """Chain run 6: after a gym blackout quest() answers 'train first — grind()'; the bot re-called quest 40x until the stall fired."""
+    from agent.scripted_policy import ChainPolicy
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.stall, p._pending, p._fails, p._skip_heal, p.history = "", "", [], 0, []
+    p.on_result("You blacked out in this gym when your team's levels totalled 240 (now 240). Don't walk back into the same fight: train first — grind() with no level lifts the weaker members")
+    assert p._pending == "grind"
+
+
+def test_chain_policy_grinds_before_shopping_when_a_quest_wants_both():
+    """Run 9: the Elite Four's not-ready asked for levels AND Potions; shopping first meant the second quest() went anyway at L53 / L40."""
+    from agent.scripted_policy import ChainPolicy
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.stall, p._pending, p._fails, p._skip_heal, p.history = "", "", [], 0, []
+    p.on_result("Not ready for quest('elite_four'): your best Pokémon is L53 (L54 recommended). grind() with no level lifts the weaker members; and only 0 Potions / Restores in the bag (12 recommended) — shop() for Potions. Call quest('elite_four') again to go anyway.")
+    assert p._pending == "grind"
+
+
+def test_a_forced_replacement_reading_transitioning_is_answered_too(monkeypatch):
+    """Run 10: the forced party screen read TRANSITIONING in the Elite Four room; advance_dialog ran 3,800 times."""
+    import game.menu as gm
+    monkeypatch.setattr(gm, "forced_party_screen", lambda m, r: True)
+    party = [mon(30, hp=0), mon(30)]
+    assert policy(GameContext.TRANSITIONING, party).decide() == ("switch_pokemon", {"target": "2"})
+
+
+def test_advance_dialog_declines_the_optional_party_screen_with_b_not_a():
+    """Run 11: the SHIFT prompt opened the party screen mid-battle; advance_dialog pressed A (does nothing) 4,700 times."""
+    from game.constants import Addr
+    from game.menu import MenuDriver as Menus
+    from types import SimpleNamespace as NS
+
+    taps = []
+    state = {"cb2": Addr.CB2_PARTY_MENU}
+    mgba = NS(read32=lambda a: {Addr.GMAIN_CALLBACK2: state["cb2"], Addr.BATTLE_TYPE_FLAGS: 8}.get(a, 0), read8=lambda a: 0,
+              tick=lambda n: None)
+
+    def tap(b):
+        taps.append(b)
+        if b == "B":
+            state["cb2"] = Addr.CB2_BATTLE
+    mgba.tap = tap
+    reader = NS(read_active_battle_species=lambda: 6, read_active_battle_hp=lambda: 100)
+    menus = Menus.__new__(Menus)
+    menus.mgba, menus.reader = mgba, reader
+    menus.ctx = lambda: GameContext.IN_BATTLE if state["cb2"] == Addr.CB2_BATTLE else GameContext.TRANSITIONING
+    out = menus.advance_dialog()
+    assert taps == ["B"] and "battle" in out.lower()
+
+
+def test_chain_policy_levels_the_team_before_victory_road_then_goes_in():
+    """The Plateau has no grass and no way back that does not cross the cave: the weak members are trained BEFORE Victory Road."""
+    from agent.scripted_policy import ChainPolicy
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.stall, p._pending, p._fails, p._skip_heal, p._prepped, p.history = "", "", [], 0, False, ["grind({})"]
+    p.on_result("Party is balanced (nobody under L40, the floor for this stage): Charizard L50")
+    assert p._prepped is True

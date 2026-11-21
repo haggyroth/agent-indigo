@@ -66,11 +66,12 @@ class ScriptedPolicy:
         ctx = self.r.detect_context()
         if ctx == GameContext.IN_BATTLE:
             return self._battle()
-        if ctx == GameContext.IN_MENU:
+        if ctx != GameContext.OVERWORLD:
             from game.menu import forced_party_screen
-            if forced_party_screen(self.m, self.r):         # a faint's forced replacement reads IN_MENU: B does nothing, pick someone
+            if forced_party_screen(self.m, self.r):         # a faint's forced replacement reads IN_MENU or TRANSITIONING: B / A do nothing, pick someone
                 ok = [i for i, p in enumerate(self.r.read_party()) if p.current_hp > 0]
                 return "switch_pokemon", {"target": str((ok or [0])[0] + 1)}
+        if ctx == GameContext.IN_MENU:
             return "close_menus", {}
         if ctx == GameContext.DIALOG_OPEN:
             return "advance_dialog", {}
@@ -136,7 +137,7 @@ class ChainPolicy(ScriptedPolicy):
     STALL_REPEATS = 3                 # the same failure text this many times in a row = a stall
     STALL_CALLS = 40                  # calls spent on one beat with no new badge / key item / map progress
 
-    NOT_READY = ("Not ready for quest", "lopsided", "likely lose", "under-levelled", "Your highest-level Pokémon is L", "Call grind")
+    NOT_READY = ("Not ready for quest", "lopsided", "likely lose", "under-levelled", "Your highest-level Pokémon is L", "Call grind", "train first", "grind()")
     NEEDS_HEAL = ("heal()", "Call heal", "must-heal", "Not travelling yet")
     NEEDS_SHOP = ("shop()", "Potions / Restores in the bag", "Revives in the bag")
 
@@ -145,19 +146,29 @@ class ChainPolicy(ScriptedPolicy):
         self.stall: str = ""
         self._pending = ""             # what the last result asked for: "grind" | "heal" | "shop" | ""
         self._fails: list[str] = []
+        self._prepped = False          # the team was levelled BEFORE Victory Road (past it there is no grass to train on: Plateau → back through the cave)
+        self._skip_heal = 0            # decisions to go on WITHOUT healing after a heal that could not (a cave with no Center, an empty Bag)
         self._calls_on: dict[str, int] = {}
         self._progress: dict = {}
+        self._maps_seen: dict[str, set] = {}
 
     def on_result(self, result: str) -> None:
         low = result
         self._pending = ""
+        if self.history and self.history[-1].startswith("heal(") and low.startswith(("Victory Road has no", "On the way to a Pokémon Center to heal", "No Pokémon Center is reachable")) and "healed from the Bag" not in low:
+            self._skip_heal = 6
+            return
         if any(k in low for k in self.NEEDS_HEAL) and "Healed" not in low:
             self._pending = "heal"
+        elif "grind(" in low and "Not ready for quest" in low:
+            self._pending = "grind"          # levels first: a not-ready that asks for BOTH (levels and Potions) went shopping, then charged the Elite Four at L53 / L40 and blacked out 5x
         elif any(k in low for k in self.NEEDS_SHOP):
             self._pending = "shop"
         elif any(k in low for k in self.NOT_READY):
             self._pending = "grind"
         failed = any(k in low for k in ("Can't reach", "Can't get to", "No route", "stuck at", "No walkable path", "couldn't", "Couldn't", "isn't working", "was stopped"))
+        if self.history and self.history[-1].startswith("grind(") and low.startswith(("Party is balanced", "Your best Pokémon is already", "No tall grass", "Not worth", "Training isn't")):
+            self._prepped = True
         self._fails = (self._fails + [low[:160]] if failed else [])[-self.STALL_REPEATS:]
         if len(self._fails) >= self.STALL_REPEATS and len(set(self._fails)) == 1 and not self.stall:
             self.stall = f"{self._beat_key() or '?'}: {self._fails[-1]}"
@@ -173,8 +184,12 @@ class ChainPolicy(ScriptedPolicy):
         ready = [b for b in next_beats(self._status()) if b.driver]
         return ready[0].key if ready else ""
 
-    def _progress_sig(self):
-        return (self.r.read_badges()[0], len(self.r.read_key_items()), tuple(self.r.read_current_map()), sum(p.level for p in self.r.read_party()))
+    def _progress_sig(self, key: str = ""):
+        """What counts as progress on a beat: a badge, a key item, a level, or a map not yet visited FOR THIS BEAT — not merely a different map (a heal trip that
+        bounces between two maps forever changed the old signature every call and hid a 2,800-call loop)."""
+        seen = self._maps_seen.setdefault(key, set())
+        seen.add(tuple(self.r.read_current_map()))
+        return (self.r.read_badges()[0], len(self.r.read_key_items()), len(seen), sum(p.level for p in self.r.read_party()))
 
     def decide(self):
         from game.state import GameContext
@@ -186,13 +201,15 @@ class ChainPolicy(ScriptedPolicy):
         from knowledge.readiness import blocking
         key = self._beat_key()
         if key:                                         # count EVERY call against the beat (a heal / shop / grind loop that goes nowhere is a stall too)
-            sig = self._progress_sig()
+            sig = self._progress_sig(key)
             if self._progress.get(key) != sig:
                 self._progress[key], self._calls_on[key] = sig, 0
             self._calls_on[key] = self._calls_on.get(key, 0) + 1
             if self._calls_on[key] > self.STALL_CALLS and not self.stall:
                 self.stall = f"{key}: {self.STALL_CALLS} calls with no new badge, key item, map or level (last: {self.last_result[:160]})"
-        if blocking(self.c._readiness()) or self._pending == "heal":
+        if self._skip_heal > 0:
+            self._skip_heal -= 1
+        elif blocking(self.c._readiness()) or self._pending == "heal":
             self._pending = ""
             return "heal", {}
         if self._pending == "shop":
@@ -203,6 +220,8 @@ class ChainPolicy(ScriptedPolicy):
             return "grind", {}
         if not key:
             return "wait_frames", {"frames": 30}
+        if key == "victory_road" and not self._prepped and tuple(self.r.read_current_map()) not in {(1, 39), (1, 40), (1, 41), (3, 9)}:
+            return "grind", {}                          # level the weakest on Routes 22 / 23 first: the Elite Four wants five Pokémon near L46+ and the Plateau has no grass
         return "quest", {"name": key, "auto_trainers": True}
 
 
