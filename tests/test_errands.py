@@ -67,10 +67,11 @@ def test_the_itemfinder_and_exp_share_aides_count_species_caught():
 
 def test_the_exp_share_goes_to_the_pokemon_that_lags():
     c = client(caught=60)
-    party = [NS(level=40, nickname="", species_name="Ace", held_item=0, max_hp=100), NS(level=12, nickname="Tiny", species_name="Rattata", held_item=0, max_hp=30)]
+    party = [NS(level=40, nickname="", species_name="Ace", held_item=0, max_hp=100, personality=1), NS(level=12, nickname="Tiny", species_name="Rattata", held_item=0, max_hp=30, personality=2)]
     c.reader.read_party = lambda: party
+    c.reader.read_items_pocket = lambda: [(182, 1)]
     c._gift_errand = lambda *a, **k: None
     gave = []
     c._give_item = lambda item, who: (gave.append((item, who)), "Tiny now holds it.")[1]
     out = c._get_exp_share()
-    assert gave == [("Exp. Share", "Tiny")] and "Got the Exp. Share" in out and "Tiny now holds it" in out         # the L12, not the L40 ace
+    assert gave == [("Exp. Share", "Tiny")] and "Got the Exp. Share" in out and "Exp. Share → Tiny" in out         # the L12, not the L40 ace

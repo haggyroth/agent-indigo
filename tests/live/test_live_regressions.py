@@ -2187,3 +2187,22 @@ def test_running_with_the_shoes_halves_the_frames_and_lands_on_the_same_tiles(li
         assert walk[:2] == run[:2], (walk, run)                                  # same arrival tile
     assert result[True][0][2] < result[False][0][2] * 0.65, result               # Vermilion -> Route 11 (all outdoors): about half
     assert result[True][1][2] < result[False][1][2], result
+
+
+def test_the_exp_share_follows_the_lowest_level_pokemon(live):
+    """Adaptive Exp. Share on the real ROM: with one in the Bag the lowest-level Pokémon is given it (Bag -> GIVE -> party); when that Pokémon levels past the others the upkeep TAKES it back (party
+    -> ITEM -> TAKE, even for a Pokémon whose sub-menu has field moves in front) and gives it to the new lowest."""
+    live.load("threemon")
+    if live.r.detect_context() == GameContext.IN_BATTLE:
+        live.c._flee_battle()
+        live.m.tick(60)
+    live.patch_mon(0, [15, 70, 33, 22], [30, 15, 35, 25], level=3, exp=27)                 # Bulbasaur L3 knowing Cut + Strength: the lowest, with field moves in its menu
+    live.give_item(182)
+
+    def holder():
+        return next((p.species_name for p in live.r.read_party() if p.held_item == 182), None)
+    assert "Exp. Share → BULBASAUR L3" in (live.c._maintain_exp_share() or "") and holder() == "Bulbasaur"
+    live.patch_mon(0, None, None, level=60, exp=211060)                                    # it outlevels the rest
+    note = live.c._maintain_exp_share() or ""
+    assert "from BULBASAUR L60" in note and holder() in ("Pikachu", "Caterpie"), (note, holder())
+    assert dict(live.r.read_items_pocket()).get(182, 0) == 0 and live.c._maintain_exp_share() is None      # in hand, in the right place: quiet
