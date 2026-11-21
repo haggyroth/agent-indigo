@@ -137,6 +137,8 @@ class ChainPolicy(ScriptedPolicy):
     STALL_REPEATS = 3                 # the same failure text this many times in a row = a stall
     STALL_CALLS = 40                  # calls spent on one beat with no new badge / key item / map progress
 
+    OPTIONAL_WANTED = ("fly",)        # optional beats the chain takes anyway: HM02 Fly is the only way back from the Indigo Plateau (no grass there, Victory Road behind)
+
     NOT_READY = ("Not ready for quest", "lopsided", "likely lose", "under-levelled", "Your highest-level Pokémon is L", "Call grind", "train first", "grind()")
     NEEDS_HEAL = ("heal()", "Call heal", "must-heal", "Not travelling yet")
     NEEDS_SHOP = ("shop()", "Potions / Restores in the bag", "Revives in the bag")
@@ -146,6 +148,7 @@ class ChainPolicy(ScriptedPolicy):
         self.stall: str = ""
         self._pending = ""             # what the last result asked for: "grind" | "heal" | "shop" | ""
         self._fails: list[str] = []
+        self._fly_taught = False       # HM02 Fly was offered to a Pokémon (once: a refusal must not loop)
         self._prepped = False          # the team was levelled BEFORE Victory Road (past it there is no grass to train on: Plateau → back through the cave)
         self._skip_heal = 0            # decisions to go on WITHOUT healing after a heal that could not (a cave with no Center, an empty Bag)
         self._calls_on: dict[str, int] = {}
@@ -181,8 +184,26 @@ class ChainPolicy(ScriptedPolicy):
 
     def _beat_key(self) -> str:
         from knowledge.story_beats import next_beats
-        ready = [b for b in next_beats(self._status()) if b.driver]
+        ready = [b for b in next_beats(self._status(), include_optional=True) if b.driver and (not b.optional or b.key in self.OPTIONAL_WANTED)]
         return ready[0].key if ready else ""
+
+    def _teach_fly(self):
+        """Once HM02 is in the Bag and the Thunder Badge is won, teach Fly to a Pokémon that can learn it (one try): the move that gets the team out of the League's dead end."""
+        if self._fly_taught or not self.r.read_flag(0x238) or not self.r.read_badges()[1] >> 2 & 1:
+            return None
+        from knowledge.tmhm import HM_MOVES, ITEM_HM01
+        from knowledge.tmhm_learnsets import can_learn
+        party = self.r.read_party()
+        if any("Fly" in (p.move_names or []) for p in party):
+            self._fly_taught = True
+            return None
+        iid = ITEM_HM01 + HM_MOVES.index("Fly")
+        able = [p for p in party if can_learn(p.species_id, iid)]
+        self._fly_taught = True
+        if not able:
+            return None
+        mon = min(able, key=lambda p: p.level)          # the weakest able member: its fourth move matters least
+        return "teach_move", {"tm": "Fly", "pokemon": mon.species_name}
 
     def _progress_sig(self, key: str = ""):
         """What counts as progress on a beat: a badge, a key item, a level, or a map not yet visited FOR THIS BEAT — not merely a different map (a heal trip that
@@ -218,6 +239,8 @@ class ChainPolicy(ScriptedPolicy):
         if self._pending == "grind":
             self._pending = ""
             return "grind", {}
+        if (teach := self._teach_fly()):
+            return teach
         if not key:
             return "wait_frames", {"frames": 30}
         if key == "victory_road" and not self._prepped and tuple(self.r.read_current_map()) not in {(1, 39), (1, 40), (1, 41), (3, 9)}:

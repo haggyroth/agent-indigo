@@ -17,6 +17,17 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 
+def nearest_mart(cur):
+    """The nearest place to SHOP: a Mart, or a Pokémon Center with a clerk of its own (the Indigo Plateau's) — whichever the route reaches first. The map graph has one kind per
+    map, so the Plateau's Center was only ever a Center and a shop() from the League walked back through Victory Road to Viridian's Mart."""
+    from knowledge.map_graph import nearest_of_kind
+    from knowledge.shop_stock import SHOPS
+    mart, center = nearest_of_kind(cur, "mart"), nearest_of_kind(cur, "pokecenter")
+    if center and (center[0] in {(b, m) for b, m, *_ in SHOPS}) and (mart is None or len(center[1]) < len(mart[1])):
+        return center
+    return mart
+
+
 class NavMixin:
     # go_to stall detection: consecutive travel calls that end at the same map
     # without arriving. The "call go_to again" resume message loops the agent
@@ -568,7 +579,7 @@ class NavMixin:
             # to Viridian's gym (locked until 7 badges), instead of onward (#92).
             return self._resolve_next_gym()
         if kind:
-            found = nearest_of_kind(cur, kind)
+            found = nearest_mart(cur) if kind == "mart" else nearest_of_kind(cur, kind)
             if not found:
                 return None, f"No {dest} reachable from here."
             target_map = found[0]
