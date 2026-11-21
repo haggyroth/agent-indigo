@@ -449,6 +449,14 @@ def _supplies(t: Tick) -> list[str]:
         rec = shopping_summary(bag, t.ltm.data["badges_earned"], money)
         if rec:
             out.append("MART — " + rec + ". Call shop() to buy the recommended restock automatically.")
+    if t.here == (3, 6) or t.here[0] == 10:                    # Celadon City / its Dept. Store: the only place that sells evolution stones (4F)
+        from knowledge.shop_stock import ITEM_LABELS, PRICES
+        from knowledge.shopping import stone_wants
+        wants = _safe("stone_wants", lambda: stone_wants(state.party, bag, money, reserve=3000), [])
+        if wants:
+            out.append("STONES — the Dept. Store (4F) sells evolution stones: " + "; ".join(
+                f"{ITEM_LABELS[sid]} ¥{PRICES[sid]} → {who} evolves into {into}" for sid, who, into in wants[:3])
+                + ". shop(item='<stone>') buys it, then use_item('<stone>', '<pokemon>') evolves it.")
     if t.here in (GAME_CORNER, PRIZE_ROOM) and r.read_flag(COIN_CASE[1]):
         coins = r.read_coins()
         buys = [f"{p.name} ({p.coins})" for p in PRIZES if p.coins <= coins]

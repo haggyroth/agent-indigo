@@ -194,6 +194,22 @@ class TilemapReader:
         behind it and a single press in that direction hops 2 tiles over it."""
         return self._LEDGE_DIRS.get(self.metatile_behavior(x, y))
 
+    # Warps that fire on a PRESS while you stand on the tile, not on stepping onto it (field_control_avatar.c TryArrowWarp): the arrow warps (MB_EAST/WEST/NORTH/SOUTH_ARROW_WARP
+    # 0x62-0x65) take their own direction, the directional stairs (MB_UP/DOWN_RIGHT/LEFT_STAIR_WARP 0x6C-0x6F) East or West.
+    _WARP_PRESS = {0x62: "Right", 0x63: "Left", 0x64: "Up", 0x65: "Down", 0x6C: "Right", 0x6D: "Left", 0x6E: "Right", 0x6F: "Left"}
+
+    def warp_press(self, x: int, y: int) -> str | None:
+        """The D-pad direction to press while standing on warp tile (x, y) for it to fire (a staircase, an arrow mat), or None for an ordinary door / mat that fires on entry."""
+        return self._WARP_PRESS.get(self.metatile_behavior(x, y))
+
+    # MB_CAVE_DOOR .. MB_DOWN_LEFT_STAIR_WARP (0x60-0x6F: cave door, ladder, arrow warps, fall / regular / door warps, escalators, directional stairs) and MB_UNION_ROOM_WARP:
+    # a map's warp EVENT list also holds tiles that sit on plain floor or wall (the Celadon Dept. Store's 1F lists (1,15) and (3,15) beside the real exit (2,14)).
+    _REAL_WARP_BEHAVIORS = frozenset(range(0x60, 0x70)) | {0x71}
+
+    def is_real_warp(self, x: int, y: int) -> bool:
+        """True when the metatile at (x, y) is one the game actually warps from (a door, arrow mat, stairs, ladder …) — not just a warp-event coordinate."""
+        return self.metatile_behavior(x, y) in self._REAL_WARP_BEHAVIORS
+
     _SPIN_ARROWS = frozenset({0x54, 0x55, 0x56, 0x57})          # MB_SPIN_RIGHT / LEFT / UP / DOWN (Silph Co., Rocket Hideout, Viridian Gym)
 
     _SPIN_DIRS = {0x54: "Right", 0x55: "Left", 0x56: "Up", 0x57: "Down"}

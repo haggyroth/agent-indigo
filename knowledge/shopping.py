@@ -173,3 +173,112 @@ def approach_options(clerk: tuple, passable, reachable=None) -> list[tuple]:
         elif not passable(*near) and reachable(*far):
             out.append((far, face))
     return out
+
+
+# ── the best of what THIS mart sells, and stocking up with spare money ──────────────────────────────────────────────
+# BUY_POLICY above picks tiers by badge count, which is a guess about the mart: a Mart that sells Ultra Balls at 3 badges still got Great Balls, and a rich
+# player (¥26,000, 17 balls, 1 Potion — a watched run) carried the same par of 10 as a broke one. This plan reads what the open buy menu actually lists.
+BALL_TIERS = (2, 3, 4)               # Ultra, Great, Poké — best first
+HEAL_TIERS = (19, 20, 21, 22, 13)    # Full Restore, Max Potion, Hyper, Super, Potion
+FULL_HEAL, REVIVE = 23, 24
+CURES = (14, 18, 17, 15, 16)         # Antidote, Paralyze Heal, Awakening, Burn Heal, Ice Heal
+# par (what it keeps in the bag) and stock-up par (what it keeps when there is spare money), by item: the dearer the item, the fewer
+BASE_PAR = {2: 10, 3: 10, 4: 10, 19: 3, 20: 4, 21: 6, 22: 8, 13: 8, 23: 5, 24: 2, 14: 2, 18: 2, 17: 2, 15: 1, 16: 1}
+STOCK_PAR = {2: 25, 3: 25, 4: 25, 19: 5, 20: 6, 21: 10, 22: 15, 13: 15, 23: 10, 24: 5}
+# the most of the budget each family may take in the base pass, so a ball tier cannot eat the potion money
+FAMILY_SHARE = {"ball": 0.4, "heal": 0.5, "full_heal": 0.25, "revive": 0.25, "cure": 0.1}
+UPGRADE_HALF_PARS = 0.5              # a better tier is chosen once its budget covers this share of its par
+STOCK_UP_FLOOR = 3000                # spare yen (after the base par) before it stocks up beyond par
+STOCK_UP_SHARE = 0.6                 # …and it spends this share of the spare yen on the extra stock
+
+
+def best_tier(tiers, sold, money: int) -> int | None:
+    """The best item of `tiers` (best first) that the mart sells and that `money` covers UPGRADE_HALF_PARS of its par of; else the cheapest tier it sells."""
+    from knowledge.shop_stock import PRICES
+    offered = [t for t in tiers if t in sold and PRICES.get(t)]
+    for t in offered:
+        if money >= PRICES[t] * max(1, int(BASE_PAR[t] * UPGRADE_HALF_PARS)):
+            return t
+    return offered[-1] if offered else None
+
+
+def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reserve: int = 0) -> dict:
+    """What to buy at a mart whose buy menu lists `sold` (item ids): the best ball and healing tier it has that the money supports, up to par (priority order, each
+    family within its share of the money), then — with spare yen beyond that — extra stock (more balls and potions, Revives, Full Heals). Returns the shape of
+    compute_shopping_list plus "missing": better items a different mart sells, as names."""
+    from knowledge.shop_stock import PRICES, SHOPS
+    sold = set(sold)
+    budget = max(0, money - reserve)
+    ball = best_tier(BALL_TIERS, sold, budget * FAMILY_SHARE["ball"])
+    heal = best_tier(HEAL_TIERS, sold, budget * FAMILY_SHARE["heal"])
+    wants: list[tuple[int, str]] = []                       # (item id, family) in priority order
+    if ball:
+        wants.append((ball, "ball"))
+    if heal:
+        wants.append((heal, "heal"))
+    if badges >= 4 and FULL_HEAL in sold:
+        wants.append((FULL_HEAL, "full_heal"))
+    elif badges < 4:
+        wants += [(c, "cure") for c in CURES if c in sold]
+    if badges >= 4 and REVIVE in sold:
+        wants.append((REVIVE, "revive"))
+    spent = 0
+    got: dict[int, int] = {}                                 # item id -> quantity planned (the base pass and the stock-up pass add to one line)
+
+    def stock_of(item_id: int) -> float:
+        """What the bag already holds toward this item's par: itself, better tiers in full, cheaper tiers at half (17 Poké Balls make a Great Ball par half met)."""
+        have = bag.get(item_id, 0) + got.get(item_id, 0)
+        for tiers in (BALL_TIERS, HEAL_TIERS):
+            if item_id in tiers:
+                i = tiers.index(item_id)
+                have += sum(bag.get(t, 0) for t in tiers[:i]) + sum(bag.get(t, 0) for t in tiers[i + 1:]) // 2
+        return have
+
+    def buy(item_id: int, upto: int, cap: int) -> None:
+        nonlocal spent
+        price = PRICES.get(item_id)
+        room = min(max(cap, spent + (price or 0) if not got.get(item_id) else cap), budget) - spent        # a family always gets at least one unit when the money covers it
+        qty = int(min(upto - stock_of(item_id), room // price)) if price else 0
+        if qty > 0:
+            got[item_id] = got.get(item_id, 0) + qty
+            spent += qty * price
+
+    base_spent: dict[str, int] = {}
+    for item_id, fam in wants:
+        before = spent
+        buy(item_id, BASE_PAR[item_id], spent + max(0, int(budget * FAMILY_SHARE[fam]) - base_spent.get(fam, 0)))
+        base_spent[fam] = base_spent.get(fam, 0) + spent - before
+    spare = budget - spent
+    if spare >= STOCK_UP_FLOOR:
+        cap = spent + int(spare * STOCK_UP_SHARE)
+        for item_id, _fam in wants:
+            if item_id in STOCK_PAR:
+                buy(item_id, STOCK_PAR[item_id], cap)
+    lines = [{"item_id": i, "name": ITEM_NAMES.get(i, item_label(i)), "qty": q, "unit_price": PRICES[i], "subtotal": q * PRICES[i]} for i, q in got.items()]
+    others = {i for _b, _m, _x, _y, items in SHOPS for i in items}
+    missing = [ITEM_NAMES[t] for t in (next((t for t in BALL_TIERS if t in others and t not in sold), None), next((t for t in HEAL_TIERS if t in others and t not in sold), None)) if t
+               and PRICES.get(t) and budget >= PRICES[t] * 4 and t not in (ball, heal)
+               and ((t in BALL_TIERS and ball is not None and BALL_TIERS.index(t) < BALL_TIERS.index(ball)) or (t in HEAL_TIERS and heal is not None and HEAL_TIERS.index(t) < HEAL_TIERS.index(heal)))]
+    return {"lines": lines, "total": spent, "affordable": True, "missing": missing}
+
+
+# ── evolution stones ──────────────────────────────────────────────────────────────────────────────────────────────────
+# Stones the Celadon Dept. Store (4F) sells, and the party members they evolve. Eevee is left out (three outcomes: the model should choose) and so are the Moon / Sun
+# stones (not sold anywhere in Kanto).
+SOLD_STONES = (95, 96, 97, 98)
+
+
+def stone_wants(party, bag: dict[int, int], money: int, reserve: int = 0) -> list[tuple[int, str, str]]:
+    """[(stone id, party member, what it becomes)] for the stones worth buying now: a party member evolves with a stone the Dept. Store sells, none is in the bag, and
+    the money covers it. One entry per stone."""
+    from game.constants import SPECIES_NAMES
+    from knowledge.evolutions import EVO_BY_ITEM
+    from knowledge.shop_stock import PRICES
+    out, seen = [], set()
+    for mon in party:
+        for stone in SOLD_STONES:
+            target = EVO_BY_ITEM.get((mon.species_id, stone))
+            if target and mon.species_id != 133 and stone not in seen and not bag.get(stone) and money - reserve >= PRICES.get(stone, 10 ** 9):
+                seen.add(stone)
+                out.append((stone, getattr(mon, "nickname", "") or mon.species_name, SPECIES_NAMES.get(target, "?").title()))
+    return out

@@ -464,8 +464,11 @@ class OverworldMixin:
             return ("Couldn't open the Mart buy menu — walk up to the clerk at the "
                     "counter and call shop() again.")
         sold = set(self._shop_item_list())
+        # What THIS mart lists decides the tiers (Ultra over Great over Poké, Hyper over Super over Potion) and, with spare money, a bigger stock.
+        from knowledge.shopping import compute_stock_plan
+        stock = compute_stock_plan(self.reader.read_bag(), self.ltm.data["badges_earned"], money, sold, reserve=500)
         bought, spent, skipped = [], 0, []
-        for line in plan["lines"]:
+        for line in (stock["lines"] or plan["lines"]):
             iid, qty, unit = line["item_id"], line["qty"], ITEM_PRICES.get(line["item_id"], line["unit_price"])
             if iid not in sold:
                 # The Celadon Dept. Store has no Poké Ball / Potion: buy the next grade up with the same BUDGET (fewer of them).
@@ -496,6 +499,8 @@ class OverworldMixin:
         events.emit("shop", f"bought {', '.join(bought)} (−¥{spent}, ¥{self.reader.read_money()} left)")
         if skipped:
             msg += f" (Not sold here: {', '.join(dict.fromkeys(skipped))}.)"
+        if stock["missing"]:
+            msg += f" (A better grade: {', '.join(stock['missing'])} — other marts sell it: Fuchsia / Cinnabar / Saffron / Indigo.)"
         return msg
 
     _OPPOSITE = {"Up": "Down", "Down": "Up", "Left": "Right", "Right": "Left"}
@@ -572,6 +577,21 @@ class OverworldMixin:
         px, py = self.reader.read_player_pos()
         return min(tiles, key=lambda t: abs(t[0] - px) + abs(t[1] - py))
 
+    def _grind_objective(self):
+        """The map of the next goal the grind should stay near — the city of the next gym still owed — or None once all eight are won."""
+        from knowledge.leafgreen_data import GYMS
+        ltm = getattr(self, "ltm", None)
+        beaten = set(ltm.data.get("gyms_beaten", [])) if ltm is not None else set()
+        nxt = next((g for g in GYMS if g["leader"] not in beaten), None)
+        return next((key for key, name in MAP_NAMES.items() if name == nxt["city"]), None) if nxt else None
+
+    def _routing_start(self):
+        """Where the player stands as a routing node (split maps are region-qualified), for the planners."""
+        from knowledge.map_graph import node_for
+        bank, mid = self.reader.read_current_map()
+        pos = _safe_call(self.reader.read_player_pos)
+        return node_for(bank, mid, *(pos or (None, None)))
+
     def _relocate_to_grass(self, exclude_current: bool = False, level: int | None = None) -> bool:
         """Deterministically travel to the nearest grass route so grind has grass to
         work with, instead of handing a 'go find grass' message back to the model
@@ -589,7 +609,7 @@ class OverworldMixin:
         for _attempt in range(3):
             found = None
             for _probe in range(16):                       # skip grass behind a gate (Brock, a ticket…) without spending an attempt
-                found = best_grass((bank, mid), level, exclude_current=exclude_current, avoid=avoid)
+                found = best_grass(self._routing_start(), level, exclude_current=exclude_current, avoid=avoid, objective=self._grind_objective())
                 if found is None:
                     break
                 walkable = not no_walk_reason((bank, mid), found[0], self.reader.read_player_pos())      # e.g. back west across Route 4's ledges
@@ -901,7 +921,7 @@ class OverworldMixin:
         from knowledge.grind_routes import best_grass
         avoid = {tuple(a[:2]) for a in avoid}
         for _ in range(16):
-            found = best_grass(tuple(here[:2]), level, avoid=avoid)
+            found = best_grass(self._routing_start(), level, avoid=avoid, objective=self._grind_objective())
             if found is None:
                 return None
             if not self._grass_route_gated(tuple(here[:2]), found[0]):
