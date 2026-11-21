@@ -1,8 +1,11 @@
 """The observation says how the player is travelling (no emulator)."""
 from types import SimpleNamespace as NS
 
-from agent.observation import _header
-from game.state import GameContext
+import pytest
+
+pytest.importorskip("openai")
+from agent.observation import _header  # noqa: E402
+from game.state import GameContext  # noqa: E402
 
 
 def tick(biking=False, surfing=False, road=False, ctx=GameContext.OVERWORLD):
