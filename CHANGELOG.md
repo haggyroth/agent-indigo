@@ -20,6 +20,14 @@ All notable changes to this project are documented here. Format loosely follows
 - Evolution stones: `shop(item='Thunderstone')` (Dept. Store 4F, ¥2,100) was already supported — now live-verified — and the Celadon observation lists the stones a party member would use
   (`stone_wants`: Pikachu / Growlithe / Vulpix / Gloom / Weepinbell / Poliwhirl / Shellder / Staryu / Exeggcute; Eevee and the unsold Moon / Sun stones are left out).
 
+### Fixed — found by the live suite on this PR
+- **A wandering NPC broke the gift quests**: the Route 16 house's woman has `MOVEMENT_TYPE_WANDER_AROUND`; after a few frames of difference in how we walked in she stood one tile off her home tile and the
+  player pressed A at an empty one (`quest('fly')`: "Talked to the woman but nothing was given"). `_talk_to` now aims at the nearest loaded NPC when none stands on the home tile, and `_gift_errand`
+  looks again up to three times.
+- **Victory Road's boulder pushes overshot**: `_vr_push` held the direction 20 frames, longer than one 16-frame step, so depending on the frame phase it pushed the boulder twice and carried it past its stop
+  ("No route through Victory Road 1F"). The hold is now 12 frames (exactly one tile).
+- `_warp_exit_tile` now moves off a listed warp tile only to a real warp within one tile, and otherwise keeps the old door-centre rule.
+
 ### Fixed — the shuffle at stairs and exit mats
 - **Directional staircases** (the Celadon Dept. Store's) fire on a LEFT / RIGHT press while you stand on them. `walk_to` nudged Down first, stepped off, replanned and stepped back on: about twenty
   D / U cycles per floor before a probe found the side. It now presses the tile's own direction first (`TilemapReader.warp_press`: arrow warps and directional stairs).

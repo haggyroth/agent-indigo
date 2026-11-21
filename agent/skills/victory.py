@@ -73,8 +73,8 @@ class VictoryMixin:
         self._answer_field_yes()
         self._advance_to_control(tries=20)
         if tuple(self.reader.read_player_pos()) == tuple(stand):
-            self.mgba.hold(direction, 20)
-            self.mgba.tick(24)
+            self.mgba.hold(direction, 12)              # under one 16-frame step: a longer hold started a SECOND push whenever the frame phase allowed it, and the boulder overshot its stop
+            self.mgba.tick(30)
             dx, dy = _STEP[direction]
             old = (stand[0] + dx, stand[1] + dy)
             if tuple(self.reader.read_player_pos()) == old:                  # we stepped into the boulder's tile: it moved one tile on

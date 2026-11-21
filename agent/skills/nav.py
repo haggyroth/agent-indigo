@@ -1191,14 +1191,18 @@ class NavMixin:
             return warp
         # The warp event list can name tiles the game never warps from (the Dept. Store 1F lists (1,15) and (3,15) next to the real exit (2,14), an arrow mat): aim for the
         # real mat — walking into the listed wall tile pressed Down about seventy times.
-        pool, reach = (real, 2) if real else (warps, 1)
+        wx, wy = warp
+        if warp not in real and real:
+            near = [w for w in real if max(abs(w[0] - wx), abs(w[1] - wy)) <= 1]
+            if near:
+                return min(near, key=lambda w: abs(w[0] - wx) + abs(w[1] - wy))
+        pool = real if warp in real else warps
         centers = door_centers(pool)
         if not centers:
             return warp
-        wx, wy = warp
         cx, cy = min(centers, key=lambda c: max(abs(c[0] - wx), abs(c[1] - wy)))
         # Only snap within the same doormat cluster; otherwise the graph tile is a standalone warp we should target directly.
-        return (cx, cy) if max(abs(cx - wx), abs(cy - wy)) <= reach else warp
+        return (cx, cy) if max(abs(cx - wx), abs(cy - wy)) <= 1 else warp
 
     _GYM_RETRY_LEVELS = 8          # team-level total to gain after a loss in a gym before challenge_leader will walk in again
 

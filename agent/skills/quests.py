@@ -235,8 +235,31 @@ class QuestMixin:
         if tuple(self.reader.read_current_map()) == SAFARI_ENTRANCE:
             self._go_to("Fuchsia City", mode="flee")
 
+    _FACE_DELTA = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
+
+    def _live_spots(self, spots) -> list:
+        """Where to stand to talk to an NPC that is NOT on its home tile. `spots` are written for the NPC's home tile (stand + facing = that tile); some wander (the Route 16 house's
+        woman has MOVEMENT_TYPE_WANDER_AROUND, and a few frames of difference in how we walked in left her one tile over: the player stood on her home tile and pressed A at nothing).
+        Returns [] when the NPC is home (or none is near), else the approach to the nearest loaded NPC within four tiles."""
+        if not spots:
+            return []
+        (sx, sy), face = spots[0]
+        dx, dy = self._FACE_DELTA.get(face, (0, 0))
+        home = (sx + dx, sy + dy)
+        try:
+            npcs = set(self._npc_tiles())
+        except Exception:
+            return []
+        if home in npcs:
+            return []
+        near = [t for t in npcs if abs(t[0] - home[0]) + abs(t[1] - home[1]) <= 4]
+        if not near:
+            return []
+        spot = self._clerk_approach(min(near, key=lambda t: abs(t[0] - home[0]) + abs(t[1] - home[1])))
+        return [spot] if spot else []
+
     def _talk_to(self, spots) -> bool:
-        for stand, face in spots:
+        for stand, face in [*self._live_spots(spots), *spots]:
             if self._press_on_tile(stand, face):
                 return True
         return False

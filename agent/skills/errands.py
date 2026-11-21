@@ -100,26 +100,29 @@ class ErrandsMixin:
                 return f"Can't reach {dest}: {out}"
         if tuple(self.reader.read_current_map()) != dest_map:
             return f"Didn't reach {dest} yet — call {call} again to continue (it resumes)."
-        if not self._talk_to(spots):
-            if (b := self._quest_battle(call, who)):
-                return b
-            return f"Couldn't reach {who} — walk up to them, face them and press A."
-        if (b := self._hideout_fight(call, who, auto_trainers)):
-            return b
-        asked = 0
-        for _ in range(14):
-            if self.reader.read_flag(flag) and not self._menus.choice_live():
-                break
-            if self._menus.choice_live():
-                self._menus.answer_prompt(answers[min(asked, len(answers) - 1)])
-                asked += 1
-                self.mgba.tick(30)
-            else:
-                self._advance_to_control(tries=30)
+        for attempt in range(3):                     # a wandering NPC can step aside while we walk up: look again, and talk to where they are now
+            if not self._talk_to(spots):
+                if (b := self._quest_battle(call, who)):
+                    return b
+                return f"Couldn't reach {who} — walk up to them, face them and press A."
             if (b := self._hideout_fight(call, who, auto_trainers)):
                 return b
-        if not self.reader.read_flag(flag):
-            return f"Talked to {who} but nothing was given — call {call} again."
+            asked = 0
+            for _ in range(14):
+                if self.reader.read_flag(flag) and not self._menus.choice_live():
+                    break
+                if self._menus.choice_live():
+                    self._menus.answer_prompt(answers[min(asked, len(answers) - 1)])
+                    asked += 1
+                    self.mgba.tick(30)
+                else:
+                    self._advance_to_control(tries=30)
+                if (b := self._hideout_fight(call, who, auto_trainers)):
+                    return b
+            if self.reader.read_flag(flag):
+                break
+            if attempt == 2:
+                return f"Talked to {who} but nothing was given — call {call} again."
         self._advance_to_control(tries=24)
         return None
 

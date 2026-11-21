@@ -85,6 +85,7 @@ def test_watchdog_cuts_off_the_old_status_spam_bug(live, monkeypatch):
     monkeypatch.setattr(kp, "can_attack", lambda m: True)
     monkeypatch.setattr(kp, "attack_pp", lambda m: 99)
     monkeypatch.setattr(live.c, "_relocate_to_grass", lambda **kw: True)       # stay in the forest: this test is about the fights
+    monkeypatch.setattr(live.c, "_grind_futile", lambda best, target: "")      # (grind(40) at L19 in Viridian Forest is rightly refused as futile; here we want the fights)
     out = live.c._execute("grind", json.dumps({"level": 40, "auto_battles": 50}))   # autopilot: the bug lives there
     assert "was stopped" in out and "no progress" in out, out
 
@@ -855,7 +856,7 @@ def test_shop_restocks_at_the_celadon_dept_store_with_substitutes(live):
             break
         if live.r.detect_context().name == "IN_BATTLE":
             c._execute("flee_battle", "{}")
-    assert out.startswith("Bought") and "Great Ball (instead of Poké Ball)" in out, out
+    assert out.startswith("Bought") and "Great Ball" in out and "Super Potion" in out, out         # the plan reads what this clerk lists: Great Balls / Super Potions straight away
     assert live.r.read_current_map() == (10, 1)                 # Celadon Dept. Store 2F
     assert live.r.count_item(3) > balls and live.r.count_item(22) > supers
     assert live.r.read_money() < 6000
