@@ -42,6 +42,18 @@ class MoveLearnMixin:
                 and self.mgba.read32(Addr.BATTLE_SCRIPT_PTR) == Addr.SCRIPT_LEARN_DELETE      # the script is WAITING on this box (lms alone lingers)
                 and self._offered_move() != 0)
 
+    def _learn_would_accept(self) -> bool:
+        """Would the forget policy learn the offered move (True) or decline it (False)?"""
+        from knowledge.movelearn import choose_move_to_forget
+        from knowledge.leafgreen_data import POKEMON_TYPES
+        from game.constants import MOVE_NAMES
+        party = self.reader.read_party()
+        cur = party[0].move_names if party else []
+        if len(cur) != 4:
+            return False
+        own = POKEMON_TYPES.get((party[0].species_name or "").upper().strip(), ())
+        return choose_move_to_forget(cur, MOVE_NAMES.get(self._offered_move(), ""), own) is not None
+
     def _resolve_move_learn(self) -> str | None:
         """At a LIVE delete box, apply the value-based forget policy (knowledge.movelearn): learn the new move
         when it clearly beats the cheapest move we may forget, navigating the KNOWN MOVES summary to ANY slot
@@ -260,7 +272,15 @@ class MoveLearnMixin:
             # bleeds through the ~2-frame lms==1 window as an accept. After pressing,
             # watch frame by frame so the next A never lands on a box either.
             self._wait_idle()
+            ptr = self.mgba.read32(Addr.BATTLE_SCRIPT_PTR)
             if self.mgba.read8(Addr.LEARN_MOVE_STATE) == 1:
+                if Addr.SCRIPT_LEARN_START <= ptr < Addr.SCRIPT_LEARN_DELETE:
+                    # learnMoveState LINGERS at 1 from an earlier prompt, so the "…is trying to learn X" texts run while it already reads 1. They need a button to move on
+                    # (the old code's mashing of B through its phantom "box" did that by accident): the policy's own answer, so a press that lands on the box when it
+                    # opens is the one we would give anyway — A if we would learn the move, B if we would decline.
+                    self.mgba.tap("A" if self._learn_would_accept() else "B")
+                    self.mgba.tick(6)
+                    idle = 0
                 continue
             self.mgba.tap("A")
             for _ in range(6):

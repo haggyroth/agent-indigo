@@ -12,6 +12,8 @@ All notable changes to this project are documented here. Format loosely follows
 - The box is now live only while the battle script is WAITING on it: `gBattlescriptCurrInstr` sits on the "Delete a move?" command (`SCRIPT_LEARN_DELETE` 0x081D8A08) — and, for the give-up box,
   on 0x081D8A17 (both read from the real prompt). `_accept_forget_slot` presses A only while the pointer is there, waits for the summary before steering, and backs out with B / A only when the
   script is on the give-up box; the drive loop stops after three resolves of one prompt instead of 300 iterations. Real prompts (forget slot 0-3, decline, back-to-back) still work.
+- The suite caught a regression in the first cut of this fix: while the "is trying to learn X" texts print, `learnMoveState` can already read 1 (stale) with the script still before the box, so nothing advanced
+  the text and other code mashed A at the real box (Ivysaur forgot Tackle for Sweet Scent in the SS-ticket quest). Those texts are now advanced with the policy's own button — B to decline, A to learn.
 
 ### Added — the Cycling Road: Route 16's Snorlax and bike-aware routing (#272 / #269, the rest)
 - **`quest('snorlax_16')`** (optional beat): the second Snorlax at Route 16 (31,13), Celadon's side. Same flute-and-fight script as Route 12's — the fight goes to the model under the one-shot protocol, never

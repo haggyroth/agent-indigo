@@ -191,6 +191,7 @@ class Addr:
     # …and the level-up move-learn prompts (read live from the delete_box fixture: the pointer waits on the command while the box is up): "Delete a move to make room?"
     # and, after B, "Stop learning X?". learnMoveState alone is not proof — it LINGERS at 1 after a decline, and a driver that trusted it pressed A into the ordinary
     # battle menu (a watched run used Foresight ~24 times, 13 min of game time, until the Pokémon fainted).
+    SCRIPT_LEARN_START  = 0x081D89ED    # BattleScript_TryLearnMoveLoop; the "wants to learn X" texts run from here to the box at SCRIPT_LEARN_DELETE (learnMoveState can already read 1 then)
     SCRIPT_LEARN_DELETE = 0x081D8A08
     SCRIPT_LEARN_GIVEUP = 0x081D8A17
     SCREEN_FADE     = 0x03000F9C   # u8: 1 while a menu is on screen OR mid-fade; clears when the menu closes

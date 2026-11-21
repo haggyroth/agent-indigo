@@ -58,3 +58,25 @@ def test_accepting_never_presses_a_when_the_script_is_not_on_the_prompt():
     pressed = []
     c.mgba.tap = pressed.append
     assert c._accept_forget_slot(0) is False and pressed == []     # and no blind B / A back-out either
+
+
+def _drive_once(ptr, accept):
+    """One pass of the drive loop with learnMoveState stale at 1 and the script at `ptr`: which buttons get pressed?"""
+    from game.state import GameContext
+    c, _ = client(ptr=ptr)
+    pressed = []
+    c.mgba.tap = pressed.append
+    c.reader.detect_context = lambda: GameContext.IN_BATTLE
+    c._learn_would_accept = lambda: accept
+    c._resolve_move_learn = lambda: "resolved"
+    c._drive_pending_learn()
+    return pressed
+
+
+def test_the_wants_to_learn_texts_are_advanced_with_the_policys_own_button_while_the_state_is_stale():
+    """Real run (SS-ticket quest, Ivysaur offered Sweet Scent): learnMoveState lingered at 1 while the 'is trying to learn' texts printed, the strict check saw no box, nothing
+    advanced the text, other code mashed A at the real box and Tackle was forgotten. The old loose check had pressed B through it by accident."""
+    pre_box = Addr.SCRIPT_LEARN_START + 14                      # inside BattleScript_AskToLearnMove's printstrings
+    assert set(_drive_once(pre_box, accept=False)) == {"B"}
+    assert set(_drive_once(pre_box, accept=True)) == {"A"}
+    assert _drive_once(0x081D8000, accept=False) == []          # nowhere near the learn script: still nothing pressed
