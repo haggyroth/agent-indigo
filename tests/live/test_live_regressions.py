@@ -292,8 +292,10 @@ def test_balance_training_keeps_the_ace_from_stealing_xp(live, monkeypatch):
     live.patch_mon(0, [33, 45, 73, 22], [35, 40, 10, 25], level=14, exp=1612)
     out = _grind(live, {"catch": False}, rounds=120)
     party = live.r.read_party()
-    assert party[0].species_name == "Bulbasaur" and party[0].level == 14, (out, [(p.species_name, p.level, p.current_hp) for p in party])
-    assert max(p.level for p in party[1:]) > 5, out                              # the trainees actually levelled
+    ace = next(p for p in party if p.species_name == "Bulbasaur")
+    assert ace.level == 14, (out, [(p.species_name, p.level, p.current_hp) for p in party])                 # the ace did not steal the XP
+    assert party[0].species_name != "Bulbasaur", [p.species_name for p in party]                          # …and the travel lead is a trainee now (lowest viable), not the ace
+    assert max(p.level for p in party if p is not ace) > 5, out                                            # the trainees actually levelled
 
 
 def _pc(live, tool, **args):
