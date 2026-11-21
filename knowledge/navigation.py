@@ -175,7 +175,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      None),
 
     (6, "Surf to Cinnabar Island and defeat Blaine (Fire type)",
-     "Surf south from Fuchsia (Route 19/20) to reach Cinnabar Island. The Gym is in the south-east of the island. Use Water moves — any Surf user works fine.",
+     "Surf south from Fuchsia (Route 19/20) to reach Cinnabar Island. The Gym is in the south-east of the island. Use Water moves — any Surf user works fine. After the badge Bill may ask 'Come with me to One Island?' — answer NO (answer_prompt('no')): the Sevii Islands trip is not needed for the Elite Four.",
      "S"),
 
     (7, "Return to Viridian City and defeat Giovanni (Ground type) at Gym 8",

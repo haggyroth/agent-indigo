@@ -17,7 +17,7 @@ def policy(ctx, party, gyms_beaten=(), cur_map=(3, 1), needs_heal=False, ticket=
     client = SimpleNamespace(_party_needs_heal=lambda: needs_heal, _has_ss_ticket=lambda: ticket,
                              _knows_cut=lambda: knows_cut,
                              _readiness=lambda: [])
-    rt = SimpleNamespace(client=client, reader=reader, mgba=SimpleNamespace(),
+    rt = SimpleNamespace(client=client, reader=reader, mgba=SimpleNamespace(read32=lambda a: 0, read8=lambda a: 0),
                          ltm=SimpleNamespace(data={"gyms_beaten": list(gyms_beaten)}))
     return ScriptedPolicy(rt)
 
@@ -80,3 +80,11 @@ def test_after_misty_it_fetches_the_ss_ticket_first():
 def test_with_the_ticket_but_no_cut_it_gets_cut_before_the_gym():
     p = policy(GameContext.OVERWORLD, [mon(30)], gyms_beaten=["Brock", "Misty"], ticket=True, knows_cut=False)
     assert p.decide() == ("quest", {"name": "cut"})
+
+
+def test_a_forced_replacement_reads_in_menu_and_is_answered_with_switch_pokemon_not_close_menus(monkeypatch):
+    """A chain run sat 1000+ steps on close_menus while the game forced a replacement (B does nothing)."""
+    import game.menu as gm
+    monkeypatch.setattr(gm, "forced_party_screen", lambda m, r: True)
+    party = [mon(30, hp=0), mon(30)]
+    assert policy(GameContext.IN_MENU, party).decide() == ("switch_pokemon", {"target": "2"})

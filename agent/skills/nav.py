@@ -145,7 +145,17 @@ class NavMixin:
         self.mgba.tick(8)
         self.mgba.tap("A")
         self.mgba.tick(30)
-        if yesno or self._menus.choice_live():
+        if yesno:
+            # A switch/statue/door script: text, then 'Press it?' (the cursor starts on YES), then the result.
+            # Don't probe for the choice — a stale menu flag makes this dialogue read IN_MENU and the probe's
+            # Down/Up presses ate the budget. Press A until the script engine goes idle.
+            from game.constants import Addr
+            for _ in range(10):
+                if self.mgba.read8(Addr.SCRIPT_RAM) == 0:
+                    break
+                self.mgba.tap("A")
+                self.mgba.tick(30)
+        elif self._menus.choice_live():
             for _ in range(4):
                 if self._menus.choice_live():
                     self._menus.answer_prompt("yes")
@@ -165,6 +175,9 @@ class NavMixin:
         tiles = PUZZLE_TILES.get(self.reader.read_current_map())
         if not tiles:
             return False
+        from knowledge.mansion_data import FLOORS as _MANSION
+        if tuple(self.reader.read_current_map()) in _MANSION:     # the Mansion's floors + one switch are a search of their own
+            return self._mansion_walk(goal)
         step = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
 
         def passable(extra):
@@ -718,6 +731,19 @@ class NavMixin:
                     f"go_to({target_name!r}) again.")
         return None   # escaped; keep travelling
 
+    VAR_SCENE_CINNABAR = 0x4071          # VAR_MAP_SCENE_CINNABAR_ISLAND: 1 = Blaine beaten, Bill is about to invite you to One Island
+
+    def _bill_scene_pending(self) -> bool:
+        """Blaine is beaten and we are on Cinnabar: stepping out starts Bill's scene, 'Come with me to One Island?' (YES/NO). A-mashing accepts it (the cursor starts on YES)
+        and the Sevii detour (One -> Two -> Three Island, the Network Machine, Lostelle) begins — a long side story the Elite Four does not need, with a ferry the router
+        knows nothing about. While the scene is pending the dialogue is advanced with B instead: B also turns the text over, and on the YES/NO box it is NO (Bill waits in
+        the Pokémon Center). Probing for the box and then pressing A raced the text printing and still said yes."""
+        try:
+            return tuple(self.reader.read_current_map()) == (3, 8) and self.reader.read_var(self.VAR_SCENE_CINNABAR) == 1
+        except Exception:
+            log_once("advance.bill", "nav: reading the Cinnabar scene variable failed (ignored)")
+            return False
+
     def _advance_to_control(self, tries: int = 10):
         """Press A to advance a dialog / menu / trainer-engagement into either
         overworld control or a battle. Dungeons are full of trainers whose spotting
@@ -739,7 +765,8 @@ class NavMixin:
             # SELECT things in it (that is how a left-open Bag drank potions in a loop) — back out.
             from game.constants import Addr
             in_screen = self.mgba.read32(Addr.GMAIN_CALLBACK2) in Addr.FULLSCREEN_MENU_CB2
-            self.mgba.tap("B" if in_screen else "A")
+            back = in_screen or self._bill_scene_pending()
+            self.mgba.tap("B" if back else "A")
             self.mgba.tick(30 if in_screen else 10)    # menu inputs drop mid-fade: give B time
         return self.reader.detect_context()
 
@@ -1035,6 +1062,9 @@ class NavMixin:
                 continue   # fled; resume travelling
 
             cur = self.reader.read_current_map()
+            from knowledge.mansion_data import FLOORS as _MANSION
+            if tuple(cur) in _MANSION and tuple(target_map) not in _MANSION and self._mansion_leave():
+                continue                        # the Mansion's barriers hang on one statue switch: its own search gets us out
             if cur == target_map:
                 self._go_to_stalls = 0          # reached it — clear any stall streak
                 self._go_to_last_end = None

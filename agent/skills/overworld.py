@@ -137,6 +137,15 @@ class OverworldMixin:
         from knowledge.leafgreen_data import MOVE_POWER
         return any(n and MOVE_POWER.get(n, 0) > 0 for n in (mon.move_names or []))
 
+    def _nurse_tile(self) -> tuple[int, int]:
+        """Where to stand to talk to Nurse Joy: two tiles below her (the counter between). The mainland Centers share one layout (Joy at (7,2));
+        the Sevii Islands' differ (One Island: (5,2)) — and a patient stood on the mainland tile there, so read her from the live objects."""
+        nurses = self.reader.read_objects_by_gfx([64])           # OBJ_EVENT_GFX_NURSE
+        if nurses:
+            jx, jy = min(nurses, key=lambda t: abs(t[0] - self._NURSE_TILE[0]) + abs(t[1] - 2))
+            return (jx, jy + 2)
+        return self._NURSE_TILE
+
     def _heal(self, force: bool = False) -> str:
         """Heal the whole party at a Pokémon Center. Travels to the nearest one if
         not already inside, walks to Nurse Joy, and advances the heal dialogue
@@ -152,10 +161,10 @@ class OverworldMixin:
             if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
                 return f"On the way to a Pokémon Center to heal: {res}"
         # Walk to the nurse's counter and face her.
-        nx, ny = self._NURSE_TILE
+        nx, ny = self._nurse_tile()
         self._walk_to(nx, ny)
         if self.reader.read_player_pos() != (nx, ny):
-            return (f"Couldn't reach Nurse Joy's counter at {self._NURSE_TILE} "
+            return (f"Couldn't reach Nurse Joy's counter at {(nx, ny)} "
                     f"(at {self.reader.read_player_pos()}). Try walk_to it, then talk.")
         self.mgba.tap("Up")            # face the nurse across the counter
         # Advance greeting → YES/NO (YES is default) → heal → closing. A-mash and

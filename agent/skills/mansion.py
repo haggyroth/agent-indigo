@@ -34,6 +34,71 @@ class MansionMixin:
             self.mgba.hold(button, 20)
             self.mgba.tick(72)
 
+    def _mansion_walk(self, goal, floor=None) -> bool:
+        """Get to (or beside) `goal` on THIS floor when the live barriers cut the way: the statue switch + stairs are a search (knowledge.mansion_route),
+        so any travel inside the Mansion — heal(), go_to a town, a fled battle — can leave it, not just the Secret Key quest. Returns True if it acted."""
+        from knowledge.mansion_route import plan
+        cur = tuple(self.reader.read_current_map())
+        floor0 = tuple(floor) if floor else cur                      # the floor `goal` is on (default: this one)
+        if cur not in FLOORS or floor0 not in FLOORS:
+            return False
+        from knowledge.mansion_data import WARPS
+        start = (tuple(self.reader.read_player_pos()), 1 if self.reader.read_flag(FLAG_SWITCH_STATE) else 0)
+        exits = [tuple(goal)]
+        if WARPS.get((floor0, *goal), "x") is None:        # the target is a way OUT: any of the floor's exits will do (one may be walled off right now)
+            exits += [(x, y) for (f, x, y), v in WARPS.items() if f == floor0 and v is None and (x, y) != tuple(goal)]
+        gx, gy = exits[0]
+        for ex in exits:
+            if plan(cur, start[0], start[1], goal=lambda fl, x, y, ex=ex: fl == floor0 and abs(x - ex[0]) + abs(y - ex[1]) <= 1) is not None:
+                gx, gy = ex
+                break
+
+        def near(fl, x, y):
+            return fl == floor0 and abs(x - gx) + abs(y - gy) <= 1
+
+        acted, last, stuck = False, None, 0
+        for _ in range(40):
+            here = tuple(self.reader.read_current_map())
+            if here not in FLOORS or self.reader.detect_context() != GameContext.OVERWORLD:
+                break
+            pos = tuple(self.reader.read_player_pos())
+            flag = 1 if self.reader.read_flag(FLAG_SWITCH_STATE) else 0
+            actions = plan(here, pos, flag, goal=near)
+            if not actions:                                                   # unreachable, or already beside it: the ordinary walk takes over
+                break
+            state = (here, pos, flag, actions[0])
+            stuck = stuck + 1 if state == last else 0
+            last = state
+            if stuck >= 3:
+                break
+            kind = actions[0][0]
+            self._in_puzzle = True
+            try:
+                if kind == "goto":
+                    self._walk_far(actions[0][2])
+                elif kind == "press":
+                    self._press_on_tile(actions[0][2], actions[0][3], yesno=True)
+                else:
+                    _k, _floor, tile, button = actions[0]
+                    self._take_warp(pos, tile, button, here)
+            finally:
+                self._in_puzzle = False
+            acted = True
+        if acted and tuple(self.reader.read_current_map()) == floor0 \
+                and abs(self.reader.read_player_pos()[0] - gx) + abs(self.reader.read_player_pos()[1] - gy) <= 1:
+            self._in_puzzle = True
+            try:
+                self._walk_to(gx, gy)                                          # step through the exit we could reach
+            finally:
+                self._in_puzzle = False
+        return acted
+
+    def _mansion_leave(self) -> bool:
+        """Out of the Mansion by whichever 1F exit the switch lets us reach (see _mansion_walk). True if it acted."""
+        from knowledge.mansion_data import WARPS
+        exits = [(x, y) for (f, x, y), v in WARPS.items() if f == MANSION_1F and v is None]
+        return bool(exits) and self._mansion_walk(exits[0], floor=MANSION_1F)
+
     def _get_secret_key(self, auto_trainers: bool = False) -> str:
         call = "quest('pokemon_mansion')"
         if self._has_secret_key():

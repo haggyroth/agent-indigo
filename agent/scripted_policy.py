@@ -28,6 +28,7 @@ class ScriptedPolicy:
         self.rt = rt
         self.c, self.r, self.m, self.ltm = rt.client, rt.reader, rt.mgba, rt.ltm
         self.history: list[str] = []
+        self.last_result = ""
 
     # ── helpers ─────────────────────────────────────────────────────────────
     def _next_gym(self):
@@ -66,6 +67,10 @@ class ScriptedPolicy:
         if ctx == GameContext.IN_BATTLE:
             return self._battle()
         if ctx == GameContext.IN_MENU:
+            from game.menu import forced_party_screen
+            if forced_party_screen(self.m, self.r):         # a faint's forced replacement reads IN_MENU: B does nothing, pick someone
+                ok = [i for i, p in enumerate(self.r.read_party()) if p.current_hp > 0]
+                return "switch_pokemon", {"target": str((ok or [0])[0] + 1)}
             return "close_menus", {}
         if ctx == GameContext.DIALOG_OPEN:
             return "advance_dialog", {}
@@ -107,15 +112,98 @@ class ScriptedPolicy:
             return "challenge_leader", {}
         return "go_to", {"destination": "Gym"}
 
+    def on_result(self, result: str) -> None:
+        """Hook: the tool result of the call this policy just made (the plain policy ignores it)."""
+
     # ── fake OpenAI surface ─────────────────────────────────────────────────
     def respond(self, messages):
         """One chat.completions response for the agent's current message list."""
         last = messages[-1]["role"] if messages else "user"
         if last == "tool":
+            self.last_result = str(messages[-1].get("content", ""))
+            self.on_result(self.last_result)
             return _response("")
         name, args = self.decide()
         self.history.append(f"{name}({json.dumps(args)})")
         return _response("", name, args)
+
+
+class ChainPolicy(ScriptedPolicy):
+    """The WHOLE story chain without a model (#260): at each free moment run the next open beat's `quest(...)` (knowledge.story_beats), prepare when a quest says the team is not ready
+    (grind, heal, shop), and hand every fight to the same battle logic as ScriptedPolicy. It is the regression test for the chain end to end: where it stalls is where a model would —
+    `stall` records the first beat that could not progress (the same failure text three times, or the same beat with no change in badges / map for `STALL_CALLS` calls)."""
+
+    STALL_REPEATS = 3                 # the same failure text this many times in a row = a stall
+    STALL_CALLS = 40                  # calls spent on one beat with no new badge / key item / map progress
+
+    NOT_READY = ("Not ready for quest", "lopsided", "likely lose", "under-levelled", "Your highest-level Pokémon is L", "Call grind")
+    NEEDS_HEAL = ("heal()", "Call heal", "must-heal", "Not travelling yet")
+    NEEDS_SHOP = ("shop()", "Potions / Restores in the bag", "Revives in the bag")
+
+    def __init__(self, rt):
+        super().__init__(rt)
+        self.stall: str = ""
+        self._pending = ""             # what the last result asked for: "grind" | "heal" | "shop" | ""
+        self._fails: list[str] = []
+        self._calls_on: dict[str, int] = {}
+        self._progress: dict = {}
+
+    def on_result(self, result: str) -> None:
+        low = result
+        self._pending = ""
+        if any(k in low for k in self.NEEDS_HEAL) and "Healed" not in low:
+            self._pending = "heal"
+        elif any(k in low for k in self.NEEDS_SHOP):
+            self._pending = "shop"
+        elif any(k in low for k in self.NOT_READY):
+            self._pending = "grind"
+        failed = any(k in low for k in ("Can't reach", "Can't get to", "No route", "stuck at", "No walkable path", "couldn't", "Couldn't", "isn't working", "was stopped"))
+        self._fails = (self._fails + [low[:160]] if failed else [])[-self.STALL_REPEATS:]
+        if len(self._fails) >= self.STALL_REPEATS and len(set(self._fails)) == 1 and not self.stall:
+            self.stall = f"{self._beat_key() or '?'}: {self._fails[-1]}"
+
+    def _status(self):
+        from agent.story import story_status
+        moves = {m for p in self.r.read_party() for m in (p.move_ids or [])}
+        flag = self.r.read_flag
+        return story_status(self.r, self.ltm, {"cut": 15 in moves, "surf": 57 in moves or bool(flag(0x239)), "strength": 70 in moves or bool(flag(0x23A))})
+
+    def _beat_key(self) -> str:
+        from knowledge.story_beats import next_beats
+        ready = [b for b in next_beats(self._status()) if b.driver]
+        return ready[0].key if ready else ""
+
+    def _progress_sig(self):
+        return (self.r.read_badges()[0], len(self.r.read_key_items()), tuple(self.r.read_current_map()), sum(p.level for p in self.r.read_party()))
+
+    def decide(self):
+        from game.state import GameContext
+        if self.r.detect_context() != GameContext.OVERWORLD:
+            return super().decide()                     # battles, menus, dialogue, fades: the plain policy's rules
+        party = self.r.read_party()
+        if not party:
+            return "wait_frames", {"frames": 30}
+        from knowledge.readiness import blocking
+        key = self._beat_key()
+        if key:                                         # count EVERY call against the beat (a heal / shop / grind loop that goes nowhere is a stall too)
+            sig = self._progress_sig()
+            if self._progress.get(key) != sig:
+                self._progress[key], self._calls_on[key] = sig, 0
+            self._calls_on[key] = self._calls_on.get(key, 0) + 1
+            if self._calls_on[key] > self.STALL_CALLS and not self.stall:
+                self.stall = f"{key}: {self.STALL_CALLS} calls with no new badge, key item, map or level (last: {self.last_result[:160]})"
+        if blocking(self.c._readiness()) or self._pending == "heal":
+            self._pending = ""
+            return "heal", {}
+        if self._pending == "shop":
+            self._pending = ""
+            return "shop", {}
+        if self._pending == "grind":
+            self._pending = ""
+            return "grind", {}
+        if not key:
+            return "wait_frames", {"frames": 30}
+        return "quest", {"name": key, "auto_trainers": True}
 
 
 def _has_pp(mon) -> bool:

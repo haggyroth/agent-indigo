@@ -2155,6 +2155,25 @@ def test_a_lingering_learn_state_in_the_battle_menu_does_not_make_the_driver_pre
     assert live.r.read_party()[0].current_hp == hp and live.r.read_active_battle_moves()[2] == pp and live.r.detect_context() == GameContext.IN_BATTLE
 
 
+def test_the_mansion_statue_press_flips_the_switch_even_when_a_stale_menu_flag_makes_the_dialogue_read_in_menu(live):
+    """A chain run stalled on Mansion 3F (12,6): the stale MENU_OPEN flag made the statue's dialogue read IN_MENU, and the driver's choice probe (Down/Up) used up its budget before 'Press it?'.
+    From that exact state the press must flip FLAG_POKEMON_MANSION_SWITCH_STATE."""
+    live.load("mansion3f_statue")
+    assert tuple(live.r.read_current_map()) == (1, 61) and not live.r.read_flag(0x26C)
+    assert live.c._press_on_tile((12, 6), "Up", yesno=True) is True
+    assert live.r.read_flag(0x26C)
+
+
+def test_travel_from_inside_the_mansion_finds_its_way_out_through_the_statue_switch(live):
+    """A chain run looped on heal() at Mansion 1F (25,27): the stairs start in the barrier-walled middle, the exit (8,33) is cut off and the other (34,33) needs the B1F statue pressed first.
+    go_to's generic walk knew none of that ('No walkable path'); inside the Mansion it now uses the mansion search to reach whichever exit is open."""
+    live.load("mansion1f_stairs")
+    assert tuple(live.r.read_current_map()) == (1, 59) and not live.r.read_flag(0x26C)
+    out = live.c._go_to("Cinnabar Island", mode="flee")
+    assert out.startswith("Arrived"), out
+    assert tuple(live.r.read_current_map()) not in {(1, 59), (1, 60), (1, 61), (1, 62)}
+
+
 def test_running_with_the_shoes_halves_the_frames_and_lands_on_the_same_tiles(live):
     """#269: with FLAG_SYS_B_DASH, walk_to / go_to hold B outdoors (8 frames a tile instead of 16). The same trips with and without the shoes end on the same tiles — through doors, an
     arrow-mat exit and a Pokémon Center — and the outdoor leg takes far fewer frames. Indoors B does nothing, so nothing runs there."""
@@ -2258,3 +2277,15 @@ def test_fuchsia_to_cinnabar_goes_round_by_pallet_not_into_route_20s_walled_sea(
         if "Arrived" in out:
             break
     assert tuple(live.r.read_current_map()) == (3, 8) and (3, 38) not in seen and (3, 39) in seen, (seen, out)
+
+
+def test_leaving_cinnabars_gym_after_blaine_declines_bills_one_island_offer(live):
+    """A chain run hit Bill's scene right after the Volcano Badge, A-mashed 'Come with me to One Island?' (the cursor starts on YES) and sailed to the Sevii Islands, where the router has no ferry
+    and heal() found no way home. The Elite Four does not need that trip: answer NO and the Cinnabar Pokémon Center is the destination."""
+    live.load("blaine_won")
+    assert tuple(live.r.read_current_map()) == (12, 0) and live.r.read_var(0x4071) == 1
+    out = live.c._go_to("Pokemon Center", mode="flee")
+    here = tuple(live.r.read_current_map())
+    assert here[0] != 32 and here != (3, 12), f"sailed to One Island: {here} / {out}"
+    assert out.startswith("Arrived") and here == (12, 5), (here, out)
+    assert live.r.read_var(0x4071) == 2                      # Bill 'will wait in the Pokémon Center'
