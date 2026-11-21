@@ -2298,3 +2298,14 @@ def test_flee_battle_escapes_when_the_move_menu_is_the_screen(live):
     assert live.r.detect_context() == GameContext.IN_BATTLE
     out = live.c._execute("flee_battle", "{}")
     assert "Got away" in out and live.r.detect_context() != GameContext.IN_BATTLE, out
+
+
+def test_heal_from_route_23_with_a_fainted_party_goes_round_to_viridian(live):
+    """Chain run 14 looped 700 calls on Route 23 / Victory Road with five fainted Pokémon: heal() aimed at the Indigo Plateau's Center (the graph's nearest, via the North edge) and, when
+    that was not walkable, gave up. It must try the next Center — Viridian's, across Route 23's Surf gap."""
+    live.load("zeropp_move_menu")
+    live.c._execute("flee_battle", "{}")
+    assert tuple(live.r.read_current_map()) == (3, 42)
+    out = live.c._execute("heal", "{}")
+    assert out.startswith("Healed the party"), out
+    assert tuple(live.r.read_current_map()) == (5, 4)               # Viridian's Pokémon Center

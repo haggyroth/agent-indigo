@@ -557,6 +557,14 @@ class NavMixin:
         from knowledge.map_graph import nearest_of_kind, node_for
         # normalise: lowercase, strip, drop accents (é→e) so "Poké Mart" matches.
         dest = str(destination).strip().lower().replace("é", "e").replace("è", "e")
+        if dest.startswith("map:"):                  # an exact map, "map:<bank>,<id>" — a Center the heal trip picked itself (Centers have no names)
+            try:
+                goal = tuple(int(v) for v in dest[4:].split(","))
+            except ValueError:
+                goal = ()
+            if len(goal) == 2:
+                return goal, MAP_NAMES.get(goal) or f"the Pokémon Center ({goal[0]}, {goal[1]})"
+            return None, f"Unknown destination '{destination}'."
         # Region-qualify the start so routing off a split map (Route 2) is correct.
         bank, mid = self.reader.read_current_map()
         px, py = self.reader.read_player_pos()

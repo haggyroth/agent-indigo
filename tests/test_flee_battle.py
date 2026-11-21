@@ -21,6 +21,9 @@ class _Fake:
     def read_current_map(self):
         return (3, 0)
 
+    def read_player_pos(self):
+        return (10, 10)
+
     def read32(self, addr):
         return self.flags if addr == Addr.BATTLE_TYPE_FLAGS else 0
 
