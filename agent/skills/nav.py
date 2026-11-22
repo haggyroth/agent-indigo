@@ -576,7 +576,7 @@ class NavMixin:
             # to Viridian's gym (locked until 7 badges), instead of onward (#92).
             return self._resolve_next_gym()
         if kind:
-            found = nearest_mart(cur) if kind == "mart" else nearest_of_kind(cur, kind)
+            found = nearest_mart(cur) if kind == "mart" else nearest_of_kind(cur, self._healer_kinds() if kind == "pokecenter" else kind)
             if not found:
                 return None, f"No {dest} reachable from here."
             target_map = found[0]
@@ -647,6 +647,10 @@ class NavMixin:
             foe = self.reader.read_enemy_lead()
             if foe and foe.species_id and not (foe.species_name or "").startswith("#"):
                 what = f"{foe.species_name} L{foe.level} (HP {foe.current_hp}/{foe.max_hp})"
+                if getattr(foe, "is_shiny", False):
+                    what = "✨ SHINY " + what
+                    verdict = (" CATCH IT: a shiny is 1 in 8192 — weaken it gently (never a strong move), sleep/paralyse it, then catch(); "
+                               "never flee_battle or knock it out (load_state(9) retries).")
                 balls = self._ball_count()
                 party = self.reader.read_party()
                 from game.constants import Addr as _Addr
@@ -677,6 +681,8 @@ class NavMixin:
         is_trainer = bool(self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
         if mode == "yield" and not (is_trainer and auto_trainers):
             return self._yield_encounter(target_name, is_trainer, resume, call)
+        if not is_trainer and self._wild_shiny():          # never auto-flee or auto-fight a shiny: the model catches it, whatever the trip's mode
+            return self._yield_encounter(target_name, False, resume, call)
         low_hp_stop = mode != "flee"      # a heal trip is already on its way to the Center
         if is_trainer and mode == "flee" and call == "heal()" and self._has_must_need():
             # A trip to heal with a HURT party (only heal() passes call="heal()": the gym puzzles and grind's relocation also use "flee" and rely on the autopilot): auto-fighting the

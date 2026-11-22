@@ -148,3 +148,21 @@ def test_from_open_water_on_route_23_the_route_goes_by_the_shores_not_the_phanto
     to_plateau = route_to(here, (3, 9))
     assert to_plateau[0][2][:2] == (1, 39)                           # in through Victory Road's door, not straight up the (unwalkable) North edge
     assert nearest_of_kind(here, "pokecenter")[0] == (5, 4)          # Viridian's, round by the gatehouse
+
+
+def test_mom_counts_as_a_healer_from_route_21_but_a_center_is_still_cinnabar():
+    """From Route 21 the Center is Cinnabar's; Mom's house in Pallet (once the rival is beaten) is a heal spot too — and the nearer of the two from the north end."""
+    from knowledge.map_graph import HEAL_KINDS, MAP_KIND, nearest_of_kind, node_for
+    assert MAP_KIND[(4, 0)] == "home"
+    start = node_for(3, 39, 10, 10)                      # Route 21 (the north half, next to Pallet)
+    assert nearest_of_kind(start, "pokecenter")[0] != (4, 0)
+    assert nearest_of_kind(start, HEAL_KINDS)[0] == (4, 0)
+    assert nearest_of_kind((4, 0), HEAL_KINDS) == ((4, 0), [])
+
+
+def test_the_pokemon_mansion_is_grind_ground_for_a_mid_level_trainee_in_cinnabar():
+    from knowledge.grind_routes import best_grass
+    from knowledge.map_graph import CAVE_GRIND_MAPS, GRASS_MAPS
+    assert CAVE_GRIND_MAPS <= GRASS_MAPS
+    goal, _ = best_grass((3, 8), 29)                      # a L29 trainee standing in Cinnabar
+    assert goal in CAVE_GRIND_MAPS, goal

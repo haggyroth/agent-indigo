@@ -83,8 +83,8 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "heal",
-        "description": "Restore the whole party (HP, PP, status) at the nearest Pokémon Center — travels there, "
-                       "fleeing wild battles on the way. Call it when HP or PP is low and you're not in a battle.",
+        "description": "Restore the whole party (HP, PP, status) at the nearest Pokémon Center — or at home with Mom in Pallet Town when that is nearer (free; once Gary is beaten) — travels there, "
+                       "fleeing wild battles on the way (never a shiny: catch it). Call it when HP or PP is low and you're not in a battle.",
         "parameters": {"type": "object", "properties": {}},
     }},
     {"type": "function", "function": {
@@ -151,11 +151,11 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "grind",
-        "description": "Level up on wild Pokémon in tall grass. It walks to a route whose wild levels fit the "
+        "description": "Level up on wild Pokémon in tall grass (or the Mansion floor). It walks to a route whose wild levels fit the "
                        "Pokémon being trained; each wild encounter then ENDS the call — you fight it, then call "
                        "grind again (the session persists). grind(level=13) raises your best Pokémon to L13; grind() "
                        "with no level BALANCES the team up to a floor fixed at the start (best − 7, capped at the "
-                       "next gym's level): the weakest member leads and the ACE IS BENCHED (don't switch it in). It "
+                       "next gym's level): the weakest member leads and the ACE IS BENCHED. It "
                        "heals itself at a Center when HP/PP run low and stops with a diagnosis if the ace is taking "
                        "the XP. Boring wild fights autopilot (balancing mode: 12 per call; auto_battles=N overrides).",
         "parameters": {"type": "object", "properties": {
@@ -343,7 +343,7 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "catch",
-        "description": "Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's). Weaken it first — "
+        "description": "Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's) — ALWAYS catch a SHINY. Weaken it first — "
                        "low HP, or sleep / paralysis — it may break free, so throw again. ALWAYS pass a `nickname` "
                        "you invent: memorable, a bit funny, max 10 chars, letters / digits / space . , ! ? only, "
                        "never the species name, no two alike. The result reports the new Pokémon's quality (IVs / "

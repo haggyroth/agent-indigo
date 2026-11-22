@@ -210,14 +210,14 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `go_to_map` | overworld | direction | Leave the current map by crossing a seamless connection on the given edge (see 'Map edges' in the observation). |
 | `go_to` | overworld | destination?, force?, auto_trainers? | Travel to a named map ('Pewter City') or waypoint ('Pokemon Center', 'Mart', 'Gym'). |
 | `challenge_leader` | overworld | — | Walk up to the Gym Leader and start the battle (inside the gym, healed and save_state'd first). |
-| `heal` | overworld | — | Restore the whole party (HP, PP, status) at the nearest Pokémon Center — travels there, fleeing wild battles on the way. |
+| `heal` | overworld | — | Restore the whole party (HP, PP, status) at the nearest Pokémon Center — or at home with Mom in Pallet Town when that is nearer (free; once Gary is beaten) — travels there, fleeing wild battles on the way (never a shiny: catch it). |
 | `shop` | overworld | sell?, item?, quantity? | Restock at a Poké Mart (travels there if needed): buys the badge-scaled par levels of Balls, Potions and cures with the money you have. |
 | `switch_pokemon` | battle | target | Switch your active Pokémon (species name or 1-based slot). |
 | `use_item` | battle + overworld | item, target? | Use a Bag item.  In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status cure. |
 | `give_item` | overworld | item, pokemon | Make a party Pokémon HOLD a Bag item (Leftovers, Exp. |
 | `pick_up_items` | overworld | — | Collect the item balls on this map (see 'Items on the ground:' in the observation). |
 | `use_move` | battle | move | Use one of your active Pokémon's moves by name (the 'Your moves' list). |
-| `grind` | overworld | level?, catch?, auto_battles? | Level up on wild Pokémon in tall grass.  It walks to a route whose wild levels fit the Pokémon being trained; each wild encounter then ENDS the call — you fight it, then call grind again (the session persists). |
+| `grind` | overworld | level?, catch?, auto_battles? | Level up on wild Pokémon in tall grass (or the Mansion floor). |
 | `quest` | overworld | name?, auto_trainers? | The story, start to Elite Four.  quest() lists every beat: ✔ done / ▶ next / … blocked. |
 | `inspect_pokemon` | battle + overworld | pokemon | Look closely at ONE Pokémon: real stats, IVs, EVs, nature, Hidden Power and a quality grade for what its species is used for, compared with your team. |
 | `team_report` | battle + overworld | — | Read-only team analysis: the types your KNOWN moves hit super effectively, shared weaknesses, who can carry each HM, whether the team answers the NEXT gym and — if not — what to catch and where (or which PC Pokémon to swap in with pc). |
@@ -237,7 +237,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `close_menus` | battle + overworld | — | Back out of every open menu, prompt and dialogue with B until you are on the free field again. |
 | `flee_battle` | battle | — | Run from a WILD battle (trainer battles can't be fled). |
 | `safari` | menus / naming screens | action, nickname? | One turn of a SAFARI ZONE battle (the menu is BALL / BAIT / GO NEAR / RUN — no moves, party or Bag). |
-| `catch` | battle | nickname? | Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's). |
+| `catch` | battle | nickname? | Throw a Poké Ball at the WILD Pokémon you're fighting (never a trainer's) — ALWAYS catch a SHINY. |
 | `enter_name` | menus / naming screens | name | Type a name on the naming screen when one is open (a nickname, or the player/rival name in a new game) and confirm it. |
 | `read_game_state` | overworld | — | Read current game state: party HP, battle status, badges, location. |
 | `game_corner` | overworld | action?, amount? | The Celadon Game Corner (needs the Coin Case: quest('coin_case')). |

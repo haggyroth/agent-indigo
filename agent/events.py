@@ -26,7 +26,7 @@ STYLE = {
     "tool": ("▸", "cyan"), "battle_start": ("⚔", "magenta"), "battle_end": ("⚑", "magenta"),
     "foe_ko": ("✓", "green"), "faint": ("💥", "red"), "catch": ("🎯", "green bold"),
     "level_up": ("⬆", "green"), "evolve": ("✨", "green bold"), "learn_move": ("📖", "green"),
-    "heal": ("✚", "green"), "shop": ("🛒", "yellow"), "pc": ("💾", "blue"), "badge": ("🏅", "yellow bold"),
+    "heal": ("✚", "green"), "shiny": ("✨", "magenta bold"), "shop": ("🛒", "yellow"), "pc": ("💾", "blue"), "badge": ("🏅", "yellow bold"),
     "gym_leader": ("🏆", "yellow bold"), "key_item": ("🔑", "cyan bold"), "town": ("🗺", "cyan"),
     "blackout": ("☠", "red bold"), "hm_use": ("🌿", "green"), "trip": ("➜", "blue"), "party": ("👥", "dim"),
     "checkpoint": ("⚑", "dim"), "status": ("●", "dim"), "milestone": ("★", "green bold"), "note": ("·", "dim"),
@@ -56,7 +56,7 @@ def reset() -> None:
 
 _STAT_KINDS = {"catches": "catch", "level_ups": "level_up", "evolutions": "evolve", "faints": "faint",
                "blackouts": "blackout", "badges": "badge", "new_towns": "town", "key_items": "key_item",
-               "heals": "heal"}
+               "heals": "heal", "shinies": "shiny"}
 
 
 def run_stats() -> dict:
@@ -280,6 +280,8 @@ def _observe_battle(reader) -> None:
             cur["announced"] = True
             emit("battle_start", f"{'trainer battle' if cur['trainer'] else 'wild'} {label}"
                  + (f" @ {cur['where']}" if cur["where"] else ""), trainer=cur["trainer"], foe=label)
+            if not cur["trainer"] and getattr(foe, "is_shiny", False):
+                emit("shiny", f"✨ a SHINY {label} appeared" + (f" @ {cur['where']}" if cur["where"] else ""), foe=label)
         elif cur["foe_hp"] and foe.current_hp == 0 and cur["foe_species"] == foe.species_id:
             emit("foe_ko", f"{foe.species_name} fainted", major=False)
         cur["foe"], cur["foe_hp"], cur["foe_species"] = label, foe.current_hp, foe.species_id

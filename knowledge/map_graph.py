@@ -478,6 +478,7 @@ DUNGEON_MAPS: frozenset = frozenset(
 )
 
 MAP_KIND: dict[tuple[int, int], str] = {
+    (4, 0): "home",         # the player's house in Pallet Town (hand-added): Mom heals the party for free once the rival is beaten — see HEAL_KINDS
     (5, 1): "gym",
     (5, 3): "mart",
     (5, 4): "pokecenter",
@@ -839,18 +840,22 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True
     return hit[1] if hit else None
 
 
+HEAL_KINDS = ("pokecenter", "home")        # where the party can be healed: a Pokémon Center, or Mom's house in Pallet Town (free; only once the rival is beaten)
+
+
 def nearest_of_kind(start, kind, exclude=()):
-    """Route to the nearest map of a kind ("pokecenter"/"mart"/"gym").
+    """Route to the nearest map of a kind ("pokecenter"/"mart"/"gym"/"home") — or of any of several (a tuple, e.g. HEAL_KINDS).
     Returns (goal_map, steps) or None. Region-aware with a coarse fallback; the returned
     goal_map is the plain (bank, id) of the destination.
     `exclude`: goal maps to skip — ones a trip already failed to reach. The next-nearest is then also searched
     with Cut and Surf (a Center only across water — Route 23's Surf gap to Viridian — is still a Center)."""
     exclude = {tuple(m[:2]) for m in exclude}
-    if MAP_KIND.get(start[:2]) == kind and start[:2] not in exclude:
+    kinds = (kind,) if isinstance(kind, str) else tuple(kind)
+    if MAP_KIND.get(start[:2]) in kinds and start[:2] not in exclude:
         return (start[:2], [])
 
     def ok(n, s):
-        return MAP_KIND.get(n[:2]) == kind and tuple(n[:2]) not in exclude
+        return MAP_KIND.get(n[:2]) in kinds and tuple(n[:2]) not in exclude
     rstarts = _region_starts(start)            # a water tile: from any shore of the map, not from its phantom plain node
     hit = _shortest([_search(r, _R_CONN, _R_WARP, ok) for r in rstarts]) if rstarts else None
     if hit is None:
@@ -866,7 +871,9 @@ def nearest_of_kind(start, kind, exclude=()):
 # invoked somewhere with no reachable grass (e.g. the model called grind() while
 # standing in a city). Routes + Viridian Forest; the runtime grass check filters
 # any that turn out to be all-water, so this stays a superset, not a hand audit.
-GRASS_MAPS: frozenset = frozenset({(1, 0), *((3, i) for i in range(19, 45))})
+# The Pokémon Mansion has no tall grass: every floor tile of its four floors rolls land encounters (Grimer, Koffing, Ponyta, Muk… L26-38), so grind treats those tiles as its grass.
+CAVE_GRIND_MAPS: frozenset = frozenset({(1, 59), (1, 60), (1, 61), (1, 62)})
+GRASS_MAPS: frozenset = frozenset({(1, 0), *((3, i) for i in range(19, 45)), *CAVE_GRIND_MAPS})
 
 
 def nearest_grass(start, exclude_current: bool = False, avoid=()):

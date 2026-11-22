@@ -343,6 +343,10 @@ class BattleMixin:
             return "Can't run from a trainer battle — win it or switch Pokémon."
         if not self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_SAFARI and self._battle_trapped():
             return self._trapped_message("run")
+        shiny = self._wild_shiny()
+        if shiny and self._ball_count() > 0:
+            return (f"Not fleeing: that is a SHINY {shiny.species_name} (1 in 8192). Weaken it gently (see the ONE-SHOT/SHINY block), "
+                    "put it to sleep or paralyse it, then catch(). load_state(9) retries if it faints.")
         for _ in range(20):
             if self.reader.detect_context() != GameContext.IN_BATTLE:
                 return "Got away safely — fled the wild battle."
@@ -588,10 +592,12 @@ class BattleMixin:
                     else "No Poké Balls — buy some at a Mart with shop(), then catch.")
         party_before = len(self.reader.read_party())
         try:
-            foe_pid = self.reader.read_enemy_lead().personality      # identifies the new catch afterwards (IV report)
+            lead = self.reader.read_enemy_lead()
+            foe_pid = lead.personality                               # identifies the new catch afterwards (IV report)
+            foe_shiny = bool(getattr(lead, "is_shiny", False))
         except Exception:
             log_once("battle._catch", "battle._catch: tolerated failure (continuing with a default)")
-            foe_pid = 0
+            foe_pid, foe_shiny = 0, False
         # Vet the nickname BEFORE spending a ball: the naming keyboard only types letters, digits,
         # space and . , ! ? — and the model's first idea is often just the species name ("Zubat",
         # "Kakuna1"). Refuse ONCE per species with the reason (no ball thrown) so it invents something
@@ -706,12 +712,14 @@ class BattleMixin:
             try:
                 from agent import events
                 foe0 = events.current_foe() or (self._current_opponent or "").title() or "Pokémon"
-                events.emit("catch", f"CAUGHT {foe0}" + (f" — {named.strip(' .')}" if named else "")
+                events.emit("catch", ("✨ SHINY " if foe_shiny else "") + f"CAUGHT {foe0}" + (f" — {named.strip(' .')}" if named else "")
                             + (" (party full → PC box)" if party_before >= 6 else "")
                             + (f" · {quality.split(' — ')[0].replace('Quality: ', '')}" if quality else ""), species=foe0)
             except Exception:
                 log_once("battle._catch", "battle._catch: tolerated failure (continuing with a default)")
                 pass
+            if foe_shiny:
+                extra = " ✨ It was a SHINY!" + extra
             if party_before >= 6:
                 return ("Gotcha! Caught the wild Pokémon — your party was full, so it was sent to the PC "
                         f"box — see pc('list'), and pc('swap') / pc('withdraw') to bring it into the team.{extra}")
@@ -1304,6 +1312,13 @@ class BattleMixin:
                 return out.startswith("Used")
         return False
 
+    def _wild_shiny(self):
+        """The shiny wild Pokémon we are facing, or None (also None when the reader can't tell)."""
+        try:
+            return self.reader.read_wild_shiny()
+        except Exception:
+            return None
+
     def _auto_fight(self) -> None:
         """Fight the current battle to the end with the best damaging move each turn."""
         from game.constants import Addr
@@ -1313,6 +1328,8 @@ class BattleMixin:
         if foe and foe.max_hp and foe.current_hp > 0 and is_one_shot(foe.species_id, self.reader.read_current_map()) \
                 and not self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
             return                             # a Snorlax / a legend: the autopilot would knock it out — leave it to the model (callers hand a battle that is still on to it)
+        if foe and self._wild_shiny():
+            return                             # a SHINY: same — it must be caught, never knocked out (a watched run ice-beamed one)
         potions_used: list = []
         for _ in range(24):
             if self._send_next_mon():          # lead fainted: the game forces a replacement

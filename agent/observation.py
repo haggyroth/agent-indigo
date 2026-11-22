@@ -390,7 +390,8 @@ def _one_shot(t: Tick, enemy, move_names, pp_view) -> str:
     """The ONE-SHOT protocol for a Snorlax / legendary foe (knowledge.one_shot), and the battle-start save it promises (slot 9, once per encounter)."""
     from knowledge.leafgreen_data import MOVE_POWER
     from knowledge.one_shot import SAVE_SLOT, gentlest_move, is_one_shot, protocol
-    if not enemy or not enemy.max_hp or not is_one_shot(enemy.species_id, t.map_key):
+    shiny = bool(enemy and not getattr(t.run, "battle_is_trainer", False) and getattr(enemy, "is_shiny", False))
+    if not enemy or not enemy.max_hp or not is_one_shot(enemy.species_id, t.map_key, shiny):
         return ""
     key = (enemy.species_id, tuple(t.map_key))
     if getattr(t.run, "one_shot_saved", None) != key:
@@ -399,7 +400,7 @@ def _one_shot(t: Tick, enemy, move_names, pp_view) -> str:
     balls = {b: n for b, n in t.reader.read_bag().items() if b in BALL_IDS}
     asleep = any(w in (enemy.status or "") for w in ("asleep", "paraly"))
     return protocol(enemy.species_id, enemy.current_hp, enemy.max_hp, balls, catch_setup_hint(move_names, pp_view),
-                    gentlest_move(move_names, pp_view, MOVE_POWER), asleep, map_key=t.map_key)
+                    gentlest_move(move_names, pp_view, MOVE_POWER), asleep, map_key=t.map_key, shiny=shiny, species_name=enemy.species_name)
 
 
 def _volatiles(v: dict) -> list[str]:
@@ -421,6 +422,10 @@ def _volatiles(v: dict) -> list[str]:
 def _catch_advice(t: Tick, enemy, move_names, pp_view) -> list[str]:
     """A NEW species while you have balls: is it worth one? (Called for wild battles only.)"""
     r, party = t.reader, t.state.party
+    if enemy and getattr(enemy, "is_shiny", False):           # the ONE-SHOT block above already says to catch it; the verdicts below ("you already have one", "not worth a ball") must not talk the model out of it
+        taken = [p.nickname for p in party if p.nickname]
+        return ["Pass a funny, inventive nickname to catch() — a shiny deserves a good one (e.g. " + ", ".join(nickname_ideas(enemy.species_name, taken, 3)) + "). "
+                "A full party sends it to the PC box; pc('swap') brings it into the team."]
     if r.client.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_GHOST:
         return ["GHOST — the Pokémon Tower's ghost Marowak dodges every ball (it CAN'T be caught): don't catch(); defeat it with use_move, then carry on."]
     balls = sum(r.read_bag().get(b, 0) for b in BALL_IDS)

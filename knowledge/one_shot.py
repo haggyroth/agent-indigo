@@ -16,12 +16,14 @@ RED = 0.25                       # at or below this fraction the foe is weak eno
 STATIC_BY_MAP: dict[tuple, dict[int, str]] = {(1, 95): {101: "Electrode"}}
 
 
-def is_one_shot(species_id: int, map_key=None) -> bool:
-    """A foe that must be caught, not beaten: Snorlax, the legends, Mewtwo anywhere — and a static Electrode in the Power Plant."""
-    return species_id in ONE_SHOT or (map_key is not None and species_id in STATIC_BY_MAP.get(tuple(map_key[:2]), {}))
+def is_one_shot(species_id: int, map_key=None, shiny: bool = False) -> bool:
+    """A foe that must be caught, not beaten: Snorlax, the legends, Mewtwo anywhere — a static Electrode in the Power Plant — and any SHINY wild Pokémon (1 in 8192: knock it out and it is gone)."""
+    return shiny or species_id in ONE_SHOT or (map_key is not None and species_id in STATIC_BY_MAP.get(tuple(map_key[:2]), {}))
 
 
-def one_shot_name(species_id: int, map_key=None) -> str:
+def one_shot_name(species_id: int, map_key=None, species_name: str = "", shiny: bool = False) -> str:
+    if shiny:
+        return f"SHINY {species_name or 'Pokémon'}"
     return ONE_SHOT.get(species_id) or STATIC_BY_MAP.get(tuple(map_key[:2]) if map_key is not None else (), {}).get(species_id, "")
 
 
@@ -37,16 +39,19 @@ def gentlest_move(move_names, pp, power) -> str:
     return best[1] if best else ""
 
 
-def protocol(species_id: int, hp: int, max_hp: int, balls: dict, setup_hint: str = "", chip: str = "", asleep_or_para: bool = False, slot: int = SAVE_SLOT, map_key=None) -> str:
+def protocol(species_id: int, hp: int, max_hp: int, balls: dict, setup_hint: str = "", chip: str = "", asleep_or_para: bool = False, slot: int = SAVE_SLOT, map_key=None,
+             shiny: bool = False, species_name: str = "") -> str:
     """The ONE-SHOT block for the battle observation, or '' for any other foe."""
-    if not is_one_shot(species_id, map_key) or not max_hp or hp <= 0:
+    if not is_one_shot(species_id, map_key, shiny) or not max_hp or hp <= 0:
         return ""                                            # not one of them, or it already fainted (nothing left to protect)
-    name = one_shot_name(species_id, map_key)
+    name = one_shot_name(species_id, map_key, species_name, shiny)
     frac = hp / max_hp
     ball = ("the MASTER BALL (it never fails)" if balls.get(MASTER_BALL) and species_id in LEGENDS else
             "an Ultra Ball" if balls.get(ULTRA_BALL) else "a Great Ball" if balls.get(GREAT_BALL) else "a Poké Ball" if balls.get(POKE_BALL) else "")
-    head = (f"ONE-SHOT: {name} appears once — do NOT knock it out or let it flee. The battle-start state is saved in slot {slot}: if it faints or runs, "
-            f"load_state({slot}) and try again, more gently.")
+    head = ((f"✨ SHINY {species_name or 'Pokémon'}! A 1-in-8192 find — it must be CAUGHT whatever its species or level (even one you own or 'not worth a ball'): "
+             "do NOT knock it out, flee, or let it flee. ") if shiny else f"ONE-SHOT: {name} appears once — do NOT knock it out or let it flee. ")
+    head += (f"The battle-start state is saved in slot {slot}: if it faints or runs, "
+             f"load_state({slot}) and try again, more gently.")
     if not ball:
         return head + " You have no Poké Balls: load_state, buy Ultra Balls (shop), and come back."
     if frac <= RED:

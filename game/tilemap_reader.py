@@ -188,6 +188,31 @@ class TilemapReader:
     def is_tall_grass(self, x: int, y: int) -> bool:
         return self.metatile_behavior(x, y) == self._TALL_GRASS
 
+    _ENCOUNTER_LAND = 1          # TILE_ENCOUNTER_LAND: the metatile attribute (bits 24-26) that makes a step roll for a wild Pokémon
+
+    def encounter_type(self, x: int, y: int) -> int | None:
+        """The metatile's encounter type (0 none, 1 land, 2 water), or None on error / out of bounds. Cave and building floors carry it where tall grass would."""
+        if self._map_ptr is None or self._width is None or not (0 <= x < self._width and 0 <= y < self._height):
+            return None
+        try:
+            mid = self._entry(x, y) & 0x3FF
+            attr_arr, idx = (self._attr_primary, mid) if mid < 640 else (self._attr_secondary, mid - 640)
+            if attr_arr is None:
+                return None
+            return (self.client.read32(attr_arr + idx * 4) >> 24) & 0x7
+        except Exception:
+            logger.warning("metatile encounter type read failed at (%d, %d)", x, y, exc_info=True)
+            return None
+
+    def is_land_encounter_tile(self, x: int, y: int) -> bool:
+        return self.encounter_type(x, y) == self._ENCOUNTER_LAND
+
+    def land_encounter_tiles(self) -> list[tuple[int, int]]:
+        """Every tile of the current map where a step can start a wild battle (cave / mansion floors — the maps with no tall grass)."""
+        if self._width is None or self._height is None:
+            return []
+        return [(x, y) for y in range(self._height) for x in range(self._width) if self.encounter_type(x, y) == self._ENCOUNTER_LAND]
+
     def ledge_dir(self, x: int, y: int) -> str | None:
         """If (x, y) is a one-way ledge, the D-pad direction you jump across it
         ('Up'/'Down'/'Left'/'Right'); else None. You approach a ledge from the tile
