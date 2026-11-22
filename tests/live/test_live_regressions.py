@@ -2327,3 +2327,13 @@ def test_run_episode_ends_with_reason_stalled_when_the_observer_says_so(live):
     live.load("route23_stuck")
     res = main.run_episode(live.rt, goal=None, max_steps=50, max_wall_s=120, verbose=False, should_stop=lambda: "test: no progress")
     assert res.reason == "stalled" and not res.passed and res.steps == 0, res
+
+
+def test_elite_four_flies_to_the_plateau_instead_of_walking_victory_road_again(live):
+    """After a blackout the walk to the League is Victory Road again, whose boulder puzzles reset on leaving the floor and which quest('elite_four') cannot solve: a chain run looped 300 calls
+    between Route 23 and the cave. With the Plateau visited and a Fly user, the driver flies to the League's door."""
+    from agent.skills.league import ROOM_BY_MAP
+    live.load("route23_stuck")
+    assert live.r.read_flag(0x899) and tuple(live.r.read_current_map()) == (3, 42)
+    out = live.c._get_elite_four(auto_trainers=True)
+    assert tuple(live.r.read_current_map()) in {(3, 9), (13, 0), *ROOM_BY_MAP}, (live.r.read_current_map(), out)
