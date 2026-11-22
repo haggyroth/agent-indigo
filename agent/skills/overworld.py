@@ -4,6 +4,7 @@ battles, and pick up item balls. See agent.lm_studio_client.AgentClient
 
 from agent.skills.base import log_once
 from game.state import GameContext
+from knowledge.league_rooms import LEAGUE_ROOM_MAPS
 from knowledge.navigation import MAP_NAMES
 from knowledge.party import boss_lead as boss_lead_slot, travel_lead as travel_lead_slot
 from knowledge.travel_rules import no_walk_reason
@@ -201,6 +202,17 @@ class OverworldMixin:
                 return "A battle started while healing — handle it, then heal again."
         return "Talked to Mom but couldn't confirm a full heal — try heal again, or check you're facing her."
 
+    def _league_heal(self) -> str:
+        """Inside an Elite Four room there is no Pokémon Center to reach (the door sealed behind you): heal from the Bag — Revives for the fainted, then the smallest Potion / Full Restore
+        that fills the gap of anyone under 60% — and say what is left. A watched run called heal() and go_to('Pokemon Center') in Lorelei's room for 300 calls."""
+        used = self._field_heal(max_uses=12, below=0.6)
+        bag = dict(self.reader.read_items_pocket())
+        left = f"{sum(n for i, n in bag.items() if i == 19)} Full Restore, {sum(n for i, n in bag.items() if i in (24, 25))} Revive, {sum(n for i, n in bag.items() if i in (13, 22, 21, 20))} Potions"
+        if used:
+            return f"The Elite Four's rooms are sealed — no Center to leave for. Healed from the Bag instead: {', '.join(used)}. Left: {left}. Press on: quest('elite_four')."
+        return (f"The Elite Four's rooms are sealed — there is no Pokémon Center to leave for, and nothing more in the Bag is worth using now ({left}). "
+                "Press on with quest('elite_four'): win outright, or if the whole team faints the whiteout returns you to the Plateau's Center fully healed (the League resets).")
+
     def _heal(self, force: bool = False) -> str:
         """Heal the whole party at a Pokémon Center. Travels to the nearest one if
         not already inside, walks to Nurse Joy, and advances the heal dialogue
@@ -212,6 +224,8 @@ class OverworldMixin:
             return "Party is already at full HP and PP — no need to heal."
         # Inside Victory Road no Center is reachable (the way out south needs Surf over Route 23, the way on is the puzzle itself): a go_to from there only
         # wandered the cave pushing boulders out of place (chain run 8). Heal from the Bag and push on.
+        if tuple(self.reader.read_current_map()) in LEAGUE_ROOM_MAPS:
+            return self._league_heal()
         cave = tuple(self.reader.read_current_map())
         if cave in _VICTORY_ROAD:
             # Grinding in the cave (its wild L32-48 are the closest fit for a team past the gyms), a heal is a walk OUT to Viridian's Center — the reverse puzzle — not an item-by-item drain of the Bag,

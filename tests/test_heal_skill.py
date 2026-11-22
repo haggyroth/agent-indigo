@@ -119,7 +119,7 @@ def test_field_heal_uses_a_revive_then_the_smallest_potion_that_fills_the_gap():
             elif item == "Hyper Potion":
                 bag[21] -= 1
                 party[1].current_hp = 100
-            return "ok"
+            return "Used it"
 
     assert Host()._field_heal() == ["Revive", "Hyper Potion"]          # Revive first; the 80-HP gap needs more than a Potion's 20
     assert Host()._field_heal() == []                                   # nobody is left under half

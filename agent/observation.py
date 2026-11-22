@@ -27,6 +27,7 @@ from knowledge.gym_advice import brief as gym_brief
 from knowledge.game_corner import PRIZES
 from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
+from knowledge.league_rooms import LEAGUE_ROOM_MAPS, league_notice
 from knowledge.nicknames import suggest as nickname_ideas
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
@@ -483,6 +484,15 @@ def _supplies(t: Tick) -> list[str]:
     return out
 
 
+def _league(t: Tick) -> list[str]:
+    """Inside an Elite Four room: say plainly that there is no leaving to heal (a run walked the sealed room, calling heal() and go_to('Pokemon Center') for 300 calls)."""
+    if t.here not in LEAGUE_ROOM_MAPS:
+        return []
+    bag = _safe("league_bag", lambda: dict(t.reader.read_items_pocket()), None)
+    note = league_notice(t.here, t.state.party or None, bag)
+    return [f"ELITE FOUR: {note}"] if note else []
+
+
 def _gym(t: Tick) -> list[str]:
     """Inside a gym point at the Leader — unless already beaten (the agent once looped in/out of Pewter Gym)."""
     if t.in_battle or not t.overworld or MAP_KIND.get(t.here) != "gym":
@@ -605,7 +615,7 @@ def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool,
     parts.append(f"Pos: ({state.player_x},{state.player_y}) Map: {state.map_bank}/{state.map_id}")
     if not in_battle and state.context in (GameContext.OVERWORLD, GameContext.IN_MENU):
         parts += _supplies(t)
-    parts += _gym(t) + _area(t) + _field(t) + _exits(t) + _loop_signals(t)
+    parts += _league(t) + _gym(t) + _area(t) + _field(t) + _exits(t) + _loop_signals(t)
     if not in_battle and (state.map_bank == 0 or not state.party):
         parts.append("NEW GAME: the game has not started (title screen / intro / no Pokémon yet) — call quest('new_game') and it plays the intro, names you, picks the starter and "
                      "fetches Oak's Parcel. Options go after the name: quest('new_game squirtle name=KYLE rival=GARY girl') (starter: bulbasaur | charmander | squirtle)"

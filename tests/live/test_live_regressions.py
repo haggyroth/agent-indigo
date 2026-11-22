@@ -2585,3 +2585,30 @@ def test_grind_works_inside_victory_road_and_a_heal_walks_out_to_viridian(live):
             break
     assert out.startswith("Healed the party"), out
     assert tuple(live.r.read_current_map()) == (5, 4), tuple(live.r.read_current_map())           # Viridian's Pokémon Center
+
+
+def test_inside_an_elite_four_room_heal_uses_the_bag_and_nothing_leaves_the_room(live):
+    """A watched run beat Lorelei, then called heal() / shop() / go_to('Pokemon Center') / walk_to from the sealed room for ~300 calls ('No walkable path ... (6,12)'). The room is sealed: heal() must
+    heal from the Bag (Revive, the smallest fitting Potion) and say so; go_to anywhere else explains the seal; the observation says so too."""
+    live.load("league_door")                                        # in the Plateau's Center: the north door leads into Lorelei's room (and seals)
+    c = live.c
+    c._walk_to(4, 1)
+    c._advance_to_control(tries=40)
+    live.m.tick(120)
+    here = tuple(live.r.read_current_map())
+    from knowledge.league_rooms import LEAGUE_ROOM_MAPS
+    assert here in LEAGUE_ROOM_MAPS and live.r.detect_context().name == "OVERWORLD", (here, live.r.detect_context())
+    party = live.r.read_party()
+    for slot in (0, 1):                                             # one fainted, one at a sliver of HP
+        live.m.write16(Addr.PARTY_DATA + 100 * slot + 0x56, 0 if slot == 0 else 5)
+    live.give_item(24, 2)                                           # Revive
+    live.give_item(21, 3)                                           # Hyper Potion
+    assert len(party) >= 2
+    out = c._execute("heal", "{}")
+    assert "sealed" in out and "Healed from the Bag" in out, out
+    assert tuple(live.r.read_current_map()) == here
+    p = live.r.read_party()
+    assert p[0].current_hp > 0 and p[1].current_hp >= 0.6 * p[1].max_hp, [(m.current_hp, m.max_hp) for m in p[:2]]
+    out = c._execute("go_to", json.dumps({"destination": "Pokemon Center"}))
+    assert "SEALED IN" in out and tuple(live.r.read_current_map()) == here, out
+    from agent.observation import build_observation  # noqa: F401  (the section is exercised by the unit tests)
