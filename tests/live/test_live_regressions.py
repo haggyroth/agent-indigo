@@ -2493,3 +2493,32 @@ def test_go_to_the_plateau_from_inside_victory_road_runs_the_boulder_quest(live)
         if live.r.read_flag(0x899):
             break
     assert live.r.read_flag(0x899), out
+
+
+def test_walking_back_south_through_victory_road_after_the_plateau_without_fly(live):
+    """A watched run reached the Plateau without Fly, then grind() had to walk back: leaving the cave north RESETS its switches, so the way down is the puzzle in reverse (3F's push,
+    2F west's push, 1F's two pushes) — go_to looped on 'No walkable path from (36,17) to (48,12)' at a walled-in ladder tile. From the Plateau, go_to Route 22 now walks the reverse route."""
+    live.load("vr_2f_stuck")
+    c = live.c
+    live.strong_lead()
+    for _ in range(25):                                                              # first up to the Plateau (the quest from the stuck checkpoint)
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        live.boost_party()
+        live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        c._execute("go_to", json.dumps({"destination": "Indigo Plateau", "force": True, "auto_trainers": True}))
+        if live.r.read_flag(0x899):
+            break
+    assert live.r.read_flag(0x899)
+    out = ""
+    for _ in range(25):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        live.boost_party()
+        live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        out = c._execute("go_to", json.dumps({"destination": "Route 22", "force": True, "auto_trainers": True}))
+        if tuple(live.r.read_current_map()) == (3, 41):
+            break
+    assert tuple(live.r.read_current_map()) == (3, 41), (out, tuple(live.r.read_current_map()), live.r.read_player_pos())

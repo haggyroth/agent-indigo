@@ -95,6 +95,16 @@ class VictoryMixin:
                     self._vr_known.add(new)
 
     def _vr_warp(self, pos, tile, button, here) -> None:
+        if tuple(pos) == tuple(tile) and not button:                # standing on a ladder we arrived by (a walled-in pocket): step off it and back on
+            opposite = {"Left": "Right", "Right": "Left", "Up": "Down", "Down": "Up"}
+            for d in ("Left", "Right", "Up", "Down"):
+                self.mgba.hold(d, 18)
+                self.mgba.tick(20)
+                if tuple(self.reader.read_player_pos()) != tuple(tile):
+                    self.mgba.hold(opposite[d], 18)
+                    self.mgba.tick(40)
+                    return
+            return
         if tuple(pos) == tuple(tile) and button:                    # already standing on an arrow warp: hold its arrow
             self.mgba.hold(button, 20)
             self.mgba.tick(72)
@@ -110,13 +120,17 @@ class VictoryMixin:
             self.mgba.hold(button, 20)
             self.mgba.tick(72)
 
-    def _get_victory_road(self, auto_trainers: bool = False) -> str:
-        call = "quest('victory_road')"
-        if self.reader.read_flag(FLAG_INDIGO):
+    def _vr_back(self, resume: str, auto_trainers: bool = False):
+        """Walk OUT of the cave to Route 23's south half by the reverse puzzle (vr_route.plan_back) — the way home from the Plateau without Fly. None once outside; else the message to hand back
+        (a battle for the model, or why it stopped). `resume` is the call that continues it."""
+        return self._get_victory_road(auto_trainers, back=True, call=resume)
+
+    def _get_victory_road(self, auto_trainers: bool = False, back: bool = False, call: str = "quest('victory_road')"):
+        if not back and self.reader.read_flag(FLAG_INDIGO) and tuple(self.reader.read_current_map()) not in FLOORS:
             return "You've reached Indigo Plateau — heal and save at the Pokémon Center, then the Elite Four's door (north)."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
-        if bin(int(self.reader.read_badges()[1])).count("1") < 8:
+        if not back and bin(int(self.reader.read_badges()[1])).count("1") < 8:
             return "Route 23's guards want all eight badges before Victory Road."
         if not self._knows_move(STRENGTH_MOVE):
             return "Victory Road's boulders need a Pokémon that knows Strength: quest('strength')."
@@ -124,22 +138,26 @@ class VictoryMixin:
         for _ in range(160):
             if (b := self._hideout_fight(call, "Victory Road", auto_trainers)):
                 return b
-            if self.reader.read_flag(FLAG_INDIGO):
+            if not back and self.reader.read_flag(FLAG_INDIGO) and tuple(self.reader.read_current_map()) not in FLOORS:
                 break
             if self.reader.detect_context() != GameContext.OVERWORLD:
                 self._advance_to_control(tries=30)
             here = tuple(self.reader.read_current_map())
             pos = tuple(self.reader.read_player_pos())
-            if here == INDIGO_PLATEAU:
+            if not back and here == INDIGO_PLATEAU:
                 break
             if here not in FLOORS:
+                if back:
+                    return None                       # out of the cave
                 north = here == ROUTE_23 and map_graph.region_at(here, *pos) == "0"
                 dest, target = ("Indigo Plateau", INDIGO_PLATEAU) if north else ("Victory Road 1F", vr_route.VR_1F)
                 if (msg := self._hideout_travel(dest, target, call, auto_trainers)):
                     return msg
                 continue
             boulders, pressed = self._vr_boulders(here), self._vr_pressed(here)
-            act = vr_route.plan(here, pos, boulders, pressed, self._vr_revealed(), {fl: self._vr_pressed(fl) for fl in FLOORS})
+            all_pressed = {fl: self._vr_pressed(fl) for fl in FLOORS}
+            act = (vr_route.plan_back(here, pos, boulders, pressed, all_pressed) if back
+                   else vr_route.plan(here, pos, boulders, pressed, self._vr_revealed(), all_pressed))
             if act is None:
                 return (f"No route through Victory Road {FLOORS[here]['name']} from {pos} — a trainer may be in the way. Clear it, then call {call} again.")
             state = (here, pos, tuple(sorted(boulders)), act)
@@ -156,6 +174,8 @@ class VictoryMixin:
             else:
                 _k, tile, button = act
                 self._vr_warp(pos, tile, button, here)
+        if back:
+            return f"Made progress on the way out of Victory Road — call {call} again to continue (it resumes)."
         if self.reader.read_flag(FLAG_INDIGO) or tuple(self.reader.read_current_map()) == INDIGO_PLATEAU:
             return "Reached Indigo Plateau. Heal and save at its Pokémon Center, stock up, then the Elite Four's door (north)."
         return f"Made progress on the way to Indigo Plateau — call {call} again to continue (it resumes)."

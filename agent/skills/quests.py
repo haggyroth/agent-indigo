@@ -147,6 +147,11 @@ class QuestMixin:
         if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party(), self._bag_or_none())):
             self._ready_warned.add(beat.key)            # once per beat: a second call (or a resumed one) goes ahead
             return warn
+        if beat.key == "victory_road" and "victory_road:fly" not in self._ready_warned and not self.reader.read_flag(0x899) and not self._fly_ready():
+            self._ready_warned.add("victory_road:fly")
+            return ("Past Victory Road there is no grass to train on and no quick way home: the Plateau's Center is the only one, and the way back south is the cave's puzzle in reverse. "
+                    "Fly is the way home — get it first (quest('fly'), then teach it) and train the team up before you go (the Elite Four wants a best Pokémon of L54 and five at L46+). "
+                    "Call quest('victory_road') again to go anyway.")
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
                 "strength": self._get_strength, "coin_case": self._get_coin_case,
                 "rocket_hideout": self._get_silph_scope, "tea": self._get_tea, "pokemon_tower": self._get_pokemon_tower,
@@ -163,6 +168,15 @@ class QuestMixin:
     def _in_safari_zone(self) -> bool:
         from game.constants import Addr
         return bool(self.mgba.read8(Addr.SAFARI_BALLS) or self.mgba.read16(Addr.SAFARI_STEPS))
+
+    def _fly_ready(self) -> bool:
+        """Can someone in the party fly home from the Plateau right now (a Pokémon that knows Fly and the badge that obeys it)?"""
+        from knowledge.team import hm_status
+        try:
+            knower, _cap = hm_status(self.reader.read_party(), "Fly")
+            return bool(knower and self.reader.read_badges()[1] >> 2 & 1)
+        except Exception:
+            return False
 
     def _knows_move(self, move_id: int) -> bool:
         return any(move_id in (p.move_ids or []) for p in self.reader.read_party())
