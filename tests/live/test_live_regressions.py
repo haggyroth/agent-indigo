@@ -2337,3 +2337,82 @@ def test_elite_four_flies_to_the_plateau_instead_of_walking_victory_road_again(l
     assert live.r.read_flag(0x899) and tuple(live.r.read_current_map()) == (3, 42)
     out = live.c._get_elite_four(auto_trainers=True)
     assert tuple(live.r.read_current_map()) in {(3, 9), (13, 0), *ROOM_BY_MAP}, (live.r.read_current_map(), out)
+
+
+def test_heal_from_pallet_town_goes_to_moms_house_not_a_center(live):
+    """From Route 21 the nearest Pokémon Center is Cinnabar's (a grinder walked it dozens of times); Mom heals for free at home in Pallet, a few tiles away."""
+    live.load("route23_stuck")
+    assert "Flew" in live.c._fly_to("Pallet"), live.r.read_current_map()
+    live.heal_hp()
+    party = live.r.read_party()
+    live.m.write16(Addr.PARTY_DATA + 0x56, 1)                        # the lead is nearly dead
+    assert live.c._party_needs_heal()
+    out = live.c._execute("heal", "{}")
+    assert tuple(live.r.read_current_map()) == (4, 0), (live.r.read_current_map(), out)
+    assert "Mom" in out and not live.c._party_needs_heal(), out
+    assert len(party) == len(live.r.read_party())
+
+
+def test_the_heal_destination_from_route_21_is_pallet_not_cinnabar(live):
+    live.load("route23_stuck")
+    live.c._fly_to("Pallet")
+    out = live.c._execute("go_to", json.dumps({"destination": "Route 21"}))
+    assert tuple(live.r.read_current_map()) in {(3, 37), (3, 39)} or "appeared" in out, out
+    dest, _ = live.c._resolve_destination("Pokemon Center")
+    assert dest == (4, 0), dest
+
+
+def test_grind_works_inside_the_pokemon_mansion(live):
+    """The Mansion has no tall grass — every floor tile rolls an encounter — so grind() said 'no grass here' and walked out to a route. Its grass step must now pace the floor until a wild Pokémon appears."""
+    from knowledge.map_graph import CAVE_GRIND_MAPS
+    live.load("mansion1f_stairs")
+    here = tuple(live.r.read_current_map())
+    assert here in CAVE_GRIND_MAPS, here
+    live.heal_hp()
+    assert live.c._nearest_grass() is not None
+    st = {"stuck": 0, "reloc": 0}
+    for _ in range(300):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            break
+        assert live.c._grass_step(st, "grind()") is None, st
+    assert live.r.detect_context() == GameContext.IN_BATTLE, live.r.read_player_pos()
+    foe = live.r.read_enemy_lead()
+    assert tuple(live.r.read_current_map()) in CAVE_GRIND_MAPS and foe and 20 <= foe.level <= 40, (foe, live.r.read_current_map())
+
+
+def _make_foe_shiny(live):
+    """Re-key gEnemyParty[0] with an OT id that makes its PID shiny (the substructures are XORed with PID ^ OT id, so they must be re-encrypted)."""
+    b = Addr.ENEMY_PARTY
+    raw = bytearray(live.m.read8(b + i) for i in range(100))
+    pid, old_ot = int.from_bytes(raw[0:4], "little"), int.from_bytes(raw[4:8], "little")
+    new_ot = (pid >> 16) ^ (pid & 0xFFFF)                       # shiny value 0
+    for i in range(32, 80, 4):
+        word = int.from_bytes(raw[i:i + 4], "little") ^ pid ^ old_ot ^ pid ^ new_ot
+        raw[i:i + 4] = word.to_bytes(4, "little")
+    raw[4:8] = new_ot.to_bytes(4, "little")
+    for i in range(100):
+        live.m.write8(b + i, raw[i])
+
+
+def test_a_shiny_wild_pokemon_is_not_fled_from_or_auto_fought(live):
+    """A watched run ice-beamed a shiny Tangela: a shiny must be caught, so no flee, no autopilot, and the observation says so."""
+    live.load("mansion1f_stairs")
+    live.heal_hp()
+    st = {"stuck": 0, "reloc": 0}
+    for _ in range(300):
+        if live.r.detect_context() == GameContext.IN_BATTLE:
+            break
+        live.c._grass_step(st, "grind()")
+    assert live.r.detect_context() == GameContext.IN_BATTLE
+    live.c._wait_idle()                                        # past the intro: the foe's HP is only populated once the battle settles
+    live.m.tick(120)
+    assert live.r.read_wild_shiny() is None                    # an ordinary foe
+    species = live.r.read_enemy_lead().species_id
+    _make_foe_shiny(live)
+    foe = live.r.read_wild_shiny()
+    dbg = live.r.read_enemy_lead()
+    assert foe is not None and foe.species_id == species and foe.is_shiny, (foe, dbg, hex(dbg.personality), hex(dbg.ot_id), species, live.r.detect_context())
+    assert live.c._flee_battle().startswith("Not fleeing")
+    live.c._auto_fight()
+    assert live.r.detect_context() == GameContext.IN_BATTLE and live.r.read_wild_shiny().current_hp == foe.current_hp     # not one hit was thrown
+    assert "SHINY" in live.c._yield_encounter("Route 1", False, None, None)

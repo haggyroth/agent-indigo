@@ -45,6 +45,14 @@ class ScriptedPolicy:
             return "switch_pokemon", {"target": str((ok or [0])[0] + 1)}
         trainer = bool(self.m.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER)
         _ids, names, pp, _d, _t = self.c._active_moves_view()
+        shiny = self.c._wild_shiny()
+        if shiny and self.c._ball_count() > 0:             # a shiny is caught, not beaten: chip it down gently, then throw a ball
+            from knowledge.leafgreen_data import MOVE_POWER
+            from knowledge.one_shot import RED, gentlest_move
+            chip = gentlest_move(names, pp, MOVE_POWER)
+            if chip and shiny.current_hp / shiny.max_hp > RED + 0.1:
+                return "use_move", {"move": chip}
+            return "catch", {}
         atk, dfn = self.c._battle_types()
         mv = self.c._best_damaging_move(names, pp, atk, dfn, self.c._battle_ctx())
         if mv:

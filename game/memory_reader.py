@@ -180,6 +180,7 @@ class LeafGreenReader:
             species_name=species_name, move_ids=move_ids, move_names=move_names, pp=pp,
             nickname="".join(nick).strip(),
             personality=int.from_bytes(raw[0:4], "little"),
+            ot_id=int.from_bytes(raw[4:8], "little"),
             ivs=ivs, evs=evs, friendship=friendship, ability_slot=ability_slot, held_item=held_item,
             stats=tuple(int.from_bytes(raw[o:o + 2], "little") for o in (0x58, 0x5A, 0x5C, 0x5E, 0x60, 0x62)),
         )
@@ -326,6 +327,16 @@ class LeafGreenReader:
         except Exception:
             pass
         return mon
+
+    def read_wild_shiny(self) -> "PokemonStatus | None":
+        """The SHINY wild Pokémon in front of us (still standing), or None — no battle, a trainer's, or an ordinary foe."""
+        try:
+            if self.detect_context() != GameContext.IN_BATTLE or self.client.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
+                return None
+            foe = self.read_enemy_lead()
+        except Exception:
+            return None
+        return foe if foe and foe.max_hp and foe.current_hp > 0 and foe.is_shiny else None
 
     _FACING = {1: "Down", 2: "Up", 3: "Left", 4: "Right"}        # gObjectEvents[0].facingDirection: DIR_SOUTH, NORTH, WEST, EAST
 

@@ -48,7 +48,7 @@ def pokecenter_tiles(site: tuple) -> float | None:
     """Tiles from the nearest Pokémon Center to `site` (a map): what every heal trip costs one way."""
     best = None
     for pc, kind in MAP_KIND.items():
-        if kind == "pokecenter":
+        if kind in ("pokecenter", "home"):          # Mom's house heals too (once the rival is beaten — always true by the time anyone grinds far from Pallet)
             d = tiles_between(pc, tuple(site[:2]))
             if d is not None and (best is None or d < best):
                 best = d

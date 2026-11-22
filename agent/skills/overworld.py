@@ -8,6 +8,8 @@ from knowledge.navigation import MAP_NAMES
 from knowledge.party import boss_lead as boss_lead_slot, travel_lead as travel_lead_slot
 from knowledge.travel_rules import no_walk_reason
 
+FLAG_BEAT_RIVAL_IN_OAKS_LAB = 0x258       # from then on Mom heals the party at home in Pallet Town
+
 
 def _safe_call(fn, default=None):
     try:
@@ -149,13 +151,54 @@ class OverworldMixin:
             return (jx, jy + 2)
         return self._NURSE_TILE
 
+    def _home_heals(self) -> bool:
+        """Mom heals the party for free once the rival is beaten in Oak's lab (FLAG_BEAT_RIVAL_IN_OAKS_LAB) — from then on the player's house in Pallet counts as a Center."""
+        try:
+            return bool(self.reader.read_flag(FLAG_BEAT_RIVAL_IN_OAKS_LAB))
+        except Exception:
+            return False
+
+    def _healer_kinds(self):
+        from knowledge.map_graph import HEAL_KINDS
+        return HEAL_KINDS if self._home_heals() else ("pokecenter",)
+
     def _next_center(self, tried):
         """The nearest Pokémon Center from here that is not in `tried` — the ones a heal trip already failed to reach (None if there is no other)."""
         from knowledge.map_graph import nearest_of_kind, node_for
         bank, mid = self.reader.read_current_map()
         px, py = self.reader.read_player_pos()
-        found = nearest_of_kind(node_for(bank, mid, px, py), "pokecenter", exclude=tried)
+        found = nearest_of_kind(node_for(bank, mid, px, py), self._healer_kinds(), exclude=tried)
         return found[0] if found else None
+
+    _MOM_GFX = 88                                    # OBJ_EVENT_GFX_MOM
+    _MOM_TILE = (8, 4)                               # where she stands in the Pallet Town house (1F)
+
+    def _heal_at_home(self, force: bool = False) -> str:
+        """Mom, in the player's house in Pallet Town, restores the whole party (HP, PP, status) for free — no trek to the nearest Center (Cinnabar's, from Route 21).
+        Walk next to her, face her and press A through her talk until the party is whole; the same loop as the nurse's."""
+        from game.state import GameContext
+        moms = self.reader.read_objects_by_gfx([self._MOM_GFX])
+        mx, my = moms[0] if moms else self._MOM_TILE
+        here = None
+        for tx, ty, face in ((mx + 1, my, "Left"), (mx, my + 1, "Up"), (mx - 1, my, "Right"), (mx, my - 1, "Down")):
+            self._walk_to(tx, ty)
+            if tuple(self.reader.read_player_pos()) == (tx, ty):
+                here = face
+                break
+        if here is None:
+            return f"Couldn't reach Mom at {(mx, my)} (at {self.reader.read_player_pos()}). Try walk_to next to her, then talk (A)."
+        self.mgba.tap(here)                          # face her
+        for _ in range(40):
+            if not self._party_needs_heal():
+                self._advance_to_control(tries=24)
+                from agent import events
+                events.emit("heal", "party healed by Mom at home in Pallet Town")
+                return "Healed the party to full HP and PP — Mom did it at home in Pallet Town."
+            self.mgba.tap("A")
+            self.mgba.tick(12)
+            if self.reader.detect_context() == GameContext.IN_BATTLE:
+                return "A battle started while healing — handle it, then heal again."
+        return "Talked to Mom but couldn't confirm a full heal — try heal again, or check you're facing her."
 
     def _heal(self, force: bool = False) -> str:
         """Heal the whole party at a Pokémon Center. Travels to the nearest one if
@@ -175,10 +218,10 @@ class OverworldMixin:
             return ("Victory Road has no Pokémon Center and the Bag has nothing to heal with — push on to the Indigo Plateau Center "
                     "(quest('victory_road') resumes) instead of walking back.")
         # Get inside a Pokémon Center first (resumable travel).
-        if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
+        if MAP_KIND.get(self.reader.read_current_map()) not in self._healer_kinds():
             tried = [self._resolve_destination("Pokemon Center")[0]]       # the Center the trip heads for first
             res = self._go_to("Pokemon Center", mode="flee", resume_call="heal()")
-            while (MAP_KIND.get(self.reader.read_current_map()) != "pokecenter" and len(tried) < 3
+            while (MAP_KIND.get(self.reader.read_current_map()) not in self._healer_kinds() and len(tried) < 3
                    and ("blocked" in res or "stuck at" in res or "Can't reach" in res)):
                 # The nearest Center on paper may not be reachable (Route 23: the graph walks its North edge to the Indigo Plateau's Center, but the way is
                 # a Surf gap / the League's own gate): try the next-nearest — Viridian's, across the water — before giving up on a Center.
@@ -187,12 +230,14 @@ class OverworldMixin:
                     break
                 tried.append(alt)
                 res = self._go_to(f"map:{alt[0]},{alt[1]}", mode="flee", resume_call="heal()")
-            if MAP_KIND.get(self.reader.read_current_map()) != "pokecenter":
+            if MAP_KIND.get(self.reader.read_current_map()) not in self._healer_kinds():
                 if "blocked" in res or "stuck at" in res or "Can't reach" in res:
                     used = self._field_heal()          # no Center reachable from here (a cave, a Surf gap): the Bag has to do
                     if used:
                         return f"No Pokémon Center is reachable from here ({res}) — healed from the Bag instead: {', '.join(used)}."
                 return f"On the way to a Pokémon Center to heal: {res}"
+        if MAP_KIND.get(self.reader.read_current_map()) == "home":
+            return self._heal_at_home(force)
         # Walk to the nurse's counter and face her.
         nx, ny = self._nurse_tile()
         self._walk_to(nx, ny)
@@ -600,13 +645,26 @@ class OverworldMixin:
                     todo.append(n)
         return seen
 
+    def _grind_tiles(self) -> list[tuple[int, int]]:
+        """Where a step can start a wild battle on this map: its tall grass — or, in the Pokémon Mansion (no grass; every floor tile encounters), its floor."""
+        from knowledge.map_graph import CAVE_GRIND_MAPS
+        if tuple(self.reader.read_current_map()) in CAVE_GRIND_MAPS:
+            return self.tilemap.land_encounter_tiles()
+        return self.tilemap.grass_tiles()
+
+    def _on_grind_tile(self, px: int, py: int) -> bool:
+        from knowledge.map_graph import CAVE_GRIND_MAPS
+        if tuple(self.reader.read_current_map()) in CAVE_GRIND_MAPS:
+            return self.tilemap.is_land_encounter_tile(px, py)
+        return self.tilemap.is_tall_grass(px, py)
+
     def _nearest_grass(self) -> tuple[int, int] | None:
         """Closest REACHABLE tall-grass tile to the player on the current map (Manhattan), or None if the map has no grass — or
         only grass walled off behind Cut trees we cannot cut (Route 8's fenced pocket: heading for it by distance alone sent the
         run ping-ponging between the two trees and off to Route 10 and back). Uses the metatile-behavior reader so grind can
         route the player onto a real patch instead of guessing from encounters."""
         self.tilemap.refresh()
-        tiles = self.tilemap.grass_tiles()
+        tiles = self._grind_tiles()
         if not tiles:
             return None
         here = self.reader.read_current_map()
@@ -741,7 +799,7 @@ class OverworldMixin:
         route back onto grass / relocate to a grassy route. Returns an abort message when grass
         can't be reached, else None. `st` carries {"stuck", "reloc"} between calls."""
         px, py = self.reader.read_player_pos()
-        if self.tilemap.is_tall_grass(px, py):
+        if self._on_grind_tile(px, py):
             self._wander_step()           # on grass — pace back and forth to trigger encounters
             st["stuck"] = 0
             return None
@@ -866,6 +924,10 @@ class OverworldMixin:
         for _ in range(8):
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 from game.constants import Addr
+                shiny = self._wild_shiny()
+                if shiny:                                     # never flee or autopilot a shiny: hand it to the model to catch
+                    return (f"A SHINY {shiny.species_name} L{shiny.level} appeared while healing ({why})! Catch it: weaken it gently, sleep/paralyse it, "
+                            "then catch() (load_state(9) retries if it faints). Then call heal() / grind() again.")
                 if not (self.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER):
                     self._flee_battle()
                 if self.reader.detect_context() == GameContext.IN_BATTLE:
@@ -1278,7 +1340,7 @@ class OverworldMixin:
                 return False
             active = self.reader.read_active_battle_species()
             mine = next((p for p in party if p.species_id == active), party[0])
-            if foe.level > mine.level + self._GRIND_AUTO_MARGIN:
+            if foe.level > mine.level + self._GRIND_AUTO_MARGIN or getattr(foe, "is_shiny", False):       # a shiny is never autopiloted: it is caught, not beaten
                 return False
             if run["catch"] and self._ball_count() > 0:
                 from knowledge.catch_policy import evaluate
