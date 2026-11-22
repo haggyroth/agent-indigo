@@ -71,10 +71,10 @@ class FieldItemMixin:
             return sick[0] if sick else None
         return 0
 
-    def _field_heal(self, max_uses: int = 10) -> list[str]:
+    def _field_heal(self, max_uses: int = 10, below: float = 0.5) -> list[str]:
         """Heal from the Bag when no Pokémon Center can be reached (deep in Victory Road, the Surf gap on Route 23): Revives for the
         fainted, then the smallest Potion that fills the gap for whoever is hurt worst. Returns the item names used (empty = nothing
-        usable or nothing needed). Stops once nobody is under half HP."""
+        usable or nothing needed). Stops once nobody is under `below` of their HP (half by default; the Elite Four's sealed rooms ask for more)."""
         used: list[str] = []
         for _ in range(max_uses):
             party = self.reader.read_party()
@@ -82,7 +82,7 @@ class FieldItemMixin:
                 break
             bag = dict(self.reader.read_items_pocket())
             dead = [p for p in party if p.current_hp == 0]
-            hurt = [p for p in party if 0 < p.current_hp < 0.5 * p.max_hp]
+            hurt = [p for p in party if 0 < p.current_hp < below * p.max_hp]
             if dead and bag.get(24):
                 item = 24
             elif hurt:
@@ -97,7 +97,7 @@ class FieldItemMixin:
             if item is None:
                 break
             res = self._field_use_item(ITEM_NAMES[item])
-            if res.startswith(("Couldn't", "No ", "Nobody", "Don't")):
+            if not res.startswith("Used"):               # "In a battle…", "Couldn't…", "No …": nothing was used — never count it (a refusal looked like twelve Revives)
                 break
             used.append(ITEM_NAMES[item])
         return used

@@ -1066,6 +1066,11 @@ class NavMixin:
         if target_map is None:
             return self._stop("unknown_destination", target_name)   # error message
 
+        # The Elite Four's rooms seal behind you: no trip anywhere leaves them (a watched run tried go_to('Pokemon Center') / shop() in Lorelei's room for 300 calls).
+        from knowledge.league_rooms import LEAGUE_ROOM_MAPS, SEALED
+        if tuple(self.reader.read_current_map()) in LEAGUE_ROOM_MAPS and tuple(target_map) not in LEAGUE_ROOM_MAPS:
+            return self._stop("no_walk", f"Can't travel to {target_name} from here. {SEALED}")
+
         # Some trips have NO walking route (knowledge.travel_rules.NO_WALK, e.g. Cerulean back west of Route 4).
         why_not = no_walk_reason(self.reader.read_current_map(), target_map, self.reader.read_player_pos())
         if why_not:

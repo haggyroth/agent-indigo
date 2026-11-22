@@ -88,6 +88,9 @@ class LeagueMixin:
                 if self.reader.read_flag(flag):
                     self._walk_to(*exit_tile)                      # the door opened when they fell: through it
                 else:
+                    used = self._field_heal(max_uses=12, below=0.6)      # sealed in: the Bag is the only Center, so top the team up before this trainer
+                    if used:
+                        events.emit("note", f"Elite Four: healed from the Bag before {who}: {', '.join(used)}", log=False)
                     self._set_boss_lead()                          # the strongest leads each Elite Four / Champion fight
                     self._walk_to(*stand)
                     if tuple(self.reader.read_player_pos()) == stand:
