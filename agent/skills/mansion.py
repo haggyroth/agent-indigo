@@ -56,6 +56,20 @@ class MansionMixin:
         def near(fl, x, y):
             return fl == floor0 and abs(x - gx) + abs(y - gy) <= 1
 
+        acted = self._mansion_exec(near)
+        if acted and tuple(self.reader.read_current_map()) == floor0 \
+                and abs(self.reader.read_player_pos()[0] - gx) + abs(self.reader.read_player_pos()[1] - gy) <= 1:
+            self._in_puzzle = True
+            try:
+                self._walk_to(gx, gy)                                          # step through the exit we could reach
+            finally:
+                self._in_puzzle = False
+        return acted
+
+    def _mansion_exec(self, near) -> bool:
+        """Run the Mansion planner's first actions (walk / press a statue / take a stairs or hole), re-planning after each, until `near(floor, x, y)` holds
+        or something (a battle, a stuck tile) stops it. True if it acted."""
+        from knowledge.mansion_route import plan
         acted, last, stuck = False, None, 0
         for _ in range(40):
             here = tuple(self.reader.read_current_map())
@@ -84,14 +98,16 @@ class MansionMixin:
             finally:
                 self._in_puzzle = False
             acted = True
-        if acted and tuple(self.reader.read_current_map()) == floor0 \
-                and abs(self.reader.read_player_pos()[0] - gx) + abs(self.reader.read_player_pos()[1] - gy) <= 1:
-            self._in_puzzle = True
-            try:
-                self._walk_to(gx, gy)                                          # step through the exit we could reach
-            finally:
-                self._in_puzzle = False
         return acted
+
+    def _mansion_to_floor(self, floor) -> bool:
+        """Travel between two Mansion floors with the Mansion's own planner (stairs, holes and the statue switch, barriers as they are NOW). go_to's generic
+        warp graph knows none of that: after a wild battle on 2F it routed back DOWN to 1F (the shortest hop count to B1F), the planner then led up again,
+        and the trip ping-ponged between floors (watched run, 2026-11-22). True if it acted."""
+        floor = tuple(floor)
+        if tuple(self.reader.read_current_map()) == floor or floor not in FLOORS:
+            return False
+        return self._mansion_exec(lambda fl, x, y: fl == floor)
 
     def _mansion_leave(self) -> bool:
         """Out of the Mansion by whichever 1F exit the switch lets us reach (see _mansion_walk). True if it acted."""
