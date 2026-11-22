@@ -64,13 +64,24 @@ class VictoryMixin:
                 return f"Stepped onto ({leg[0]},{leg[1]})."
         return self._walk_to(*leg)
 
+    def _confirm_with_a(self) -> None:
+        """Answer a field 'Use Strength?' box with A only (the cursor starts on YES) until the script engine is idle — never a Down press, for tiles a Down press fires."""
+        for _ in range(8):
+            if self.mgba.read8(Addr.SCRIPT_RAM) == 0 or self.reader.detect_context() == GameContext.IN_BATTLE:
+                return
+            self.mgba.tap("A")
+            self.mgba.tick(30)
+
     def _vr_push(self, stand, direction) -> None:
         """From `stand` push the boulder beside it: face it, press A (the first time on a floor: 'use Strength?' → YES), then walk into it."""
         self.mgba.tap(direction)
         self.mgba.tick(8)
         self.mgba.tap("A")
         self.mgba.tick(40)
-        self._answer_field_yes()
+        if (tuple(self.reader.read_current_map()), tuple(stand)) in vr_route.DOWN_ARROW:
+            self._confirm_with_a()          # the cave's entrance tile is a DOWN arrow warp: _answer_field_yes probes the choice box with Down, which walked out and reset the boulders
+        else:
+            self._answer_field_yes()
         self._advance_to_control(tries=20)
         if tuple(self.reader.read_player_pos()) == tuple(stand):
             self.mgba.hold(direction, 12)              # under one 16-frame step: a longer hold started a SECOND push whenever the frame phase allowed it, and the boulder overshot its stop

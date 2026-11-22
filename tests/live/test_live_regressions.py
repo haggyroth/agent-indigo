@@ -2440,3 +2440,36 @@ def test_a_trip_between_mansion_floors_never_doubles_back_down_to_1f(live):
     assert c._go_to("Pokemon Mansion B1F", mode="flee").startswith("Arrived")
     assert tuple(live.r.read_current_map()) == (1, 62)
     assert (1, 61) in floors and (1, 59) not in floors[:floors.index((1, 61))], floors      # up to 3F first; never back down to 1F on the way
+
+
+def test_victory_road_pushing_a_boulder_up_from_the_entrance_tile_does_not_leave_the_cave(live):
+    """A watched run: 1F's switch boulder ends up at (11,19), directly above the cave's entrance arrow warp (11,20), and the push UP has to be made FROM that tile. The push's 'Use Strength?' answer probed the
+    choice box with a Down press — which fires the entrance's down-arrow warp, walked out, reset the boulders, and the whole 19-push sequence started over. Pushing from the entrance tile must keep the player in the cave."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("viridian city", badges=0xFF)
+    live.strong_lead()
+    pushes = []
+    orig = c._vr_push
+
+    def push(stand, direction):
+        orig(stand, direction)
+        pushes.append((tuple(stand), direction, tuple(live.r.read_current_map())))
+    c._vr_push = push
+    for _ in range(60):
+        if live.r.detect_context().name != "IN_BATTLE":
+            live.boost_party()
+            live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        else:
+            c._auto_fight()
+            continue
+        c._execute("quest", json.dumps({"name": "victory_road", "auto_trainers": True}))
+        if any(p[0] == (11, 20) for p in pushes):
+            break
+    entrance = [p for p in pushes if p[0] == (11, 20)]
+    assert entrance, pushes
+    assert all(p[2] == (1, 39) for p in entrance), entrance                          # still on 1F after pushing from the entrance tile
