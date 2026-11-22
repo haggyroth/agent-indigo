@@ -807,8 +807,8 @@ class NavMixin:
         from knowledge.map_graph import DUNGEON_MAPS
         from knowledge.vr_data import FLOORS as _VR_FLOORS
         if tuple(end_map) in _VR_FLOORS:
-            return (f"You're inside {here}: its way on is a boulder puzzle that go_to / walk_to cannot solve (a boulder has to be pushed onto a floor switch to open the barrier). "
-                    "Call quest('victory_road') — it plans every push from wherever you stand and resumes after each battle.")
+            return (f"You're inside {here}: its way on is a boulder puzzle that walk_to cannot solve (a boulder has to be pushed onto a floor switch to open the barrier). "
+                    "go_to plans it for you in both directions — 'Indigo Plateau' (or quest('victory_road')) to go on, any town to the south to go back — and resumes after each battle.")
         if end_map in DUNGEON_MAPS:
             # A cave maze, not a gated road — don't send the "you need an HM" message that
             # made the agent backtrack out of Mt. Moon. Tell it to keep pushing through.
@@ -1049,12 +1049,6 @@ class NavMixin:
         if target_map is None:
             return self._stop("unknown_destination", target_name)   # error message
 
-        # Inside Victory Road the way to the Plateau is the boulder puzzle, which the warp graph knows nothing about: a watched run's go_to / walk_to wandered 2F <-> 3F for 300 calls without ever
-        # pushing the boulder onto 2F's second switch (the barrier in front of the south-east ladder). quest('victory_road') solves it from wherever the player stands.
-        from knowledge.vr_data import FLOORS as _VR_FLOORS
-        if tuple(self.reader.read_current_map()) in _VR_FLOORS and tuple(target_map) == (3, 9):
-            return self._get_victory_road(auto_trainers)
-
         # Some trips have NO walking route (knowledge.travel_rules.NO_WALK, e.g. Cerulean back west of Route 4).
         why_not = no_walk_reason(self.reader.read_current_map(), target_map, self.reader.read_player_pos())
         if why_not:
@@ -1089,6 +1083,15 @@ class NavMixin:
             from knowledge.mansion_data import FLOORS as _MANSION
             if tuple(cur) in _MANSION and tuple(target_map) not in _MANSION and self._mansion_leave():
                 continue                        # the Mansion's barriers hang on one statue switch: its own search gets us out
+            from knowledge.vr_data import FLOORS as _VR_FLOORS
+            if tuple(cur) in _VR_FLOORS and tuple(target_map) not in _VR_FLOORS:
+                # Inside Victory Road the way on is the boulder puzzle, which the warp graph knows nothing about: a watched run's go_to / walk_to wandered 2F <-> 3F for 300 calls without
+                # pushing the boulder onto 2F's second switch (and, from the Plateau, walked into the walled-in ladder pocket at (36,17)). The cave's own planner goes either way.
+                if tuple(target_map) == (3, 9):
+                    return self._get_victory_road(auto_trainers)
+                if (msg := self._vr_back(f"go_to({destination!r})", auto_trainers)):      # anywhere else is back SOUTH: the cave resets when you leave it north, so the way down is the puzzle in reverse
+                    return msg
+                continue
             if tuple(cur) in _MANSION and tuple(target_map) in _MANSION and tuple(cur) != tuple(target_map) and self._mansion_to_floor(target_map):
                 continue                        # floor to floor INSIDE the Mansion: its planner, not the warp graph (which sent a trip on 2F back down to 1F after every fight)
             if cur == target_map:

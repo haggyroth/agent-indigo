@@ -188,3 +188,92 @@ def waypoints(here, pos, target, boulders, pressed=frozenset(), leg: int = 8):
             run = 0
         prev_dir = d
     return out
+
+
+EXIT_SOUTH = (VR_1F, (11, 20))                   # the entrance arrow warp: holding Down on it walks out to Route 23's south half
+_BACK: dict = {}                                 # the hop list last found by plan_back, keyed by the situation it was solved in
+
+
+def _apply(f, boulders, pressed, pos, sol):
+    """(boulders, pressed, end tile) after the push sequence `sol` ([("push", stand, dir)…, ("goto", tile)])."""
+    b, pr = set(boulders), set(pressed)
+    for step in sol:
+        if step[0] == "goto":
+            return b, pr, tuple(step[1])
+        dx, dy = _DIRS[step[2]]
+        old = (step[1][0] + dx, step[1][1] + dy)
+        new = (old[0] + dx, old[1] + dy)
+        b.discard(old)
+        if new not in f.holes:
+            b.add(new)
+        if new in f.switch_at:
+            pr.add(f.switch_at[new])
+    return b, pr, tuple(pos)
+
+
+_SOLVED: dict = {}                               # solve() results for plan_back, keyed by the whole situation: later floors repeat between re-plans
+
+
+def _solve_cached(f, fl, at, boulders, pressed, w, limit):
+    k = (fl, tuple(at), tuple(sorted(boulders)), tuple(sorted(pressed)), tuple(w), limit)
+    if k not in _SOLVED:
+        _SOLVED[k] = solve(f, at, boulders, pressed, [w], limit=limit)
+    return _SOLVED[k]
+
+
+def plan_back(here, pos, boulders, pressed=frozenset(), all_pressed=None, limit: int = 8000):
+    """plan_back_once with a cheap pass first (limit 1500 per hop), then the full budget: the hops that matter are short, the expensive ones only slow the search down."""
+    for lim in (1500, limit):
+        out = _plan_back(here, pos, boulders, pressed, all_pressed, lim)
+        if out is not None:
+            return out
+    return None
+
+
+def _plan_back(here, pos, boulders, pressed, all_pressed, limit):
+    """The next action for walking OUT of the cave to Route 23's south half from floor `here` (the way back after the Plateau, with no Fly):
+    ("warp", tile, button) · ("push", stand, direction) · None when no route is found. The cave resets its switches and boulders when you leave it north, so the way down
+    is the puzzle run in reverse (from the east door: 3F's push, 2F west's push, 1F's two pushes — found by a search over floor hops, `solve` per hop). Each call re-plans from the live floor
+    state; later floors start from their decomp boulders with the switches `all_pressed` says are pressed."""
+    pos = tuple(pos)
+    boulders = tuple(sorted(map(tuple, boulders)))
+    pressed = frozenset(pressed)
+    ap = {fl: frozenset((all_pressed or {}).get(fl, ())) for fl in FLOORS}
+    ap[here] = pressed
+    key = (here, pos, boulders, tuple(sorted((k, tuple(sorted(v))) for k, v in ap.items())))
+    key = key + (limit,)
+    if key in _BACK:
+        return _BACK[key]
+    queue = deque([(here, pos, tuple(boulders), tuple(sorted((k, tuple(sorted(v))) for k, v in ap.items())), None)])
+    seen = set()
+    result = None
+    while queue and result is None:
+        fl, at, bl, prs, first = queue.popleft()
+        if (fl, at, prs) in seen:
+            continue
+        seen.add((fl, at, prs))
+        prd = {k: frozenset(v) for k, v in prs}
+        f = floor(fl)
+        cur_b = set(bl) if (fl == here and first is None) else set(initial_boulders(fl, False))
+        targets = [(w, WARPS[(fl, w[0], w[1])]) for w in sorted(f.warps)]          # a ladder we stand on counts: the driver steps off it and back
+        if fl == EXIT_SOUTH[0]:
+            targets.insert(0, (EXIT_SOUTH[1], None))
+        for w, dest in targets:
+            sol = _solve_cached(f, fl, at, cur_b, prd[fl], w, limit)
+            if sol is None:
+                continue
+            act = ("warp", w, button(fl, w)) if sol[0][0] == "goto" else ("push", sol[0][1], sol[0][2])
+            nfirst = first or act
+            if dest is None:
+                if fl == EXIT_SOUTH[0] and w == EXIT_SOUTH[1]:
+                    result = nfirst
+                    break
+                continue                                             # another exit (the north door): not the way we want
+            b2, pr2, _end = _apply(f, cur_b, prd[fl], at, sol)
+            nprd = dict(prd)
+            nprd[fl] = frozenset(pr2)
+            queue.append((dest[0], (dest[1], dest[2]), (), tuple(sorted((k, tuple(sorted(v))) for k, v in nprd.items())), nfirst))
+    _BACK.clear()
+    _BACK[key] = result
+    return result
+
