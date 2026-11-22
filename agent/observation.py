@@ -390,10 +390,10 @@ def _one_shot(t: Tick, enemy, move_names, pp_view) -> str:
     """The ONE-SHOT protocol for a Snorlax / legendary foe (knowledge.one_shot), and the battle-start save it promises (slot 9, once per encounter)."""
     from knowledge.leafgreen_data import MOVE_POWER
     from knowledge.one_shot import SAVE_SLOT, gentlest_move, is_one_shot, protocol
-    shiny = bool(enemy and not t.run.battle_is_trainer and getattr(enemy, "is_shiny", False))
+    shiny = bool(enemy and not getattr(t.run, "battle_is_trainer", False) and getattr(enemy, "is_shiny", False))
     if not enemy or not enemy.max_hp or not is_one_shot(enemy.species_id, t.map_key, shiny):
         return ""
-    key = (enemy.species_id, tuple(t.map_key), enemy.personality)
+    key = (enemy.species_id, tuple(t.map_key))
     if getattr(t.run, "one_shot_saved", None) != key:
         if t.reader.client.save_state(SAVE_SLOT):             # the very first look at this foe: nothing has hit it yet
             t.run.one_shot_saved = key
