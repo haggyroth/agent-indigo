@@ -120,7 +120,7 @@ MILESTONES: tuple[str, ...] = (
     "beat_surge", "got_flash", "cleared_rock_tunnel",
     "got_silph_scope", "rescued_mr_fuji", "got_poke_flute",
     "beat_erika", "beat_koga", "beat_sabrina", "beat_blaine", "beat_giovanni",
-    "got_surf", "got_strength",
+    "got_surf", "got_strength", "got_fly",
     "woke_snorlax_12", "woke_snorlax_16",
 )
 

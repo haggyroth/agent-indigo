@@ -872,7 +872,9 @@ def nearest_of_kind(start, kind, exclude=()):
 # standing in a city). Routes + Viridian Forest; the runtime grass check filters
 # any that turn out to be all-water, so this stays a superset, not a hand audit.
 # The Pokémon Mansion has no tall grass: every floor tile of its four floors rolls land encounters (Grimer, Koffing, Ponyta, Muk… L26-38), so grind treats those tiles as its grass.
-CAVE_GRIND_MAPS: frozenset = frozenset({(1, 59), (1, 60), (1, 61), (1, 62)})
+# Victory Road (wild L32-48, every floor tile encounters) is the same: the nearest decent training ground for a team that has cleared the gyms, instead of Cinnabar's Mansion at the other end of the map.
+VICTORY_ROAD_MAPS: frozenset = frozenset({(1, 39), (1, 40), (1, 41)})
+CAVE_GRIND_MAPS: frozenset = frozenset({(1, 59), (1, 60), (1, 61), (1, 62), *VICTORY_ROAD_MAPS})
 GRASS_MAPS: frozenset = frozenset({(1, 0), *((3, i) for i in range(19, 45)), *CAVE_GRIND_MAPS})
 
 

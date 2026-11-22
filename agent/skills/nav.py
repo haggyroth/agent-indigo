@@ -8,6 +8,7 @@ import logging
 from rich.console import Console
 
 from agent.skills.base import log_once
+from knowledge.distance import PLATEAU_CENTER
 from knowledge.navigation import MAP_NAMES, nearest_mart
 from knowledge.travel_rules import PC_TOWNS, no_walk_reason
 
@@ -550,6 +551,19 @@ class NavMixin:
             return "gym"
         return None
 
+    def _plateau_side(self) -> bool:
+        """Is the player on the Indigo Plateau's side of Victory Road (the Plateau, the League, Route 23's north half) rather than south of the cave?"""
+        from knowledge.map_graph import region_at
+        cur = tuple(self.reader.read_current_map())
+        if cur == (3, 9) or cur[0] == 13:
+            return True
+        if cur == (3, 42):
+            try:
+                return region_at(cur, *self.reader.read_player_pos()) == "0"
+            except Exception:
+                return False
+        return False
+
     def _resolve_destination(self, destination: str):
         """Resolve a go_to destination string to (target_map, name). Accepts a map
         name (exact/partial) or a waypoint (pokemon center / mart / gym, matched
@@ -576,7 +590,8 @@ class NavMixin:
             # to Viridian's gym (locked until 7 badges), instead of onward (#92).
             return self._resolve_next_gym()
         if kind:
-            found = nearest_mart(cur) if kind == "mart" else nearest_of_kind(cur, self._healer_kinds() if kind == "pokecenter" else kind)
+            skip = () if kind != "pokecenter" or self._plateau_side() else (PLATEAU_CENTER,)         # the Plateau's Center is behind Victory Road's puzzles: not a Center to head for from the south
+            found = nearest_mart(cur) if kind == "mart" else nearest_of_kind(cur, self._healer_kinds() if kind == "pokecenter" else kind, exclude=skip)
             if not found:
                 return None, f"No {dest} reachable from here."
             target_map = found[0]

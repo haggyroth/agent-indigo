@@ -4,7 +4,7 @@ Wild XP scales with the foe's level and is split between participants, so a patc
 and barely moves a L10 (and its foes can KO the L10). A human trains the weak one where the wild Pokémon are about its
 own level. Data: knowledge.encounters (generated from the decomp)."""
 from knowledge.encounters import LAND_LEVELS
-from knowledge.map_graph import GRASS_MAPS, nearest_grass, route_to
+from knowledge.map_graph import GRASS_MAPS, VICTORY_ROAD_MAPS, nearest_grass, route_to
 
 AIM_ABOVE = 1.5        # ideal average wild level relative to the trainee
 HOT_MARGIN = 6         # a route whose strongest wild Pokémon is this far above the trainee is too dangerous
@@ -52,6 +52,8 @@ def best_grass(start, level: int, exclude_current: bool = False, avoid=(), objec
     for m in GRASS_MAPS:
         if m in avoid or m not in LAND_LEVELS or (exclude_current and m == tuple(start[:2])):
             continue
+        if m in VICTORY_ROAD_MAPS and m != (1, 39) and tuple(start[:2]) not in VICTORY_ROAD_MAPS:
+            continue             # 2F / 3F sit behind the boulder puzzles: a site only for someone already inside the cave (1F is open from the entrance)
         steps = route_to(start, m)
         if steps is None:
             steps = route_to(tuple(start[:2]), m)

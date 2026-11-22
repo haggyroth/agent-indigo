@@ -146,7 +146,7 @@ def test_heal_falls_back_to_the_next_center_when_the_nearest_is_unreachable():
     """Route 23 with a fainted party: the graph's nearest Center (the Indigo Plateau's) is not reachable, so heal() must try the next one (Viridian's) instead of giving up —
     the chain stalled on this for 2,000+ calls."""
     c = AgentClient.__new__(AgentClient)
-    c.reader = _Where((3, 42), (10, 72), [_mon(0, 100)])
+    c.reader = _Where((3, 42), (10, 5), [_mon(0, 100)])         # Route 23's NORTH half: the Plateau's Center is the nearest on paper (from the south it is not even tried)
     c.mgba = c.reader
     trips = []
 
