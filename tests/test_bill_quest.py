@@ -44,3 +44,14 @@ def test_vermilion_gym_is_gated_on_cut():
     route = [("warp", (13, 28), (9, 6))]
     unmet = unmet_gates(route, lambda req: False)
     assert unmet and "Cut" in unmet[0][1].hint and "S.S. Anne" in unmet[0][1].hint
+
+
+def test_victory_road_is_gated_on_fly_until_the_plateau_has_been_visited():
+    """Victory Road 1F needs Strength AND Fly (the way home from the Plateau); a visit to the Plateau (FLAG_VISITED_INDIGO_PLATEAU) lifts the Fly gate."""
+    route = [("warp", (1, 1), (1, 39, "0"))]
+    reqs = MAP_GATES[(1, 39)]
+    assert [r.value for r in reqs] == ["Strength", "Fly"]
+    fly = reqs[1]
+    assert fly.alt_flag == 0x899 and "quest('fly')" in fly.hint
+    assert [r.value for _i, r in unmet_gates(route, lambda req: req.value != "Fly")] == ["Fly"]
+    assert unmet_gates(route, lambda req: True) == []

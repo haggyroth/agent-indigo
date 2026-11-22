@@ -847,6 +847,8 @@ class NavMixin:
                 return max((p.level for p in self.reader.read_party()), default=0) >= int(req.value)
             if req.kind == "hm":
                 move_id, bit = HM_BADGE[req.value]
+                if req.value == "Fly" and self._party_knows(move_id) is False and not self._fly_learners():
+                    return True                   # nobody in the party CAN learn Fly: an impossible gate would stall the trip for good
                 return self._party_knows(move_id) and bool(self.reader.read_badges()[1] >> bit & 1)
         except Exception:
             log_once(f"gate.{req.kind}", "nav: could not check the %s requirement — treating it as met (ignored)", req.kind)

@@ -1116,7 +1116,7 @@ def test_victory_road_quest_reaches_indigo_plateau(live):
     for _ in range(60):
         if live.r.detect_context().name != "IN_BATTLE":
             live.boost_party()                                                       # between battles only: a level-up recomputes the stats
-            live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])          # Razor Leaf, Surf, Strength, Vine Whip
+            live.patch_mon(0, moves=[75, 57, 70, 19], pps=[25, 15, 15, 15])          # Razor Leaf, Surf, Strength, Fly (the cave is gated on Fly)
         else:
             c._auto_fight()
             continue
@@ -2463,7 +2463,7 @@ def test_victory_road_pushing_a_boulder_up_from_the_entrance_tile_does_not_leave
     for _ in range(60):
         if live.r.detect_context().name != "IN_BATTLE":
             live.boost_party()
-            live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+            live.patch_mon(0, moves=[75, 57, 70, 19], pps=[25, 15, 15, 15])
         else:
             c._auto_fight()
             continue
@@ -2488,7 +2488,7 @@ def test_go_to_the_plateau_from_inside_victory_road_runs_the_boulder_quest(live)
             c._auto_fight()
             continue
         live.boost_party()
-        live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        live.patch_mon(0, moves=[75, 57, 70, 19], pps=[25, 15, 15, 15])
         out = c._execute("go_to", json.dumps({"destination": "Indigo Plateau", "force": True, "auto_trainers": True}))
         if live.r.read_flag(0x899):
             break
@@ -2506,7 +2506,7 @@ def test_walking_back_south_through_victory_road_after_the_plateau_without_fly(l
             c._auto_fight()
             continue
         live.boost_party()
-        live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        live.patch_mon(0, moves=[75, 57, 70, 19], pps=[25, 15, 15, 15])
         c._execute("go_to", json.dumps({"destination": "Indigo Plateau", "force": True, "auto_trainers": True}))
         if live.r.read_flag(0x899):
             break
@@ -2517,8 +2517,24 @@ def test_walking_back_south_through_victory_road_after_the_plateau_without_fly(l
             c._auto_fight()
             continue
         live.boost_party()
-        live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        live.patch_mon(0, moves=[75, 57, 70, 19], pps=[25, 15, 15, 15])
         out = c._execute("go_to", json.dumps({"destination": "Route 22", "force": True, "auto_trainers": True}))
         if tuple(live.r.read_current_map()) == (3, 41):
             break
     assert tuple(live.r.read_current_map()) == (3, 41), (out, tuple(live.r.read_current_map()), live.r.read_player_pos())
+
+
+def test_victory_road_is_gated_on_fly(live):
+    """Victory Road has no grass beyond it and no quick way home without Fly: quest('victory_road') and go_to Victory Road both refuse until someone knows Fly (they refuse before walking anywhere)."""
+    live.load("route23_stuck")
+    c = live.c
+    live.set_badges(0xFF)
+    live.set_flag(0x899, False)                                                  # the Plateau has not been visited
+    live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])             # Strength ...
+    live.patch_mon(2, moves=[17, 16, 98, 33], pps=[35, 35, 30, 35])             # ... and the fixture's Pidgeot (it knows Fly) loses it: Wing Attack, Gust, Quick Attack, Tackle
+    here = tuple(live.r.read_current_map())
+    out = c._execute("quest", json.dumps({"name": "victory_road"}))
+    assert out.startswith("Not yet — Fly first"), out
+    out = c._execute("go_to", json.dumps({"destination": "Victory Road 1F", "force": True}))
+    assert "Fly" in out and "quest('fly')" in out, out
+    assert tuple(live.r.read_current_map()) == here

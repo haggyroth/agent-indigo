@@ -35,6 +35,10 @@ _RIVAL_HINT = ("Your rival ambushes you at Cerulean's north exit on the way to R
                "walk north yourself (walk_to / go_to_map('Up') from Cerulean) and fight him by hand with use_move / switch_pokemon (Fire beats a Grass "
                "starter's counter, Flying hits Grass).")
 
+_FLY_HINT = ("Past Victory Road there is no grass to train on and no quick way home: the Plateau's Center is the only one, and the way back south is the cave's boulder puzzle in reverse. "
+             "Get Fly first — quest('fly') (HM02, the house at Route 16's west end), teach_move('Fly') to a Pokémon, and train the team up before you go: the Elite Four wants a best Pokémon "
+             "of L54 and five at L46+.")
+
 MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 43): [Req("level", 21, _RIVAL_HINT, alt_flag=0x29B)],     # Route 24: Cerulean's rival ambush; FLAG_GOT_FAME_CHECKER is set when that scene ends
     (3, 21): [Req("badges", 1, _PEWTER_HINT)],           # Route 3, Pewter's east exit (checked against the GAME's badge byte, not memory)
@@ -66,7 +70,8 @@ MAP_GATES: dict[tuple[int, int], list[Req]] = {
     (3, 39): [Req("hm", "Surf", "Route 21 is open water south of Pallet — you need Surf.")],
     (3, 40): [Req("hm", "Surf", "Route 21 is open water south of Pallet — you need Surf.")],
     (1, 83): [Req("hm", "Surf", "Seafoam Islands needs Surf (and Strength for its boulders).")],
-    (1, 39): [Req("hm", "Strength", "Victory Road's boulders need Strength (HM04 — quest('strength')).")],
+    (1, 39): [Req("hm", "Strength", "Victory Road's boulders need Strength (HM04 — quest('strength')).")]
+             + [Req("hm", "Fly", _FLY_HINT, alt_flag=0x899)],
     (3, 35): [Req("key_item", BICYCLE, "Route 17 is the Cycling Road: you need the Bicycle (quest('bike'): the Fan Club's voucher in Vermilion, then the Cerulean Bike Shop), and Route 16's Snorlax "
                   "must be woken too. Fuchsia needs neither: walk south from Lavender down Routes 12-15 (quest('snorlax') first).")],
     (3, 42): [Req("badges", 8, "Route 23's checkpoints only let you through with all 8 badges.")],
