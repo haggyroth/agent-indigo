@@ -10,6 +10,7 @@ from agent import events
 from game.state import GameContext
 
 CENTER_1F, EXTERIOR = (13, 0), (3, 9)
+FLAG_VISITED_PLATEAU = 0x899      # FLAG_VISITED_INDIGO_PLATEAU — set on the first arrival; also what unlocks it as a Fly destination
 HALL_OF_FAME = (1, 80)
 FLAG_GAME_CLEAR = 0x82C
 FLAG_DEFEATED_CHAMP = 0x4BC
@@ -67,6 +68,7 @@ class LeagueMixin:
             return "The Pokémon League's door needs all eight badges."
         prep = ""
         stuck, last = 0, None
+        fly_tried = False
         for _ in range(120):
             if (b := self._hideout_fight(call, "the Pokémon League", auto_trainers)):
                 return b
@@ -104,6 +106,12 @@ class LeagueMixin:
                 if (msg := self._hideout_travel("Pokemon Center", CENTER_1F, call, auto_trainers)):
                     return msg
                 continue
+            if not fly_tried:
+                # Back from a blackout the way on is Victory Road again — whose boulder puzzles RESET when you leave the floor and which this driver cannot solve (the
+                # chain looped 300 calls between Route 23 and the cave). Once the Plateau has been visited it is a Fly town: a Fly user takes the League's door directly.
+                fly_tried = True
+                if self.reader.read_flag(FLAG_VISITED_PLATEAU) and self._fly_to("Indigo Plateau").startswith("Flew"):
+                    continue
             if (msg := self._hideout_travel("Indigo Plateau", EXTERIOR, call, auto_trainers)):
                 return msg
         return f"Made progress in the Pokémon League — call {call} again to continue (it resumes from the room you are in)."
