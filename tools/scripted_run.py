@@ -20,6 +20,7 @@ def main():
     ap.add_argument("--chain", action="store_true", help="drive the whole story chain with quest() (ChainPolicy) instead of the four-gym plan")
     ap.add_argument("--max-steps", type=int, default=300)
     ap.add_argument("--max-wall", type=float, default=1800, help="wall-clock cap, seconds")
+    ap.add_argument("--no-stop-on-stall", action="store_true", help="keep going after the policy records a stall (default: end the run with reason 'stalled')")
     ap.add_argument("--state", default="", help="start from this emulator state instead of the save")
     ap.add_argument("--save", default=os.path.expanduser("~/mgba-http/Pokemon_LeafGreen.sav"))
     a = ap.parse_args()
@@ -50,7 +51,8 @@ def main():
     t0 = time.time()
     try:
         res = main.run_episode(rt, goal=goal, goal_desc=a.goal, max_steps=a.max_steps,
-                               max_wall_s=a.max_wall, verbose=False, run_log=rlog)
+                               max_wall_s=a.max_wall, verbose=False, run_log=rlog,
+                               should_stop=None if a.no_stop_on_stall else (lambda: getattr(policy, "stall", "")))
     finally:
         rlog.close()
     print(f"\nlog: {rlog.dir}\n{res}\nwall {time.time() - t0:.0f}s")

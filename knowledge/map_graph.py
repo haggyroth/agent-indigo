@@ -779,6 +779,24 @@ def bfs_route(start, goal):
     return [(d, m) for kind, d, m in steps]
 
 
+def _region_starts(start):
+    """Region nodes to search from when `start` is a plain map on a regioned one: a tile with no region of its own — open water, the player
+    surfing mid-lake. A plain start only reaches the map's plain-keyed edges, which are phantoms there (Route 23's South connection: its bottom row
+    is solid wall and the way to Route 22 is a warp from the south shore), so go_to reported 'No walkable opening on the South edge' forever.
+    From open water any shore is reachable; each hop is re-routed from wherever the player ends up."""
+    if len(start) != 2:
+        return []
+    mp = tuple(start)
+    every = {k for k in (*_R_CONN, *_R_WARP) if len(k) == 3 and k[:2] == mp}
+    shores = {n for k, outs in _R_SRF.items() if k[:2] == mp for n in (k, *(o[2] for o in outs)) if n[:2] == mp}
+    return sorted(shores or every, key=str)         # the regions the water touches (Surf edges); a map without any: every region
+
+
+def _shortest(hits):
+    hits = [h for h in hits if h is not None]
+    return min(hits, key=lambda h: len(h[1])) if hits else None
+
+
 def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True):
     """Shortest route from start to goal over connections (and warps if warps=True).
     Returns a list of steps, [] if already there, or None if unreachable:
@@ -793,14 +811,23 @@ def route_to(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True
     if _matches(start, goal):
         return []
     avoid_maps = {tuple(m[:2]) for m in avoid_maps}
-    hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps)
-    if hit is None and warps:
-        # Same strict graph, but a Cut tree / rock may be cleared: a gate the strict view saw as a wall (Route 16's tree before the upper gatehouse) is a real way
-        # through — the region-blind fallback below would plan a direct door that skips the gatehouse.
-        hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps, blk=_R_BLK)
-    if hit is None and warps:
-        # …and water: two land regions of one map that touch the same lake / river (Route 10's Power Plant side) are joined by Surf.
-        hit = _search(start, _R_CONN, _R_WARP, lambda n, s: _matches(n, goal), warps, avoid_edges, avoid_maps, blk=_R_BLK, srf=_R_SRF)
+    def accept(n, s):
+        return _matches(n, goal)
+
+    def strict(st):
+        h = _search(st, _R_CONN, _R_WARP, accept, warps, avoid_edges, avoid_maps)
+        if h is None and warps:
+            # Same strict graph, but a Cut tree / rock may be cleared: a gate the strict view saw as a wall (Route 16's tree before the upper gatehouse) is a real way
+            # through — the region-blind fallback below would plan a direct door that skips the gatehouse.
+            h = _search(st, _R_CONN, _R_WARP, accept, warps, avoid_edges, avoid_maps, blk=_R_BLK)
+        if h is None and warps:
+            # …and water: two land regions of one map that touch the same lake / river (Route 10's Power Plant side) are joined by Surf.
+            h = _search(st, _R_CONN, _R_WARP, accept, warps, avoid_edges, avoid_maps, blk=_R_BLK, srf=_R_SRF)
+        return h
+    rstarts = _region_starts(start)
+    hit = _shortest([strict(r) for r in rstarts]) if rstarts else None       # a water tile: from any shore, not from the map's phantom plain node
+    if hit is None:
+        hit = strict(start)
     if hit is None and warps and coarse:
         # coarse fallback: plain maps; a learned-blocked edge is keyed by region node, so
         # also match it by its plain map to keep the avoidance effective.
@@ -824,9 +851,12 @@ def nearest_of_kind(start, kind, exclude=()):
 
     def ok(n, s):
         return MAP_KIND.get(n[:2]) == kind and tuple(n[:2]) not in exclude
-    hit = _search(start, _R_CONN, _R_WARP, ok)
-    if hit is None and exclude:
-        hit = _search(start, _R_CONN, _R_WARP, ok, blk=_R_BLK, srf=_R_SRF)
+    rstarts = _region_starts(start)            # a water tile: from any shore of the map, not from its phantom plain node
+    hit = _shortest([_search(r, _R_CONN, _R_WARP, ok) for r in rstarts]) if rstarts else None
+    if hit is None:
+        hit = _search(start, _R_CONN, _R_WARP, ok)
+    if hit is None and (exclude or rstarts):
+        hit = _shortest([_search(r, _R_CONN, _R_WARP, ok, blk=_R_BLK, srf=_R_SRF) for r in (rstarts or [start])])
     if hit is None:
         hit = _search(start[:2], _C_CONN, _C_WARP, ok)
     return (hit[0][:2], hit[1]) if hit else None
