@@ -410,7 +410,7 @@ TOOLS = [
         "name": "record_milestone",
         "description": "Record a story milestone to long-term memory right after it happens: starter_chosen, "
                        "delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, "
-                       "rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. "
+                       "rescued_mr_fuji, got_poke_flute, got_surf, got_strength, got_fly, woke_snorlax_12, woke_snorlax_16. "
                        "Not for gym wins — those are automatic.",
         "parameters": {"type": "object", "properties": {
             "name": {"type": "string"},

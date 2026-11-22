@@ -245,7 +245,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `save_state` | overworld | slot? | Save state to a slot.  Call before gym leaders and Elite Four. |
 | `load_state` | overworld | slot? | Load a save state.  Used after a loss. |
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
-| `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, woke_snorlax_12, woke_snorlax_16. |
+| `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, got_fly, woke_snorlax_12, woke_snorlax_16. |
 
 Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 41 tools in total.
 <!-- TOOLS:END -->

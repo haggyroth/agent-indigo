@@ -2538,3 +2538,50 @@ def test_victory_road_is_gated_on_fly(live):
     out = c._execute("go_to", json.dumps({"destination": "Victory Road 1F", "force": True}))
     assert "Fly" in out and "quest('fly')" in out, out
     assert tuple(live.r.read_current_map()) == here
+
+
+def test_grind_works_inside_victory_road_and_a_heal_walks_out_to_viridian(live):
+    """Victory Road's wild L32-48 are the nearest decent training for a team past the gyms (a watched run walked to Cinnabar's Mansion instead): grind paces 1F's floor like the Mansion's, never
+    stepping onto the entrance arrow warp, and a heal in the middle of a session walks OUT (the reverse puzzle, 1F is the entrance hall) to Viridian's Center instead of draining the Bag."""
+    import pytest
+    live.load("celadon_gym_door")
+    if live.r.read_current_map() != (10, 16):
+        pytest.skip("fixture is not at the Celadon gym door")
+    c = live.c
+    c._execute("go_to", json.dumps({"destination": "Celadon City"}))
+    live.fly_to("viridian city", badges=0xFF)
+    live.strong_lead()
+    live.patch_mon(0, moves=[75, 57, 70, 19], pps=[25, 15, 15, 15])               # Razor Leaf, Surf, Strength, Fly
+    for _ in range(40):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        c._execute("go_to", json.dumps({"destination": "Victory Road 1F", "force": True, "auto_trainers": True}))
+        if tuple(live.r.read_current_map()) == (1, 39):
+            break
+    assert tuple(live.r.read_current_map()) == (1, 39)
+    assert live.r.read_player_pos() not in c._grind_tiles()                          # the arrival tile is the entrance arrow warp
+    st = {"stuck": 0, "reloc": 0}
+    for _ in range(300):
+        if live.r.detect_context().name == "IN_BATTLE":
+            break
+        assert c._grass_step(st, "grind()") is None, st
+        assert tuple(live.r.read_current_map()) == (1, 39) or live.r.detect_context().name == "IN_BATTLE", "pacing walked out of the cave"
+    assert live.r.detect_context().name == "IN_BATTLE"
+    foe = live.r.read_enemy_lead()
+    assert foe and 30 <= foe.level <= 50, foe
+    for _ in range(60):
+        if live.r.detect_context().name != "IN_BATTLE":
+            break
+        c._auto_fight()
+    live.patch_mon(1, pps=[0, 0, 0, 0])                                              # a team that needs a Center
+    out = ""
+    for _ in range(25):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("heal", "{}")
+        if out.startswith("Healed the party"):
+            break
+    assert out.startswith("Healed the party"), out
+    assert tuple(live.r.read_current_map()) == (5, 4), tuple(live.r.read_current_map())           # Viridian's Pokémon Center

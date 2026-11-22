@@ -167,7 +167,8 @@ class OverworldMixin:
         from knowledge.map_graph import nearest_of_kind, node_for
         bank, mid = self.reader.read_current_map()
         px, py = self.reader.read_player_pos()
-        found = nearest_of_kind(node_for(bank, mid, px, py), self._healer_kinds(), exclude=tried)
+        from knowledge.distance import PLATEAU_CENTER
+        found = nearest_of_kind(node_for(bank, mid, px, py), self._healer_kinds(), exclude=[*tried, *(() if self._plateau_side() else (PLATEAU_CENTER,))])
         return found[0] if found else None
 
     _MOM_GFX = 88                                    # OBJ_EVENT_GFX_MOM
@@ -211,12 +212,19 @@ class OverworldMixin:
             return "Party is already at full HP and PP — no need to heal."
         # Inside Victory Road no Center is reachable (the way out south needs Surf over Route 23, the way on is the puzzle itself): a go_to from there only
         # wandered the cave pushing boulders out of place (chain run 8). Heal from the Bag and push on.
-        if tuple(self.reader.read_current_map()) in _VICTORY_ROAD:
-            used = self._field_heal()
+        cave = tuple(self.reader.read_current_map())
+        if cave in _VICTORY_ROAD:
+            # Grinding in the cave (its wild L32-48 are the closest fit for a team past the gyms), a heal is a walk OUT to Viridian's Center — the reverse puzzle — not an item-by-item drain of the Bag,
+            # which a long session cannot afford; and 1F is just the entrance hall (an empty Bag there means walk out, not "push on" through the boulders at 19 pushes to the first switch).
+            grinding = bool(self._grind_run)
+            used = [] if grinding else self._field_heal()
             if used:
                 return f"Victory Road has no Pokémon Center — healed from the Bag instead: {', '.join(used)}."
-            return ("Victory Road has no Pokémon Center and the Bag has nothing to heal with — push on to the Indigo Plateau Center "
-                    "(quest('victory_road') resumes) instead of walking back.")
+            if not grinding and cave != (1, 39):
+                return ("Victory Road has no Pokémon Center and the Bag has nothing to heal with — push on to the Indigo Plateau Center "
+                        "(quest('victory_road') resumes) instead of walking back.")
+            if (msg := self._vr_back("heal()")):
+                return msg
         # Get inside a Pokémon Center first (resumable travel).
         if MAP_KIND.get(self.reader.read_current_map()) not in self._healer_kinds():
             tried = [self._resolve_destination("Pokemon Center")[0]]       # the Center the trip heads for first
