@@ -2418,3 +2418,25 @@ def test_a_shiny_wild_pokemon_is_not_fled_from_or_auto_fought(live):
     live.c._auto_fight()
     assert live.r.detect_context() == GameContext.IN_BATTLE and live.r.read_wild_shiny().current_hp == foe.current_hp     # not one hit was thrown
     assert "SHINY" in live.c._yield_encounter("Route 1", False, None, None)
+
+
+def test_a_trip_between_mansion_floors_never_doubles_back_down_to_1f(live):
+    """A watched run: after every wild battle on 2F the trip to B1F walked back DOWN to 1F (go_to's warp graph: fewest hops), the Mansion planner led it up again, and the
+    trip ping-ponged. Inside the Mansion go_to now follows the planner floor to floor: from 2F it climbs to 3F and drops through the hole — 1F is only touched at the end."""
+    live.load("mansion1f_stairs")
+    live.heal_hp()
+    c = live.c
+    c._go_to("Cinnabar Island", mode="flee")
+    assert c._go_to("Pokemon Mansion 2F", mode="flee").startswith("Arrived")
+    floors = []
+    for name in ("_walk_to", "_take_warp", "_walk_far"):
+        orig = getattr(c, name)
+
+        def spy(*a, _o=orig, **k):
+            r = _o(*a, **k)
+            floors.append(tuple(live.r.read_current_map()))
+            return r
+        setattr(c, name, spy)
+    assert c._go_to("Pokemon Mansion B1F", mode="flee").startswith("Arrived")
+    assert tuple(live.r.read_current_map()) == (1, 62)
+    assert (1, 61) in floors and (1, 59) not in floors[:floors.index((1, 61))], floors      # up to 3F first; never back down to 1F on the way

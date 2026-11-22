@@ -1079,6 +1079,8 @@ class NavMixin:
             from knowledge.mansion_data import FLOORS as _MANSION
             if tuple(cur) in _MANSION and tuple(target_map) not in _MANSION and self._mansion_leave():
                 continue                        # the Mansion's barriers hang on one statue switch: its own search gets us out
+            if tuple(cur) in _MANSION and tuple(target_map) in _MANSION and tuple(cur) != tuple(target_map) and self._mansion_to_floor(target_map):
+                continue                        # floor to floor INSIDE the Mansion: its planner, not the warp graph (which sent a trip on 2F back down to 1F after every fight)
             if cur == target_map:
                 self._go_to_stalls = 0          # reached it — clear any stall streak
                 self._go_to_last_end = None
