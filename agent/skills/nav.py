@@ -1089,9 +1089,13 @@ class NavMixin:
                 # pushing the boulder onto 2F's second switch (and, from the Plateau, walked into the walled-in ladder pocket at (36,17)). The cave's own planner goes either way.
                 if tuple(target_map) == (3, 9):
                     return self._get_victory_road(auto_trainers)
-                if (msg := self._vr_back(f"go_to({destination!r})", auto_trainers)):      # anywhere else is back SOUTH: the cave resets when you leave it north, so the way down is the puzzle in reverse
-                    return msg
-                continue
+                from knowledge.map_graph import node_for as _node_for, route_to as _route_to
+                px, py = self.reader.read_player_pos()
+                way = _route_to(_node_for(*cur, px, py), target_map, avoid_maps=self._avoid_maps) or []
+                if any(tuple(step[2])[:3] == (3, 42, "1") for step in way):         # the route leaves by the cave's SOUTH door (Route 23's south half): back south, the puzzle in reverse
+                    if (msg := self._vr_back(f"go_to({destination!r})", auto_trainers)):
+                        return msg
+                    continue
             if tuple(cur) in _MANSION and tuple(target_map) in _MANSION and tuple(cur) != tuple(target_map) and self._mansion_to_floor(target_map):
                 continue                        # floor to floor INSIDE the Mansion: its planner, not the warp graph (which sent a trip on 2F back down to 1F after every fight)
             if cur == target_map:

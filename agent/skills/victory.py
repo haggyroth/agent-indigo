@@ -126,7 +126,7 @@ class VictoryMixin:
         return self._get_victory_road(auto_trainers, back=True, call=resume)
 
     def _get_victory_road(self, auto_trainers: bool = False, back: bool = False, call: str = "quest('victory_road')"):
-        if not back and self.reader.read_flag(FLAG_INDIGO):
+        if not back and self.reader.read_flag(FLAG_INDIGO) and tuple(self.reader.read_current_map()) not in FLOORS:
             return "You've reached Indigo Plateau — heal and save at the Pokémon Center, then the Elite Four's door (north)."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
@@ -138,7 +138,7 @@ class VictoryMixin:
         for _ in range(160):
             if (b := self._hideout_fight(call, "Victory Road", auto_trainers)):
                 return b
-            if not back and self.reader.read_flag(FLAG_INDIGO):
+            if not back and self.reader.read_flag(FLAG_INDIGO) and tuple(self.reader.read_current_map()) not in FLOORS:
                 break
             if self.reader.detect_context() != GameContext.OVERWORLD:
                 self._advance_to_control(tries=30)
