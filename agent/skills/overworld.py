@@ -606,7 +606,13 @@ class OverworldMixin:
             if d not in order:
                 order.append(d)
         run = self._can_run(self.reader.read_current_map())          # the Running Shoes: twice the steps (so encounters) per frame
+        warps = self._warp_tiles()
+        here = tuple(self.reader.read_player_pos())
+        on_press = self.tilemap.warp_press(*here) if here in warps else None
         for mv in order:
+            dx, dy = {"Left": (-1, 0), "Right": (1, 0), "Up": (0, -1), "Down": (0, 1)}[mv]
+            if (here[0] + dx, here[1] + dy) in warps or mv == on_press:
+                continue                    # a staircase / door: pacing onto it changes floors (a watched run ping-ponged between Mansion floors)
             before = self.reader.read_player_pos()
             (self.mgba.run_step if run else self.mgba.tap)(mv)
             if self.reader.detect_context() == GameContext.IN_BATTLE:
@@ -616,6 +622,15 @@ class OverworldMixin:
                 self._wander_dir = mv   # keep pacing this way until blocked
                 return False
         return False
+
+    def _warp_tiles(self) -> set:
+        """The tiles of this map that really warp (stairs, doors, ladders) — never somewhere to pace while hunting encounters."""
+        try:
+            self.tilemap.refresh()
+            return {tuple(w) for w in self.tilemap.read_warps() if self.tilemap.is_real_warp(*w)}
+        except Exception:
+            log_once("overworld._warp_tiles", "overworld._warp_tiles: tolerated failure (continuing with a default)")
+            return set()
 
     def _reachable_tiles(self) -> set | None:
         """Tiles the player can walk to from here on this map (flood fill over the passable grid; a Cut tree counts as
@@ -649,7 +664,8 @@ class OverworldMixin:
         """Where a step can start a wild battle on this map: its tall grass — or, in the Pokémon Mansion (no grass; every floor tile encounters), its floor."""
         from knowledge.map_graph import CAVE_GRIND_MAPS
         if tuple(self.reader.read_current_map()) in CAVE_GRIND_MAPS:
-            return self.tilemap.land_encounter_tiles()
+            warps = self._warp_tiles()
+            return [t for t in self.tilemap.land_encounter_tiles() if t not in warps]
         return self.tilemap.grass_tiles()
 
     def _on_grind_tile(self, px: int, py: int) -> bool:
