@@ -805,6 +805,10 @@ class NavMixin:
         self._go_to_last_end = None
         here = MAP_NAMES.get(end_map, "here")
         from knowledge.map_graph import DUNGEON_MAPS
+        from knowledge.vr_data import FLOORS as _VR_FLOORS
+        if tuple(end_map) in _VR_FLOORS:
+            return (f"You're inside {here}: its way on is a boulder puzzle that go_to / walk_to cannot solve (a boulder has to be pushed onto a floor switch to open the barrier). "
+                    "Call quest('victory_road') — it plans every push from wherever you stand and resumes after each battle.")
         if end_map in DUNGEON_MAPS:
             # A cave maze, not a gated road — don't send the "you need an HM" message that
             # made the agent backtrack out of Mt. Moon. Tell it to keep pushing through.
@@ -1044,6 +1048,12 @@ class NavMixin:
         target_map, target_name = self._resolve_destination(destination)
         if target_map is None:
             return self._stop("unknown_destination", target_name)   # error message
+
+        # Inside Victory Road the way to the Plateau is the boulder puzzle, which the warp graph knows nothing about: a watched run's go_to / walk_to wandered 2F <-> 3F for 300 calls without ever
+        # pushing the boulder onto 2F's second switch (the barrier in front of the south-east ladder). quest('victory_road') solves it from wherever the player stands.
+        from knowledge.vr_data import FLOORS as _VR_FLOORS
+        if tuple(self.reader.read_current_map()) in _VR_FLOORS and tuple(target_map) == (3, 9):
+            return self._get_victory_road(auto_trainers)
 
         # Some trips have NO walking route (knowledge.travel_rules.NO_WALK, e.g. Cerulean back west of Route 4).
         why_not = no_walk_reason(self.reader.read_current_map(), target_map, self.reader.read_player_pos())

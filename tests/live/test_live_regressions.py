@@ -2473,3 +2473,23 @@ def test_victory_road_pushing_a_boulder_up_from_the_entrance_tile_does_not_leave
     entrance = [p for p in pushes if p[0] == (11, 20)]
     assert entrance, pushes
     assert all(p[2] == (1, 39) for p in entrance), entrance                          # still on 1F after pushing from the entrance tile
+
+
+def test_go_to_the_plateau_from_inside_victory_road_runs_the_boulder_quest(live):
+    """Two watched runs stood on Victory Road 2F calling go_to('Indigo Plateau') / walk_to ('No walkable path ... to (36,17)') for hundreds of calls: the warp graph cannot push the
+    boulder onto the second floor switch that opens the barrier before the south-east ladder. From inside the cave go_to now hands over to quest('victory_road'), which solves it
+    from wherever the player stands (the 2F checkpoint of the stuck run: the 3F boulder already dropped, the west switch pressed)."""
+    live.load("vr_2f_stuck")
+    c = live.c
+    live.strong_lead()
+    out = ""
+    for _ in range(25):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        live.boost_party()
+        live.patch_mon(0, moves=[75, 57, 70, 22], pps=[25, 15, 15, 25])
+        out = c._execute("go_to", json.dumps({"destination": "Indigo Plateau", "force": True, "auto_trainers": True}))
+        if live.r.read_flag(0x899):
+            break
+    assert live.r.read_flag(0x899), out
