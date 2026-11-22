@@ -37,7 +37,16 @@ class RunLog(NullRunLog):
         self.t0 = time.time()
         self._f = None
         try:
-            self.dir.mkdir(parents=True, exist_ok=True)
+            Path(root).mkdir(parents=True, exist_ok=True)
+            # Two runs started in the same second (parallel chain runs) used to share one directory and interleave their records; each gets its own.
+            n = 1
+            while True:
+                try:
+                    self.dir.mkdir()
+                    break
+                except FileExistsError:
+                    n += 1
+                    self.dir = Path(root) / f"{stamp}-{n}"
             self._f = open(self.dir / "run.jsonl", "a", buffering=1)
         except OSError:
             self._f = None
