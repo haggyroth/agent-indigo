@@ -21,6 +21,9 @@ All notable changes to this project are documented here. Format loosely follows
 - The chain no longer outlives its own stall: `run_episode(should_stop=)` ends the run with reason `stalled` when the policy records one (`tools/scripted_run.py` wires it; `--no-stop-on-stall` keeps the old behaviour). The detector had flagged run 15's loop at about call 100 and nothing acted on it; replayed against the run that cleared the game, neither stall rule fires.
 - `heal()` falls back to the next-nearest Pokémon Center when the nearest one can't be reached: from Route 23 the graph's nearest is the Indigo Plateau's (via a North edge that isn't walkable), so it now goes round to Viridian's across the Surf gap (`nearest_of_kind(..., exclude=)`, and a `go_to('map:<bank>,<id>')` destination for Centers, which have no names). A chain run with the whole party fainted there had looped 700 calls.
 
+### Fixed — grinding in the Mansion no longer paces onto the staircase (watched run of 2026-11-22)
+- `grind()` in the Pokémon Mansion changed floors over and over: you arrive standing on a staircase, and the first pacing step warped to the next floor, which arrived on another staircase. `_wander_step` now never steps onto a real warp tile (or presses a staircase's own direction), and the Mansion's grind tiles exclude warp tiles. The live Mansion test now asserts the floor stays put.
+
 ### Added — shinies are caught, Mom heals, the Mansion is grind ground (watched run of 2026-11-21)
 - **Shiny Pokémon are recognised and caught, never knocked out** (a watched run ice-beamed a shiny Tangela). `PokemonStatus` now carries the OT id and `is_shiny` (the Gen III rule: TID ^ SID ^ PID-high ^ PID-low < 8; a
   wild Pokémon is generated with the player's ids). A shiny wild foe is a **one-shot** (`knowledge.one_shot`, the Snorlax protocol): the observation says "✨ SHINY …: catch it whatever the species — even one you own or

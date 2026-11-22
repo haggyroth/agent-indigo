@@ -2370,11 +2370,13 @@ def test_grind_works_inside_the_pokemon_mansion(live):
     assert here in CAVE_GRIND_MAPS, here
     live.heal_hp()
     assert live.c._nearest_grass() is not None
-    st = {"stuck": 0, "reloc": 0}
+    assert live.r.read_player_pos() not in live.c._grind_tiles()          # the arrival tile is the staircase: not somewhere to pace
+    floor, st = tuple(live.r.read_current_map()), {"stuck": 0, "reloc": 0}
     for _ in range(300):
         if live.r.detect_context() == GameContext.IN_BATTLE:
             break
         assert live.c._grass_step(st, "grind()") is None, st
+        assert tuple(live.r.read_current_map()) == floor or live.r.detect_context() == GameContext.IN_BATTLE, "pacing stepped onto a staircase"   # a watched run ping-ponged between floors
     assert live.r.detect_context() == GameContext.IN_BATTLE, live.r.read_player_pos()
     foe = live.r.read_enemy_lead()
     assert tuple(live.r.read_current_map()) in CAVE_GRIND_MAPS and foe and 20 <= foe.level <= 40, (foe, live.r.read_current_map())
