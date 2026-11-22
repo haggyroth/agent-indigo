@@ -2309,3 +2309,21 @@ def test_heal_from_route_23_with_a_fainted_party_goes_round_to_viridian(live):
     out = live.c._execute("heal", "{}")
     assert out.startswith("Healed the party"), out
     assert tuple(live.r.read_current_map()) == (5, 4)               # Viridian's Pokémon Center
+
+
+def test_go_to_from_the_middle_of_route_23s_lake_routes_by_the_shores(live):
+    """The player was surfing mid-lake at Route 23 (9,97) after a trip was interrupted: the plain-map start used the phantom South connection and every go_to / heal / quest said
+    'No walkable opening on the South edge' (chain run 15, 5,400 calls). It must route round by the south gatehouse."""
+    live.load("route23_stuck")
+    assert tuple(live.r.read_current_map()) == (3, 42) and live.c._surfing()
+    out = live.c._execute("go_to", json.dumps({"destination": "Route 22"}))
+    assert out.startswith("Arrived at Route 22"), out
+    assert tuple(live.r.read_current_map()) == (3, 41)
+
+
+def test_run_episode_ends_with_reason_stalled_when_the_observer_says_so(live):
+    """run_episode(should_stop=…): a chain policy that has recorded a stall ends the run instead of repeating it to the step cap."""
+    import main
+    live.load("route23_stuck")
+    res = main.run_episode(live.rt, goal=None, max_steps=50, max_wall_s=120, verbose=False, should_stop=lambda: "test: no progress")
+    assert res.reason == "stalled" and not res.passed and res.steps == 0, res

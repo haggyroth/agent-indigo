@@ -88,7 +88,7 @@ class AgentRuntime:
 @dataclass
 class EpisodeResult:
     """Outcome of one run_episode() call — the eval scorecard for a scenario."""
-    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | interrupted | error_budget
+    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget
     passed:            bool           # goal predicate satisfied
     steps:             int
     llm_calls:         int
@@ -523,7 +523,8 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
 
 def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str = "",
                 max_steps: int = 0, max_wall_s: float = MAX_WALL_SECONDS,
-                verbose: bool = True, run_log=None) -> EpisodeResult:
+                verbose: bool = True, run_log=None,
+                should_stop: Optional[Callable[[], str]] = None) -> EpisodeResult:
     """Drive the decision loop until the goal is met, a cap is hit, or the run is
     interrupted / exceeds the error budget. Returns an EpisodeResult scorecard.
 
@@ -593,6 +594,16 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                     console.print(f"[green bold]GOAL reached: {goal_desc}[/]")
                 ltm.save()
                 return _result("goal", True, state)
+
+            # An outside observer (the scripted chain's stall detector) says the run is going nowhere: end it, with the reason
+            # in the scorecard — a run 15 chain had recorded its stall at call ~100 and then spent 5,400 more calls repeating it.
+            if should_stop is not None:
+                why = should_stop()
+                if why:
+                    if verbose:
+                        console.print(f"[yellow]Stopping — stalled: {why}[/]")
+                    ltm.save()
+                    return _result("stalled", False, state)
 
             in_battle = state.context == GameContext.IN_BATTLE
             if in_battle and not run.battle_was_active:

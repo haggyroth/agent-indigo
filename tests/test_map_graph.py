@@ -135,3 +135,16 @@ def test_nearest_center_skips_one_a_trip_could_not_reach_and_finds_the_next_acro
     assert second[0] == (5, 4) and any(s[0] == "surf" for s in second[1])
     assert nearest_of_kind(cur, "pokecenter", exclude=[(13, 0), (5, 4)])[0] not in {(13, 0), (5, 4)}
     assert nearest_of_kind((3, 4), "pokecenter") == nearest_of_kind((3, 4), "pokecenter", exclude=[])   # no exclusion: unchanged
+
+
+def test_from_open_water_on_route_23_the_route_goes_by_the_shores_not_the_phantom_south_edge():
+    """Surfing mid-lake on Route 23 (9,97) has no region of its own, so a plain-map start only saw the map's plain-keyed South connection — whose bottom row is solid wall. go_to
+    said 'No walkable opening on the South edge' for 5,000 calls; the way to Route 22 is the gatehouse warp on the south shore, and to the Plateau Victory Road."""
+    from knowledge.map_graph import node_for, route_to, nearest_of_kind
+    here = node_for(3, 42, 9, 97)
+    assert here == (3, 42)                                           # a water tile: no region
+    to_22 = route_to(here, (3, 41))
+    assert to_22[0][:2] == ("warp", (8, 153)) and not any(s[0] == "connection" and s[1] == "South" and s[2] == (3, 41) for s in to_22)
+    to_plateau = route_to(here, (3, 9))
+    assert to_plateau[0][2][:2] == (1, 39)                           # in through Victory Road's door, not straight up the (unwalkable) North edge
+    assert nearest_of_kind(here, "pokecenter")[0] == (5, 4)          # Viridian's, round by the gatehouse
