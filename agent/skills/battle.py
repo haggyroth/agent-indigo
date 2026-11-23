@@ -1105,7 +1105,7 @@ class BattleMixin:
         free = " It was a FREE switch (Battle Style SHIFT): no turn was spent." if shift else ""
         return f"Switched in {mon.species_name} (L{mon.level}). It's now your active Pokémon.{free}"
 
-    def _use_item(self, item: str) -> str:
+    def _use_item(self, item: str, move: str = "") -> str:
         """Use a Bag item on your ACTIVE Pokémon during battle — a Potion to heal, an
         Antidote/Paralyze Heal/etc. to cure status. Opens the Bag, switches to the Items
         pocket, navigates the list to the named item (via the live cursor), and uses it
@@ -1144,6 +1144,9 @@ class BattleMixin:
         before_status = mon0.status if mon0 else "healthy"
         if mon0 and mon0.max_hp and before_hp >= mon0.max_hp and before_status == "healthy" and iid in HEAL_ONLY_ITEMS:
             return f"{mon0.species_name or 'Your active Pokémon'} is already at full HP ({before_hp}/{mon0.max_hp}) — the {ITEM_NAMES.get(iid, item)} would do nothing."
+        from knowledge.pp_items import ONE_MOVE, PP_ITEMS, move_deficits, pick_move
+        if iid in PP_ITEMS and mon0 is not None and not any(move_deficits(mon0)):
+            return f"{mon0.species_name or 'Your active Pokémon'} has full PP on every move — the {ITEM_NAMES.get(iid, item)} would do nothing."
         if not self._open_battle_bag():
             return "Couldn't open the Bag in battle — try use_item again."
         self._wait_idle()
@@ -1178,9 +1181,14 @@ class BattleMixin:
         # Select → USE (default) → party menu (lead is the default slot) → confirm text.
         # Self-verifying A presses: a dropped input in the chain just costs another press
         # instead of stranding us, and we stop the instant the item takes effect.
-        for _ in range(16):
+        for tries in range(16):
             if used():
                 break
+            if iid in ONE_MOVE and tries == 5:
+                # An Ether asks "Restore which move?": after the first A picked the Pokémon a small list opens (cursor on move 1) — Down to the wanted move, then the A below picks it.
+                self._wait_idle()
+                self.mgba.tick(40)
+                self._pp_move_cursor_to(pick_move(mon0, move))
             self.mgba.tap("A")
             self._wait_idle()
             self.mgba.tick(12)
@@ -1194,6 +1202,8 @@ class BattleMixin:
             return f"Used {ITEM_NAMES.get(iid, item)} — {p.species_name or 'lead'} healed +{gained} HP ({now_hp}/{p.max_hp})."
         if before_status != "healthy" and p.status == "healthy":
             return f"Used {ITEM_NAMES.get(iid, item)} — cured {p.species_name or 'lead'}'s {before_status}."
+        if iid in PP_ITEMS:
+            return f"Used {ITEM_NAMES.get(iid, item)} — {p.species_name or 'lead'}'s PP restored ({'one move' if iid in ONE_MOVE else 'every move'}). Using it cost your turn."
         from knowledge.bag import BATTLE_BOOSTERS
         if iid in BATTLE_BOOSTERS:
             return f"Used {BATTLE_BOOSTERS[iid][0]} — {BATTLE_BOOSTERS[iid][1]} for {p.species_name or 'your active Pokémon'}."

@@ -27,7 +27,7 @@ from knowledge.gym_advice import brief as gym_brief
 from knowledge.game_corner import PRIZES
 from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
-from knowledge.league_rooms import LEAGUE_ROOM_MAPS, league_notice
+from knowledge.league_rooms import LEAGUE_ORDER, LEAGUE_ROOM_MAPS, LEAGUE_TRAINER, PLATEAU_CENTER_MAP, league_notice
 from knowledge.status_cure import cure_hint
 from knowledge.nicknames import suggest as nickname_ideas
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
@@ -490,11 +490,18 @@ def _supplies(t: Tick) -> list[str]:
 
 def _league(t: Tick) -> list[str]:
     """Inside an Elite Four room: say plainly that there is no leaving to heal (a run walked the sealed room, calling heal() and go_to('Pokemon Center') for 300 calls)."""
+    if t.here == PLATEAU_CENTER_MAP and not _safe("league_clear", lambda: bool(t.reader.read_flag(0x82C)), False):
+        scouting = " ‖ ".join(gym_brief(name) for name in LEAGUE_ORDER if gym_brief(name))
+        return [f"ELITE FOUR AHEAD (north door of this Center; five sealed rooms, one after another, no healing but the Bag): {scouting}"] if scouting else []
     if t.here not in LEAGUE_ROOM_MAPS:
         return []
     bag = _safe("league_bag", lambda: dict(t.reader.read_items_pocket()), None)
     note = league_notice(t.here, t.state.party or None, bag)
-    return [f"ELITE FOUR: {note}"] if note else []
+    out = [f"ELITE FOUR: {note}"] if note else []
+    brief = gym_brief(LEAGUE_TRAINER.get(t.here, ""))
+    if brief:
+        out.append(f"THIS ROOM: {brief} — use team_report() to see who of yours answers it")
+    return out
 
 
 def _gym(t: Tick) -> list[str]:

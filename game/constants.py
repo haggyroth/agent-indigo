@@ -281,6 +281,7 @@ class Addr:
     BAG_LIST_CURSOR    = 0x0203AD04
     # gPartyMenu.slotId on the FIELD party screen (item-use / switch / HM-use target pick),
     # 0-based over party slots (live-verified by RAM diff). Cancel sits after the last mon.
+    PP_MOVE_CURSOR     = 0x0203ADE6     # the 'Restore which move?' list an Ether opens over the party menu: cursor row 0-3 (found by diffing EWRAM while pressing Down; the list is the same in battle)
     PARTY_FIELD_SLOT   = 0x0203B0A9
     SUMMARY_MOVE_CURSOR = 0x0203B16D   # 'KNOWN MOVES' summary during a level-up delete: 0-3 = moves, 4 = the new move
     # TM Case (key item 364 -> OPEN). Live-verified by RAM diffing / screenshots:

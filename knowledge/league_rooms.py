@@ -12,6 +12,10 @@ LEAGUE_ROOMS: dict[tuple[int, int], str] = {
     (1, 79): "the Champion",
 }
 LEAGUE_ROOM_MAPS = frozenset(LEAGUE_ROOMS)
+# room -> the key knowledge.gym_advice.brief() knows the trainer by (the Champion's team depends on your starter: the brief names the shared core)
+LEAGUE_TRAINER = {(1, 75): "Lorelei", (1, 76): "Bruno", (1, 77): "Agatha", (1, 78): "Lance", (1, 79): "Gary"}
+LEAGUE_ORDER = ("Lorelei", "Bruno", "Agatha", "Lance", "Gary")
+PLATEAU_CENTER_MAP = (13, 0)          # where the model preps (heal, shop, save) before the first door
 
 SEALED = ("You are SEALED IN the Elite Four's rooms: the door closed behind you and there is no Pokémon Center, shop or way out until the Champion is beaten. "
           "Heal ONLY from the Bag — Full Restore / Revive / Potions: heal() does it for you (or use_item) — and press on with quest('elite_four'); "

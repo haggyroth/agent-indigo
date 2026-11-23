@@ -115,7 +115,21 @@ def next_gym_fit(party, gyms_beaten) -> GymFit | None:
     nxt = next((g for g in GYMS if g["leader"] not in set(gyms_beaten or [])), None)
     if nxt is None or nxt["leader"] not in TRAINER_TEAMS or not party:
         return None
-    foes = TRAINER_TEAMS[nxt["leader"]]
+    return trainer_fit(party, nxt["leader"], nxt["type"])
+
+
+LEAGUE_FOES = (("Lorelei", "Ice"), ("Bruno", "Fighting"), ("Agatha", "Ghost"), ("Lance", "Dragon"), ("Gary (Squirtle)", "mixed"))      # the Champion's shared core: the Squirtle table
+
+
+def league_fits(party) -> list:
+    """GymFit for each Elite Four trainer and the Champion (the same numbers the gym report gives): who the party answers, who it does not."""
+    return [f for f in (trainer_fit(party, name, kind) for name, kind in LEAGUE_FOES) if f is not None]
+
+
+def trainer_fit(party, leader: str, gym_type: str) -> GymFit | None:
+    if leader not in TRAINER_TEAMS or not party:
+        return None
+    foes = TRAINER_TEAMS[leader]
     att = set().union(*(_damaging_move_types(p) for p in party))
     covered, missed = 0, []
     for sid, _lvl, _moves in dict.fromkeys(foes):
@@ -126,7 +140,7 @@ def next_gym_fit(party, gyms_beaten) -> GymFit | None:
     leader_types = {t for sid, _l, _m in foes for t in _types(sid)}
     safe = sum(1 for p in party if not any(_attack_mult(t, _types(p.species_id)) >= 2 for t in leader_types))
     total = len(dict.fromkeys(s for s, _l, _m in foes))
-    return GymFit(nxt["leader"], nxt["type"], covered, total, safe,
+    return GymFit(leader.split(" (")[0].replace("Gary", "the Champion"), gym_type, covered, total, safe,
                   covered / max(total, 1) >= ANSWERS_FRACTION, missed)
 
 
@@ -236,8 +250,14 @@ def team_report(party, boxes=None, gyms_beaten=(), money_note: str = "") -> str:
         lines.append(brief(fit.leader))
     elif len(set(gyms_beaten or [])) >= 8:
         from knowledge.gym_advice import brief
-        lines.append("Elite Four, in order:")
-        lines.extend("  " + brief(n) for n in ("Lorelei", "Bruno", "Agatha", "Lance", "Gary"))
+        lines.append("Elite Four, in order (and how this team answers each):")
+        fits = {f.leader: f for f in league_fits(party)}
+        for n, label in (("Lorelei", "Lorelei"), ("Bruno", "Bruno"), ("Agatha", "Agatha"), ("Lance", "Lance"), ("Gary", "the Champion")):
+            f = fits.get(label)
+            lines.append("  " + brief(n))
+            if f:
+                lines.append(f"    → your team hits {f.covered}/{f.total} of {label}'s Pokémon, {f.safe_members}/{len(party)} members are safe from their types"
+                             + (f"; no answer for {', '.join(f.uncovered_species)}" if f.uncovered_species else "") + (" ✔" if f.answers else " ✘ NOT answered"))
     for g in gaps(party, boxes, gyms_beaten):
         lines.append(f"Gap ({g.code}): {g.text}")
     if money_note:

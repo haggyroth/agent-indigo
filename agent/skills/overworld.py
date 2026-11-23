@@ -205,7 +205,7 @@ class OverworldMixin:
     def _league_heal(self) -> str:
         """Inside an Elite Four room there is no Pokémon Center to reach (the door sealed behind you): heal from the Bag — Revives for the fainted, then the smallest Potion / Full Restore
         that fills the gap of anyone under 60% — and say what is left. A watched run called heal() and go_to('Pokemon Center') in Lorelei's room for 300 calls."""
-        used = self._field_heal(max_uses=12, below=0.6) + self._field_cure()
+        used = self._field_heal(max_uses=12, below=0.6) + self._field_cure() + self._field_pp()
         bag = dict(self.reader.read_items_pocket())
         left = f"{sum(n for i, n in bag.items() if i == 19)} Full Restore, {sum(n for i, n in bag.items() if i in (24, 25))} Revive, {sum(n for i, n in bag.items() if i in (13, 22, 21, 20))} Potions"
         if used:

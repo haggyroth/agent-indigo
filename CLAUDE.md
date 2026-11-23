@@ -213,7 +213,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `heal` | overworld | — | Restore the whole party (HP, PP, status) at the nearest Pokémon Center — or at home with Mom in Pallet Town when that is nearer (free; once Gary is beaten) — travels there, fleeing wild battles on the way (never a shiny: catch it). |
 | `shop` | overworld | sell?, item?, quantity? | Restock at a Poké Mart (travels there if needed): buys the badge-scaled par levels of Balls, Potions and cures with the money you have. |
 | `switch_pokemon` | battle | target | Switch your active Pokémon (species name or 1-based slot). |
-| `use_item` | battle + overworld | item, target? | Use a Bag item.  In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status cure. |
+| `use_item` | battle + overworld | item, target?, move? | Use a Bag item.  In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status cure; Elixir restores every move's PP. |
 | `give_item` | overworld | item, pokemon | Make a party Pokémon HOLD a Bag item (Leftovers, Exp. |
 | `pick_up_items` | overworld | — | Collect the item balls on this map (see 'Items on the ground:' in the observation). |
 | `use_move` | battle | move | Use one of your active Pokémon's moves by name (the 'Your moves' list). |

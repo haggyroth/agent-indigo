@@ -2729,3 +2729,38 @@ def test_walk_to_inside_the_cave_blames_the_barrier_not_surf(live):
     out = c._walk_to(36, 17)                                                         # the south-east ladder, behind the second switch's barrier
     assert "Surf" not in out, out
     assert out.startswith("No walkable path") and "quest('victory_road')" in out, out
+
+
+def test_ether_and_elixir_restore_pp_in_the_field_and_the_move_is_chosen(live):
+    """A watched run held an Ether and an Elixir all game and its Lapras fought a room at 'Thunder has no PP left'. Field use: an Ether asks 'Restore which move?' (a list over the party menu) —
+    the driver reads that list's cursor to the wanted move (or the most depleted one); an Elixir refills every move; _field_pp spends them where PP ran out."""
+    live.load("league_door")
+    c = live.c
+    live.give_item(34, 3)                                            # Ether
+    live.give_item(36, 1)                                            # Elixir
+    for move, pps, want in (("Ice Beam", [1, 1, 0, 1], [1, 1, 10, 1]), ("Surf", [5, 10, 0, 3], [5, 10, 0, 13]), ("", [5, 10, 4, 15], [5, 10, 10, 15])):
+        live.patch_mon(0, pps=pps)                                   # Venusaur: Hyper Beam, Earthquake, Ice Beam, Surf
+        out = c._field_use_item("Ether", target="1", move=move)
+        assert out.startswith("Used Ether"), out
+        assert live.r.read_party()[0].pp == want, (move, live.r.read_party()[0].pp)
+    live.patch_mon(0, pps=[1, 1, 1, 1])
+    assert c._field_pp() == ["Elixir on Venusaur"]                   # a total gap of 15+ PP: the Elixir
+    assert live.r.read_party()[0].pp == [5, 10, 10, 11]
+
+
+def test_ether_in_battle_restores_the_chosen_move_and_costs_the_turn(live):
+    """The same in battle (the battle Bag → party menu → the move list): use_item('Ether', move=…) refills that move; an Elixir every move; full PP is refused without spending a turn."""
+    live.load("league_agatha")                                       # Agatha's room, mid-battle
+    c = live.c
+    live.give_item(34, 3)
+    live.give_item(36, 1)
+    active = live.r.read_active_battle_species()
+    slot = next(i for i, p in enumerate(live.r.read_party()) if p.species_id == active)      # Pidgeotto: Tackle, Sand Attack, Gust, Quick Attack
+    for move, idx in (("Quick Attack", 3), ("Sand Attack", 1)):
+        pps = [1, 1, 1, 1]
+        live.patch_mon(slot, pps=pps)
+        out = c._use_item("Ether", move)
+        assert out.startswith("Used Ether") and "cost your turn" in out, out
+        got = live.r.read_party()[slot].pp
+        assert got[idx] == 11 and sum(got) == 14, (move, got)       # only that move gained 10
+    assert live.r.detect_context().name == "IN_BATTLE"

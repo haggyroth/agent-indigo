@@ -132,3 +132,22 @@ def test_team_report_is_a_readable_summary():
     assert "Cut: Ivysaur can learn it" in out and "Surf: nobody can learn it" in out
     assert "Next: Lt. Surge (Electric)" in out and "NOT answered" in out and "Gap (gym)" in out
     assert team_report([], None, []) == "No party to analyse."
+
+
+def test_the_report_says_how_the_team_answers_each_elite_four_room():
+    """After eight badges the report lists the Elite Four AND, per trainer, how many of their Pokémon the team hits super effectively (a run threw itself at the League blind)."""
+    from knowledge.team import league_fits
+    party = [mon("Pikachu", ["Thunder Shock", "Thunder"], 50), mon("Charizard", ["Flamethrower", "Rock Slide"], 52), mon("Machamp", ["Cross Chop", "Rock Slide"], 50)]
+    fits = {f.leader: f for f in league_fits(party)}
+    assert list(fits) == ["Lorelei", "Bruno", "Agatha", "Lance", "the Champion"] and all(f.total >= 4 for f in fits.values())
+    assert fits["Lorelei"].covered >= 3                                  # Electric / Rock / Fighting against Water / Ice
+    out = team_report(party, None, ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina", "Blaine", "Giovanni"])
+    assert "Elite Four, in order (and how this team answers each)" in out and "→ your team hits" in out and "Lorelei" in out and "the Champion's Pokémon" in out
+
+
+def test_the_league_observation_rooms_have_scouting_briefs():
+    from knowledge.gym_advice import brief
+    from knowledge.league_rooms import LEAGUE_ORDER, LEAGUE_ROOMS, LEAGUE_TRAINER
+    assert set(LEAGUE_TRAINER) == set(LEAGUE_ROOMS) and list(LEAGUE_TRAINER.values()) == list(LEAGUE_ORDER)
+    for name in LEAGUE_ORDER:
+        assert brief(name).startswith(name + ":"), name                  # every room's trainer has a team brief to show

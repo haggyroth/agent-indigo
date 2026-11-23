@@ -6,7 +6,8 @@ import time
 from pathlib import Path
 from openai import OpenAI
 from agent.usage import cached_prompt_tokens
-from agent.tools import SAFARI_CONTEXT, tools_for, normalize_button
+from agent.tool_args import repair_args, signature
+from agent.tools import SAFARI_CONTEXT, tool_schema, tools_for, normalize_button
 from agent.history import trim_messages, strip_control_tokens
 from game.memory_reader import LeafGreenReader
 from game.mgba_client import MGBAClient
@@ -279,7 +280,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                     result = self._execute(tc.function.name, tc.function.arguments)
                 except Exception as e:
                     log_once("client.step", "client.step: tolerated failure (continuing with a default)")
-                    result = f"Tool {tc.function.name} failed: {e}"
+                    result = self._failure_text(tc.function.name, tc.function.arguments, e)
                 self._log_tool(tc.function.name, tc.function.arguments, result,
                                time.time() - _t0)
                 events.tool(tc.function.name, tc.function.arguments, result, time.time() - _t0)
@@ -314,6 +315,20 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
         except Exception:
             log_once("client._tool_context", "client._tool_context: tolerated failure (continuing with a default)")
             return None
+
+    @staticmethod
+    def _failure_text(name: str, args_json: str, error: Exception) -> str:
+        """'Tool X failed: …' — and for a missing argument (a bare KeyError such as "'move'") the tool's own signature and what was sent, so the model can fix the call."""
+        if isinstance(error, KeyError):
+            try:
+                sent = json.loads(args_json) if args_json else {}
+            except (json.JSONDecodeError, ValueError):
+                sent = {}
+            _args, problem = repair_args(name, sent, tool_schema(name))
+            if problem:
+                return f"Tool {name} failed: {problem}"
+            return f"Tool {name} failed: missing argument {error} — {signature(name, tool_schema(name) or {})}"
+        return f"Tool {name} failed: {error}"
 
     def _log_tool(self, name: str, args_json: str, result, secs: float) -> None:
         """Run-log one tool execution with a cheap post-call state snapshot."""
@@ -414,6 +429,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
+        args, _problem = repair_args(name, args, tool_schema(name))       # a renamed / stringified argument is the model's habit, not an error; a truly missing one still raises (see _failure_text)
         events.observe(getattr(self, "reader", None))      # register a battle already under way before the tool runs
         if name in self._ABANDONS_GRIND and self._grind_run:
             self._grind_abandon()              # the model moved on: a stale session must not pin the floor
@@ -496,10 +512,10 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             case "use_item":
                 from game.state import GameContext
                 if self.reader.detect_context() == GameContext.IN_BATTLE:
-                    return self._use_item(args["item"])
+                    return self._use_item(args["item"], str(args.get("move", "") or ""))
                 if str(args["item"]).lower().strip() in ("bicycle", "bike"):
                     return self._use_bicycle()
-                return self._field_use_item(args["item"], str(args.get("target", "") or ""))
+                return self._field_use_item(args["item"], str(args.get("target", "") or ""), str(args.get("move", "") or ""))
             case "game_corner":
                 return self._game_corner(str(args.get("action", "status") or "status"), int(args.get("amount", 0) or 0))
             case "save_game":
