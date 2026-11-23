@@ -165,3 +165,26 @@ def test_a_map_destination_resolves_to_that_exact_map():
     c = AgentClient.__new__(AgentClient)
     assert c._resolve_destination("map:5,4")[0] == (5, 4)
     assert c._resolve_destination("map:oops")[0] is None
+
+
+def test_answer_yes_to_bills_one_island_invitation_is_turned_into_no():
+    """Bill's 'Come with me to One Island?' YES starts the Sevii detour (a ferry the router cannot plan): while the scene is pending a YES is answered NO and the model is told why."""
+    from agent.skills.menu import MenuMixin
+
+    class Host(MenuMixin):
+        def __init__(self, pending):
+            self.pending, self.said = pending, []
+
+        @property
+        def _menus(self):
+            return type("M", (), {"answer_prompt": lambda _s, a: self.said.append(a) or f"answered {a}"})()
+
+        def _bill_scene_pending(self):
+            return self.pending
+    h = Host(True)
+    out = h._answer_prompt("yes")
+    assert h.said == ["no"] and "Sevii" in out and "answered NO" in out
+    h = Host(True)
+    assert h._answer_prompt("no") == "answered no"                         # a NO is just a NO
+    h = Host(False)
+    assert h._answer_prompt("yes") == "answered yes" and h.said == ["yes"]   # any other prompt: untouched

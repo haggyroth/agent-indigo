@@ -15,6 +15,12 @@ class MenuMixin:
         return self._menus.open_menu(name)
 
     def _answer_prompt(self, answer: str) -> str:
+        if str(answer).strip().lower() in ("yes", "y") and self._bill_scene_pending():
+            # Bill's "Come with me to One Island?" — YES starts the Sevii detour (One -> Two -> Three Island, the Network Machine, Lostelle): a long side story the Elite Four does not need, with a ferry
+            # the router knows nothing about, so a run that said yes had no way home. Answer NO (the dialogue is advanced with B for the same reason).
+            self._menus.answer_prompt("no")
+            return ("Bill invited you to One Island (the Sevii Islands detour). That trip is not needed for the Elite Four and the router cannot plan the ferry, so I answered NO — "
+                    "it is an optional side story you can do after the Hall of Fame.")
         return self._menus.answer_prompt(answer)
 
     def _advance_dialog(self) -> str:

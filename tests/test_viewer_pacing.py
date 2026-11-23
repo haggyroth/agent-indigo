@@ -20,12 +20,20 @@ def _viewer(fps=0, present_hz=60):
     return v
 
 
-def test_uncapped_emulation_presents_at_most_present_hz():
+def test_uncapped_emulation_presents_at_most_present_hz(monkeypatch):
+    """On a fake clock (1 ms per reading): the real-clock version flaked when the machine was busy — it counted renders in 0.2 s of wall time."""
+    clock = {"t": 1000.0}
+
+    def fake_perf_counter():
+        clock["t"] += 0.001
+        return clock["t"]
+    monkeypatch.setattr(time, "perf_counter", fake_perf_counter)
     v = _viewer(fps=0)
+    v._last_present = clock["t"]
     t0 = time.perf_counter()
     while time.perf_counter() - t0 < 0.2:
         v.render(b"")                      # an emulator running flat out
-    assert v.draws <= 0.2 * 60 + 2 and v._skipped > 100 and v._pending
+    assert v.draws <= 0.2 * 60 + 2 and v._skipped > 40 and v._pending
 
 
 def test_flush_shows_the_newest_frame_once_after_skips():

@@ -1067,9 +1067,11 @@ class OverworldMixin:
                 return
             self._set_lead(str(best + 1))
 
-    def _set_boss_lead(self) -> None:
-        """The strongest healthy Pokémon leads a gym leader / Elite Four fight."""
-        self._set_lead_by(boss_lead_slot)
+    def _set_boss_lead(self, trainer: str = "") -> None:
+        """The best healthy matchup leads a gym leader / Elite Four / Champion fight: against a known trainer (`trainer`: "Lorelei", "Brock", "Gary" …) the Pokémon whose moves hit their team hardest
+        and who takes least from their types (knowledge.party.boss_lead_vs); else the strongest healthy attacker."""
+        from knowledge.party import boss_lead_vs
+        self._set_lead_by((lambda party: boss_lead_vs(party, trainer)) if trainer else boss_lead_slot)
 
     # ── grind(): resumable sessions that hand encounters to the model ─────────────────────────────
     _GRIND_MAX_BATTLES = 150          # encounters (handed over or automatic) one session may take before it reports

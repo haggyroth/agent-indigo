@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from openai import OpenAI
 from agent.usage import cached_prompt_tokens
+from agent.llm_retry import call_with_retry
 from agent.tool_args import repair_args, signature
 from agent.tools import SAFARI_CONTEXT, tool_schema, tools_for, normalize_button
 from agent.history import trim_messages, strip_control_tokens
@@ -16,7 +17,7 @@ from memory.run_log import NullRunLog
 from knowledge.leafgreen_data import MILESTONES
 from knowledge.navigation import get_map_image_path, MAP_NAMES
 from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKENS,
-                    ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT)
+                    ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT, LLM_RETRIES)
 from agent import events
 from agent.skills.base import SkillBase
 from agent.skills.gamecorner import GameCornerMixin
@@ -224,11 +225,15 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             if flush:
                 flush()           # the window only presents ~60×/s: show the latest frame before we wait on the LLM
             try:
-                resp = self.llm.chat.completions.create(
-                    model=MODEL_NAME, messages=self.messages,
-                    tools=tools_for(self._tool_context()), tool_choice="auto",
-                    temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
-                    timeout=LLM_TIMEOUT or None,   # bound a single call (see config)
+                resp = call_with_retry(
+                    lambda: self.llm.chat.completions.create(
+                        model=MODEL_NAME, messages=self.messages,
+                        tools=tools_for(self._tool_context()), tool_choice="auto",
+                        temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
+                        timeout=LLM_TIMEOUT or None,   # bound a single call (see config)
+                    ),
+                    tries=LLM_RETRIES,
+                    on_retry=lambda e, n, wait: events.emit("note", f"LLM call failed ({type(e).__name__}) — retry {n}/{LLM_RETRIES} in {wait:.0f}s", log=False),
                 )
             except Exception:
                 # A failed LLM call (e.g. an LLM_TIMEOUT) must not leave a dangling user

@@ -170,3 +170,27 @@ def boss_lead(party) -> int | None:
     """Slot of the Pokémon that should lead a gym leader / Elite Four / Champion fight: the highest-level healthy attacker (a tie keeps the earlier slot). None when nobody can fight."""
     able = [(i, p) for i, p in enumerate(party) if _can_lead(p)]
     return max(able, key=lambda ip: (ip[1].level, -ip[0]))[0] if able else None
+
+
+def boss_lead_vs(party, trainer: str) -> int | None:
+    """Slot of the Pokémon that should lead against `trainer` (a gym leader, an Elite Four member, "Gary"): the healthy attacker whose moves hit the trainer's team hardest and who takes the least from
+    the trainer's attack types, the level a small tiebreak — not simply the highest level. A Charizard leading Lorelei's Water / Ice team eats a super-effective hit on turn one; a Pikachu hits
+    most of it for double. Falls back to `boss_lead` for a trainer without team data."""
+    from knowledge.gym_advice import _team, types_used
+    from knowledge.team import _attack_mult, _damaging_move_types, _types
+    foes = _team(trainer)
+    able = [(i, p) for i, p in enumerate(party) if _can_lead(p)]
+    if not able:
+        return None
+    if not foes:
+        return boss_lead(party)
+    theirs = types_used(trainer)[:4]
+
+    def score(item):
+        i, p = item
+        mine = _damaging_move_types(p)
+        off = sum(min(4.0, max((_attack_mult(a, _types(sid)) for a in mine), default=0.5)) for sid, _l, _m in foes) / len(foes)
+        taken = sum(_attack_mult(t, _types(p.species_id)) for t in theirs) / len(theirs) if theirs else 1.0
+        return (2.0 * off - 1.5 * taken + 0.05 * p.level, p.level, -i)
+    return max(able, key=score)[0]
+

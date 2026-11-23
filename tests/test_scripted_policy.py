@@ -160,3 +160,20 @@ def test_chain_policy_teaches_fly_once_hm02_is_in_hand():
     p.r = SimpleNamespace(read_flag=lambda f: flags.get(f, False), read_badges=lambda: (8, 255), read_party=lambda: [pidgeot])
     assert p._teach_fly() == ("teach_move", {"tm": "Fly", "pokemon": "Pidgeot"})
     assert p._teach_fly() is None                       # one try only
+
+
+def test_chain_policy_absolute_cap_catches_a_grind_that_crawls():
+    """A level gain counts as progress, so one level every few hundred calls never tripped the 40-call stall. The beat's TOTAL is capped too."""
+    from agent.scripted_policy import ChainPolicy
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.stall, p._progress, p._calls_on, p._total_on, p.last_result = "", {}, {}, {}, "grind(): …"
+    for i in range(ChainPolicy.MAX_BEAT_CALLS):
+        p._note_beat_call("elite_four", ("sig", i // 30))                # the signature changes every 30 calls: never 40 in a row
+    assert not p.stall
+    p._note_beat_call("elite_four", ("sig", 99))
+    assert "calls on one beat" in p.stall and p.stall.startswith("elite_four:")
+    q = ChainPolicy.__new__(ChainPolicy)
+    q.stall, q._progress, q._calls_on, q._total_on, q.last_result = "", {}, {}, {}, "heal()"
+    for _ in range(ChainPolicy.STALL_CALLS + 1):
+        q._note_beat_call("victory_road", ("same",))
+    assert "no new badge" in q.stall                                       # the old rule still fires first

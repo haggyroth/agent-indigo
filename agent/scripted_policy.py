@@ -144,6 +144,7 @@ class ChainPolicy(ScriptedPolicy):
 
     STALL_REPEATS = 3                 # the same failure text this many times in a row = a stall
     STALL_CALLS = 40                  # calls spent on one beat with no new badge / key item / map progress
+    MAX_BEAT_CALLS = 1500             # …and the absolute cap on one beat: a level gain counts as progress, so a grind that crawls never trips STALL_CALLS
 
     OPTIONAL_WANTED = ("fly",)        # optional beats the chain takes anyway: HM02 Fly is the only way back from the Indigo Plateau (no grass there, Victory Road behind)
 
@@ -160,6 +161,7 @@ class ChainPolicy(ScriptedPolicy):
         self._prepped = False          # the team was levelled BEFORE Victory Road (past it there is no grass to train on: Plateau → back through the cave)
         self._skip_heal = 0            # decisions to go on WITHOUT healing after a heal that could not (a cave with no Center, an empty Bag)
         self._calls_on: dict[str, int] = {}
+        self._total_on: dict[str, int] = {}
         self._progress: dict = {}
         self._maps_seen: dict[str, set] = {}
 
@@ -220,6 +222,20 @@ class ChainPolicy(ScriptedPolicy):
         seen.add(tuple(self.r.read_current_map()))
         return (self.r.read_badges()[0], len(self.r.read_key_items()), len(seen), sum(p.level for p in self.r.read_party()))
 
+    def _note_beat_call(self, key: str, sig) -> None:
+        """Count one call against beat `key` and record a stall when (a) STALL_CALLS calls pass with the progress signature unchanged, or (b) the beat has taken MAX_BEAT_CALLS calls in all —
+        the signature counts a level gain as progress, so a slow grind that never ends (one level every few hundred calls) would otherwise never trip (a)."""
+        if self._progress.get(key) != sig:
+            self._progress[key], self._calls_on[key] = sig, 0
+        self._calls_on[key] = self._calls_on.get(key, 0) + 1
+        self._total_on[key] = self._total_on.get(key, 0) + 1
+        if self.stall:
+            return
+        if self._calls_on[key] > self.STALL_CALLS:
+            self.stall = f"{key}: {self.STALL_CALLS} calls with no new badge, key item, map or level (last: {self.last_result[:160]})"
+        elif self._total_on[key] > self.MAX_BEAT_CALLS:
+            self.stall = f"{key}: {self.MAX_BEAT_CALLS} calls on one beat — progress keeps being made, but too slowly to be going anywhere (last: {self.last_result[:160]})"
+
     def decide(self):
         from game.state import GameContext
         if self.r.detect_context() != GameContext.OVERWORLD:
@@ -230,12 +246,7 @@ class ChainPolicy(ScriptedPolicy):
         from knowledge.readiness import blocking
         key = self._beat_key()
         if key:                                         # count EVERY call against the beat (a heal / shop / grind loop that goes nowhere is a stall too)
-            sig = self._progress_sig(key)
-            if self._progress.get(key) != sig:
-                self._progress[key], self._calls_on[key] = sig, 0
-            self._calls_on[key] = self._calls_on.get(key, 0) + 1
-            if self._calls_on[key] > self.STALL_CALLS and not self.stall:
-                self.stall = f"{key}: {self.STALL_CALLS} calls with no new badge, key item, map or level (last: {self.last_result[:160]})"
+            self._note_beat_call(key, self._progress_sig(key))
         if self._skip_heal > 0:
             self._skip_heal -= 1
         elif blocking(self.c._readiness()) or self._pending == "heal":

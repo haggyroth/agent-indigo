@@ -183,6 +183,9 @@ TOKEN_BUDGET      = _env_int("TOKEN_BUDGET", 0, minimum=0)
 # consecutive-error budget, so a persistently-hung endpoint ends the run cleanly.
 # 0 = no timeout.
 LLM_TIMEOUT       = _env_float("LLM_TIMEOUT", 180, minimum=0.0)
+# LLM_RETRIES: how many times one chat-completion call is retried through a transient failure (connection reset, timeout, rate limit, 5xx) before the run's error budget is
+#   charged — exponential backoff 2, 4, 8 … 60 s (about four minutes at the default 8). 0 = no retries (the old behaviour).
+LLM_RETRIES       = _env_int("LLM_RETRIES", 8, minimum=0)
 # MAX_WALL_SECONDS: hard wall-clock cap on a whole run (checked each step). Belt-and-
 # suspenders alongside LLM_TIMEOUT so an unattended run can't burn hours. 0 = unlimited.
 MAX_WALL_SECONDS  = _env_float("MAX_WALL_SECONDS", 0.0, minimum=0.0)
