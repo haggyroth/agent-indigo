@@ -12,6 +12,7 @@ from game.constants import Addr, MOVE_NAMES  # noqa: F401  (MOVE_NAMES reserved 
 from game.state import GameContext
 from knowledge.bag import CANDY_VITAMINS, STONES
 from knowledge.escape import ROPE_ID, why_not
+from knowledge.pp_items import ONE_MOVE, PP_ITEMS, pick_move, pick_pp_target
 from knowledge.evolutions import EVO_BY_ITEM
 from knowledge.shopping import ITEM_NAMES
 
@@ -69,6 +70,8 @@ class FieldItemMixin:
             sick = [i for i, p in enumerate(party)
                     if p.status not in ("healthy", "", None) and (want is None or p.status == want)]
             return sick[0] if sick else None
+        if iid in PP_ITEMS:
+            return pick_pp_target(party, iid)           # whoever is shortest of PP (None = nobody)
         return 0
 
     def _field_heal(self, max_uses: int = 10, below: float = 0.5) -> list[str]:
@@ -121,7 +124,54 @@ class FieldItemMixin:
             used.append(f"{NAMES[ids[0]]} on {p.species_name}")
         return used
 
-    def _field_use_item(self, item: str, target: str = "") -> str:
+    def _field_pp(self, max_uses: int = 4) -> list[str]:
+        """Spend the Bag's PP items where PP has run out: an Elixir / Max Elixir on whoever is short of 15+ PP in total, an Ether / Max Ether on a Pokémon with a DAMAGING move at 0 PP. Neither is sold
+        in a Kanto Mart — they are only found — so they exist to be used before the Elite Four's sealed rooms ("Thunder has no PP left"). Returns 'Item on Species' per use; stops at a refusal."""
+        from knowledge.leafgreen_data import MOVE_POWER
+        from knowledge.pp_items import move_deficits
+        used: list[str] = []
+        for _ in range(max_uses):
+            party = self.reader.read_party()
+            bag = dict(self.reader.read_items_pocket())
+            choice = None
+            for iid in (37, 36):                                           # the big ones first
+                if bag.get(iid):
+                    slot = pick_pp_target(party, iid)
+                    if slot is not None and sum(move_deficits(party[slot])) >= 15:
+                        choice = (iid, slot, "")
+                        break
+            if choice is None:
+                for iid in (35, 34):
+                    if not bag.get(iid):
+                        continue
+                    for slot, p in enumerate(party):
+                        empty = [n for n, pp in zip(p.move_names or [], p.pp or []) if n and pp == 0 and MOVE_POWER.get(n, 0) > 0]
+                        if p.current_hp > 0 and empty:
+                            choice = (iid, slot, empty[0])
+                            break
+                    if choice:
+                        break
+            if choice is None:
+                break
+            iid, slot, move = choice
+            res = self._field_use_item(ITEM_NAMES[iid], target=str(slot + 1), move=move)
+            if not res.startswith("Used"):
+                break
+            used.append(f"{ITEM_NAMES[iid]} on {party[slot].species_name}" + (f" ({move})" if move else ""))
+        return used
+
+    def _pp_move_cursor_to(self, want: int) -> bool:
+        """Move the 'Restore which move?' list's cursor to row `want` (0-3), reading the live cursor (Addr.PP_MOVE_CURSOR) after each press instead of counting presses (blind presses were dropped
+        while the list was still opening)."""
+        for _ in range(8):
+            cur = self.mgba.read8(Addr.PP_MOVE_CURSOR)
+            if cur == want:
+                return True
+            self.mgba.tap("Down" if cur < want else "Up")
+            self.mgba.tick(16)
+        return self.mgba.read8(Addr.PP_MOVE_CURSOR) == want
+
+    def _field_use_item(self, item: str, target: str = "", move: str = "") -> str:
         ctx = self.reader.detect_context()
         if ctx == GameContext.IN_BATTLE:
             return "In a battle — use the battle version."
@@ -196,11 +246,19 @@ class FieldItemMixin:
             if self.mgba.read8(Addr.PARTY_FIELD_SLOT) != slot:
                 self._menus.close_menus()
                 return "Couldn't move the party cursor to the target."
-            for _ in range(6):                          # A until the item is consumed
+            if iid in ONE_MOVE:
+                # An Ether asks "Restore which move?" with a small list over the party menu (the callback stays the party menu's; ItemUseCB_TryRestorePP): A picks the Pokémon, the
+                # list opens with the cursor on move 1; read the live cursor to the wanted move, then A.
                 self.mgba.tap("A")
                 self.mgba.tick(40)
+                self._pp_move_cursor_to(pick_move(party[slot], move))
+                self.mgba.tap("A")
+                self.mgba.tick(40)
+            for _ in range(6):                          # A until the item is consumed
                 if dict(self.reader.read_items_pocket()).get(iid, 0) < qty0:
                     break
+                self.mgba.tap("A")
+                self.mgba.tick(40)
         # Advance the result text, then back out to the field. A stone starts an EVOLUTION scene (B would cancel it:
         # drive it with A) and a Rare Candy / vitamin prints level-up and stat boxes (B dismisses them).
         for _ in range(6 if iid in STONES or iid in CANDY_VITAMINS else 4):

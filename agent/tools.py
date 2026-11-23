@@ -113,7 +113,7 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "use_item",
         "description": "Use a Bag item. In battle: on your ACTIVE Pokémon (costs your turn) — a Potion or a status "
-                       "cure. Out of battle: Potions, status cures, Revive, Repel, evolution stones (Thunder Stone "
+                       "cure; Elixir restores every move's PP. Out of battle: Potions, status cures, Revive, Ether / Elixir (PP), Repel, evolution stones (Thunder Stone "
                        "on Pikachu evolves it), Rare Candy and vitamins, Escape Rope (caves only: back to the entrance). `target` = species or 1-based slot; omit it "
                        "to auto-pick whoever needs the item (Rare Candy and vitamins require a target). The 'Bag:' "
                        "line shows what you have.",
@@ -124,6 +124,8 @@ TOOLS = [
             "target": {"type": "string",
                        "description": "Optional (field use): species name or 1-based party "
                                       "slot. Omit to auto-pick whoever needs it."},
+            "move": {"type": "string",
+                     "description": "Optional, Ether / Max Ether only: which move to refill (default: the one most short of PP)."},
         }, "required": ["item"]},
     }},
     {"type": "function", "function": {
@@ -455,3 +457,12 @@ def tools_for(context=None) -> list:
     if name == GameContext.OVERWORLD.name:
         return [t for t in TOOLS if t["function"]["name"] not in _BATTLE_ONLY | _NAMING_ONLY]
     return list(TOOLS)
+
+
+def tool_schema(name: str) -> dict | None:
+    """The JSON-schema `parameters` of tool `name` (None for an unknown tool)."""
+    for t in TOOLS:
+        if t["function"]["name"] == name:
+            return t["function"].get("parameters")
+    return None
+
