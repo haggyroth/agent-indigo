@@ -2658,3 +2658,74 @@ def test_the_optional_loss_rule_raises_the_bar_once_per_loss_and_then_lets_the_m
     out = c._execute("quest", json.dumps({"name": "elite_four"}))
     assert "lost in the Pokémon League" not in out and not out.startswith("Not ready"), out          # the second call goes ahead
     assert tuple(live.r.read_current_map()) != (13, 0) or live.r.detect_context().name == "IN_BATTLE"
+
+
+def test_a_connection_the_map_calls_unreachable_is_dead_at_once_not_retried_for_thirty_calls(live, monkeypatch):
+    """Route 23 (latest watched runs): from the lake's shores go_to planned a phantom 'North' connection (that half of the map is only reachable through the cave), go_to_map answered
+    "Couldn't get to the North edge … no walkable path to any of its tiles", the player had moved a little on the way, and that counted as progress — the dead edge was retried for 10-30
+    calls per trip. Now the edge is marked dead on that answer, the router plans around it, and when nothing is left go_to says so."""
+    import knowledge.map_graph as mg
+    live.load("zeropp_move_menu")
+    c = live.c
+    live.c._execute("flee_battle", "{}")
+    calls = []
+
+    def fake_route(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True):
+        return None if avoid_edges else [("connection", "North", (3, 9))]
+    monkeypatch.setattr(mg, "route_to", fake_route)
+
+    def fake_go_to_map(direction, dest=None):
+        calls.append(direction)
+        c.mgba.tap("Up")                                          # the walk toward the edge moved the player a little: formerly "progress"
+        c.mgba.tick(20)
+        return "Couldn't get to the North edge from (10, 71): no walkable path to any of its tiles (something splits this map — water, a wall, a boulder)."
+    monkeypatch.setattr(c, "_go_to_map", fake_go_to_map)
+    out = c._go_to("Indigo Plateau", mode="flee")
+    assert len(calls) <= 2, calls
+    assert "Every way to Indigo Plateau" in out and "blocked" in out, out
+
+
+def test_victory_road_upper_floors_do_not_gate_go_to_on_a_heal_that_cannot_happen(live):
+    """24 go_to calls in the latest runs were refused with 'heal() at a Pokémon Center' while the player stood on Victory Road 2F / 3F, where heal() can only use the Bag (the model's way out was
+    force=true). The hurt party stays a warning there; on an ordinary route the gate still holds."""
+    from game.constants import Addr
+    live.load("vr_2f_stuck")
+    c = live.c
+    for slot in range(len(live.r.read_party())):
+        live.m.write16(Addr.PARTY_DATA + 100 * slot + 0x56, 1)                      # everybody at 1 HP
+    c._go_to = lambda *a, **k: "TRIP"
+    out = c._execute("go_to", json.dumps({"destination": "Indigo Plateau"}))
+    assert out.startswith("TRIP"), out
+    live.load("zeropp_move_menu")                                                    # Route 23, an ordinary road
+    c._execute("flee_battle", "{}")
+    c._go_to = lambda *a, **k: "TRIP"
+    for slot in range(len(live.r.read_party())):
+        live.m.write16(Addr.PARTY_DATA + 100 * slot + 0x56, 1)
+    out = c._execute("go_to", json.dumps({"destination": "Route 22"}))
+    assert out.startswith("Not travelling yet"), out
+
+
+def test_quest_victory_road_is_not_done_from_inside_the_cave_but_is_on_the_plateau_side(live):
+    """The quest reads 'already done' once the Plateau was visited — a dead end for a player back inside the cave or south of it (the boulders reset when you leave)."""
+    live.load("vr_2f_stuck")
+    c = live.c
+    live.set_flag(0x899, True)
+    live.give_item(13, 12)                                                           # supplies enough that the (separate, one-time) supplies warning stays quiet
+    live.give_item(24, 4)
+    assert not c._plateau_side()
+    c._get_victory_road = lambda auto_trainers=False: "DRIVER"
+    assert c._execute("quest", json.dumps({"name": "victory_road"})) == "DRIVER"
+    live.load("league_door")                                                         # the Plateau's Center: done
+    live.set_flag(0x899, True)
+    assert c._plateau_side()
+    assert c._execute("quest", json.dumps({"name": "victory_road"})).endswith("already done.")
+
+
+def test_walk_to_inside_the_cave_blames_the_barrier_not_surf(live):
+    """'Couldn't start Surf — no reachable shore' came back 27 times for Victory Road targets cut off by boulders / barriers: there is no water in the cave, so the diagnosis sent the model after the
+    wrong thing. It now says what is in the way and which tool plans it."""
+    live.load("vr_2f_stuck")
+    c = live.c
+    out = c._walk_to(36, 17)                                                         # the south-east ladder, behind the second switch's barrier
+    assert "Surf" not in out, out
+    assert out.startswith("No walkable path") and "quest('victory_road')" in out, out

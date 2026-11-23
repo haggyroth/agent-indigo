@@ -45,6 +45,7 @@ class SkillState:
     _surf_search = 0              # >0 while _surf's second pass (the elevation-3 shores) walks to a shore: walk_to must not start Surf itself then (it would recurse into the search)
     _quest_opts = ()              # the words after the quest name in quest('new_game squirtle name=KYLE') — read by the driver that was dispatched
     _pc_fail_streak = 0           # consecutive pc() calls whose storage screen would not open (two in a row: tell the model to stop retrying)
+    _stall_log = lazy(dict)       # stall snapshots saved this run (see agent.failure_shots.note_stall): the failing result being repeated, its run length, how many states were saved
     _shot_log = lazy(dict)        # failure screenshots saved this run (see agent.failure_shots): count, last time, results already pictured
     _walk_avoid = None            # tiles walk_to must not cross (set around a gym's teleport-pad walk)
     _lost_goals = lazy(dict)      # {grass map: the party's best level when a trainer on the way to it beat us} — skipped until we are 3 levels stronger

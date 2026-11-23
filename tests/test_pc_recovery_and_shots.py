@@ -151,3 +151,33 @@ def test_the_storage_menu_is_steered_to_the_mode_even_when_the_which_pc_menu_rea
         c, st = _pc_menu_sim(first_menu_live)
         assert c._pc_to_storage(mode) is None and st["opened"] == mode, (mode, st)
         assert st["presses"] == ["Down"] * mode                                  # and the 4-entry menu before it was never steered
+
+
+# ── stall snapshots (agent.failure_shots.note_stall) ──────────────────────────────────────────────
+from agent.failure_shots import MAX_STALLS, STALL_REPEATS, note_stall  # noqa: E402
+
+
+def test_the_fifth_identical_failing_result_in_a_row_asks_for_a_snapshot_once():
+    log = {}
+    results = [note_stall(log, "go_to_map", f"Couldn't get to the North edge from ({x}, 117): no walkable path") for x in range(10, 10 + STALL_REPEATS + 3)]
+    assert results == [False] * (STALL_REPEATS - 1) + [True] + [False] * 3        # positions differ, the failure is the same; only the 5th asks
+
+
+def test_a_different_result_or_a_success_resets_the_run():
+    log = {}
+    for _ in range(STALL_REPEATS - 1):
+        note_stall(log, "walk_to", "No walkable path from (1,1) to (2,2) — the target may be blocked")
+    assert note_stall(log, "walk_to", "Arrived at (3,3).") is False                  # a success
+    assert [note_stall(log, "walk_to", "No walkable path from (1,1) to (2,2) — the target may be blocked") for _ in range(STALL_REPEATS)][-1] is True
+    log2 = {}
+    for i in range(STALL_REPEATS + 2):
+        assert note_stall(log2, "walk_to" if i % 2 else "go_to", "No walkable path from (1,1) to (2,2)") is False   # alternating tools never make a run
+
+
+def test_snapshots_are_capped_per_run():
+    log, saved = {}, 0
+    for k in range(MAX_STALLS + 4):
+        for _ in range(STALL_REPEATS):
+            saved += note_stall(log, "walk_to", f"Couldn't do thing {'x' * k}")
+        note_stall(log, "walk_to", "Arrived.")
+    assert saved == MAX_STALLS

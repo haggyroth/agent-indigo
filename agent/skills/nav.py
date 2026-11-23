@@ -271,6 +271,25 @@ class NavMixin:
         self._advance_to_control(tries=30)
         return True
 
+    def _has_water(self, grid, surf_grid, w: int, h: int) -> bool:
+        """Does the Surf grid differ from the walking grid by REAL water (not just elevation-1 floor — Victory Road's pits and ledges read that way)? Without it a boulder-cut-off target in a cave
+        sent walk_to off to "Couldn't start Surf — no reachable shore" 27 times in the last runs, a diagnosis that pointed the model at the wrong cause."""
+        try:
+            checked = 0
+            for y in range(h):
+                for x in range(w):
+                    if surf_grid[y][x] and not grid[y][x]:
+                        t = self.tilemap.read_tile(x, y)
+                        if t is not None and t.is_water:
+                            return True
+                        checked += 1
+                        if checked > 400:
+                            return True               # a big diff and no verdict: keep the old behaviour
+            return False
+        except Exception:
+            log_once("nav._has_water", "nav._has_water: tolerated failure (assuming water)")
+            return True
+
     def _walk_to_tool(self, tx: int, ty: int) -> str:
         """The model-facing walk_to: reject a tile outside the current map with the real size instead of handing a
         nonsense goal to A* (internal callers use _walk_to directly — they may aim at edge/warp tiles)."""
@@ -423,7 +442,7 @@ class NavMixin:
                 if (not self._surfing() and not surf_tried and not self._surf_search and self._party_knows(57)):
                     surf_tried = True
                     sg, _w, _h = self.tilemap.passable_grid(surf=True)
-                    if sg is not None and find_path((px, py), (tx, ty), lambda x, y: sg[y][x], w, h):
+                    if sg is not None and self._has_water(grid, sg, w, h) and find_path((px, py), (tx, ty), lambda x, y: sg[y][x], w, h):
                         res = self._use_hm("surf")        # only water in the way and we can Surf
                         if self._surfing():
                             continue
@@ -491,8 +510,16 @@ class NavMixin:
         if (px, py) == (tx, ty):
             return f"Arrived at ({tx},{ty})."   # e.g. a warp target we couldn't step through
         if not saw_path:
+            hint = ""
+            try:
+                from knowledge.vr_data import FLOORS as _VR
+                if tuple(self.reader.read_current_map()) in _VR:
+                    hint = (" This is Victory Road: its barriers and cut-off pockets open with its boulder puzzles — quest('victory_road') plans every push (towards the Plateau), "
+                            "and go_to plans the way back out.")
+            except Exception:
+                log_once("nav.walk_hint", "nav._walk_to: could not build the cave hint (ignored)")
             return (f"No walkable path from ({px},{py}) to ({tx},{ty}) — "
-                    f"the target may be blocked or off this map.")
+                    f"the target may be blocked or off this map.{hint}")
         return f"Stopped at ({px},{py}) while heading to ({tx},{ty})."
 
     @staticmethod
@@ -983,6 +1010,10 @@ class NavMixin:
         dest = str(destination).lower()
         exempt = any(k in dest for k in ("pokemon center", "poke center", "pokecenter", "mart"))
         needs = self._readiness()
+        if tuple(self.reader.read_current_map()) in ((1, 40), (1, 41)):
+            # Victory Road's upper floors have no Center to reach, and heal() there only uses the Bag: a "heal first" gate would refuse every go_to forever (24 refusals in the latest runs,
+            # the model's way out was force=true). The hurt party stays a warning; quest('victory_road') / the next floor's trip carry on.
+            needs = [n for n in needs if n.code != "heal"]
         if (not force and not exempt and self.reader.detect_context() == GameContext.OVERWORLD
                 and blocking(needs)):
             return ("Not travelling yet — sort this out first:\n" + "\n".join("⛔ " + n.text for n in blocking(needs))
@@ -1088,6 +1119,7 @@ class NavMixin:
             if not out.startswith("Arrived"):
                 return out                       # the nested trip already recorded its reason
 
+        cleared = False
         for _hop in range(self._HOP_BUDGET):   # higher budget: auto-fled battles each cost a hop
             # A trainer spotting us, post-battle text, or a stray menu leaves the
             # game non-walkable (often misreads as IN_MENU). Advance it to overworld
@@ -1135,6 +1167,11 @@ class NavMixin:
             avoid = {k for k, n in fails.items() if n >= 2}
             route = route_to(cur_node, target_map, avoid_edges=avoid, avoid_maps=self._avoid_maps)
             if not route and avoid:
+                if cleared:            # already forgotten once in this call and the same dead edges came back: say so instead of looping on them
+                    dead = ", ".join(f"{k[1]} {k[2]}" for k, n in fails.items() if n >= 2)[:120]
+                    return self._stop("no_route", f"Every way to {target_name} from {MAP_NAMES.get(cur, cur)} is blocked right now (dead: {dead or 'learned this trip'}) — "
+                                                  "something has to change first (a Pokémon that can Surf / Cut, a cleared path, or a heal).")
+                cleared = True
                 fails.clear()          # every known path is blocked — forget and retry fresh
                 route = route_to(cur_node, target_map, avoid_maps=self._avoid_maps)
             if not route:
@@ -1155,6 +1192,13 @@ class NavMixin:
 
             if kind_step == "warp" and self.reader.read_current_map() == before:
                 self._press_on_warp(self._warp_exit_tile(arg))
+
+            if (kind_step == "connection" and self.reader.read_current_map() == before and self.reader.detect_context() == GameContext.OVERWORLD
+                    and ("no walkable path to any of its tiles" in str(res) or "No walkable opening" in str(res))):
+                # The map says outright that this edge cannot be reached from here (a phantom edge on a split map — Route 23's north half is only reachable through the cave). Walking
+                # toward it counted as "progress" and the dead edge was retried for 30 calls; mark it dead now and plan around it.
+                fails[(cur_node, kind_step, arg)] = fails.get((cur_node, kind_step, arg), 0) + 2
+                continue
 
             # Handle a battle that interrupted this hop.
             if self.reader.detect_context() == GameContext.IN_BATTLE:

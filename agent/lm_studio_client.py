@@ -327,8 +327,25 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             log_once("client._log_tool", "client._log_tool: tolerated failure (continuing with a default)")
             pass
         shot = self._failure_shot(name, result)
+        stall = self._stall_snapshot(name, result)
         self.run_log.event("tool", name=name, args=args_json, secs=round(secs, 2),
-                           result=str(result)[:800], **({"shot": shot} if shot else {}), **snap)
+                           result=str(result)[:800], **({"shot": shot} if shot else {}), **({"stall": stall} if stall else {}), **snap)
+
+    def _stall_snapshot(self, name: str, result) -> str:
+        """On the 5th identical failing result in a row, save the emulator state under `<run dir>/stalls/` (loadable as a live-test fixture) and return its path relative to the run dir."""
+        from agent.failure_shots import note_stall
+        try:
+            run_dir, save = getattr(self.run_log, "dir", None), getattr(self.mgba, "save_state_file", None)
+            if not note_stall(self._stall_log, name, result) or not run_dir or save is None:
+                return ""
+            rel = f"stalls/{time.time() - self.run_log.t0:08.1f}_{name}.ss1"
+            (run_dir / "stalls").mkdir(parents=True, exist_ok=True)
+            save(str(run_dir / rel))
+            events.emit("note", f"stall: {name} failed the same way {self._stall_log['run']}× — state saved to {rel}", log=False)
+            return rel
+        except Exception:
+            log_once("client._stall_snapshot", "client._stall_snapshot: could not save a stall snapshot (ignored)")
+            return ""
 
     def _failure_shot(self, name: str, result) -> str:
         """When a tool's result reads like a failure, save the current frame under the run directory and return its path relative to it ('' when not saved)."""
