@@ -28,6 +28,7 @@ from knowledge.game_corner import PRIZES
 from knowledge.game_corner_data import COIN_CASE, GAME_CORNER, PRIZE_ROOM
 from knowledge.held_items import holding_line, suggest as held_suggest
 from knowledge.league_rooms import LEAGUE_ROOM_MAPS, league_notice
+from knowledge.status_cure import cure_hint
 from knowledge.nicknames import suggest as nickname_ideas
 from knowledge.leafgreen_data import GYM_MAP_LEADER, POKEMON_TYPES
 from knowledge.map_graph import MAP_KIND
@@ -355,6 +356,9 @@ def _battle(t: Tick) -> list[str]:
                      low_hp_advice(party, active, foe, heals, wild=not run.battle_is_trainer)):
             if line:
                 out.append(line)
+    cure = _safe("status_cure", lambda: cure_hint(me.nickname or me.species_name or "Your lead", me.status, dict(r.read_items_pocket()), me.hp_percent), "")
+    if cure:
+        out.append(cure)                                      # the Bag holds the cure; nothing else ever tells the model so
     boosters = _safe("boosters", lambda: booster_note(r.read_items_pocket(), run.battle_is_trainer), "")
     if boosters:
         out.append(boosters)

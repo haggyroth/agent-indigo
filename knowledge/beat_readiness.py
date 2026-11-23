@@ -45,12 +45,14 @@ def supplies_short(key: str, bag) -> list:
     return out
 
 
-def readiness(key: str, party, bag=None) -> str:
-    """'' when the party (and, with `bag`, its healing supplies) is ready for beat `key` (or the beat has no requirement); else why not and what to do.
-    A fainted Pokémon counts as present (a heal fixes it) — only its LEVEL matters here."""
+HARD_LEVELS = frozenset({"elite_four"})      # beats whose LEVEL shortfall is a wall, not a warning (a loss resets the whole League, the rooms seal, no Center): no 'call again to go anyway'
+
+
+def level_shortfall(key: str, party) -> list[str]:
+    """['your best Pokémon is L52 (L54 recommended)', 'only 3 of your team are L46+ (5 recommended)'] — the level gaps for beat `key`, [] when there are none."""
     need = NEEDS.get(key)
     if need is None or not party:
-        return ""
+        return []
     levels = sorted((p.level for p in party), reverse=True)
     deep = sum(1 for lv in levels if lv >= need.floor)
     short = []
@@ -58,6 +60,27 @@ def readiness(key: str, party, bag=None) -> str:
         short.append(f"your best Pokémon is L{levels[0]} (L{need.top} recommended)")
     if deep < need.depth:
         short.append(f"only {deep} of your team {'is' if deep == 1 else 'are'} L{need.floor}+ ({need.depth} recommended)")
+    return short
+
+
+def hard_wall(key: str, party) -> str:
+    """'' unless beat `key` is level-gated for good (HARD_LEVELS) and the party falls short: then the refusal, which no second call overrides."""
+    short = level_shortfall(key, party) if key in HARD_LEVELS else []
+    if not short:
+        return ""
+    need = NEEDS[key]
+    return (f"Not ready for quest('{key}') — and this one cannot be skipped: {'; '.join(short)}. It means {need.why}. Throwing a team this far under at it only costs "
+            f"money and time: a loss resets the whole League and sends you back to the Plateau's Center, and the rooms are sealed (no Center, no shop), so every fight is the same fight "
+            f"with what the Bag holds. Train first: grind() with no level lifts the weaker members, grind({need.top}) the ace (Victory Road's wild L32-48 are nearest); then call quest('{key}') again.")
+
+
+def readiness(key: str, party, bag=None) -> str:
+    """'' when the party (and, with `bag`, its healing supplies) is ready for beat `key` (or the beat has no requirement); else why not and what to do.
+    A fainted Pokémon counts as present (a heal fixes it) — only its LEVEL matters here."""
+    need = NEEDS.get(key)
+    if need is None or not party:
+        return ""
+    short = level_shortfall(key, party)
     stock = supplies_short(key, bag)
     if not short and not stock:
         return ""

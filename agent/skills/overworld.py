@@ -205,7 +205,7 @@ class OverworldMixin:
     def _league_heal(self) -> str:
         """Inside an Elite Four room there is no Pokémon Center to reach (the door sealed behind you): heal from the Bag — Revives for the fainted, then the smallest Potion / Full Restore
         that fills the gap of anyone under 60% — and say what is left. A watched run called heal() and go_to('Pokemon Center') in Lorelei's room for 300 calls."""
-        used = self._field_heal(max_uses=12, below=0.6)
+        used = self._field_heal(max_uses=12, below=0.6) + self._field_cure()
         bag = dict(self.reader.read_items_pocket())
         left = f"{sum(n for i, n in bag.items() if i == 19)} Full Restore, {sum(n for i, n in bag.items() if i in (24, 25))} Revive, {sum(n for i, n in bag.items() if i in (13, 22, 21, 20))} Potions"
         if used:
@@ -220,12 +220,16 @@ class OverworldMixin:
         the trip, it stops and reports so the caller can resume."""
         from game.state import GameContext
         from knowledge.map_graph import MAP_KIND
+        try:
+            sealed = tuple(self.reader.read_current_map()) in LEAGUE_ROOM_MAPS
+        except Exception:
+            sealed = False                                   # a half-loaded screen: not the League
+        if sealed:
+            return self._league_heal()                       # sealed in: no Center, so the Bag's cures count too (a status is not "full HP and PP")
         if not force and not self._party_needs_heal():
             return "Party is already at full HP and PP — no need to heal."
         # Inside Victory Road no Center is reachable (the way out south needs Surf over Route 23, the way on is the puzzle itself): a go_to from there only
         # wandered the cave pushing boulders out of place (chain run 8). Heal from the Bag and push on.
-        if tuple(self.reader.read_current_map()) in LEAGUE_ROOM_MAPS:
-            return self._league_heal()
         cave = tuple(self.reader.read_current_map())
         if cave in _VICTORY_ROAD:
             # Grinding in the cave (its wild L32-48 are the closest fit for a team past the gyms), a heal is a walk OUT to Viridian's Center — the reverse puzzle — not an item-by-item drain of the Bag,

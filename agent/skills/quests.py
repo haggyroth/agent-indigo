@@ -146,7 +146,9 @@ class QuestMixin:
         if beat.key == "victory_road" and not self.reader.read_flag(0x899) and not self._fly_ready():
             from knowledge.gates import _FLY_HINT
             return f"Not yet — Fly first. {_FLY_HINT}"              # a gate, not a warning: the cave has no way home without it
-        from knowledge.beat_readiness import readiness
+        from knowledge.beat_readiness import hard_wall, readiness
+        if (wall := hard_wall(beat.key, self.reader.read_party())):
+            return wall                                          # the League's level wall: every call, no "go anyway" (a run threw itself at it eleven times)
         if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party(), self._bag_or_none())):
             self._ready_warned.add(beat.key)            # once per beat: a second call (or a resumed one) goes ahead
             return warn

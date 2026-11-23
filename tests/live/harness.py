@@ -25,6 +25,7 @@ class Live:
         from agent.skills.state import SkillState
         for attr in [n for n in list(vars(self.c)) if hasattr(SkillState, n)]:
             delattr(self.c, attr)
+        self.c.__dict__.pop("_use_move", None)           # a test's one-hit-foe wrapper must not leak into the next test (it cleared the whole League for a later one)
         import copy
         from memory.long_term import DEFAULTS
         self.rt.ltm.data = copy.deepcopy(DEFAULTS)
@@ -150,6 +151,14 @@ class Live:
         """Stage: make the lead (the fixture's Venusaur, Medium-Slow growth) a level-60 with a consistent exp total, so a long dungeon of L40+ wild
         Pokémon cannot out-level it — and, because it stays well under L61, no level-up recomputes the stats that boost_party() raised."""
         self.patch_mon(0, level=level, exp=exp)
+        self.boost_party()
+
+    def league_ready(self, level: int = 58) -> None:
+        """Stage: every party member at `level` with an exp total consistent with its growth rate — a team past quest('elite_four')'s level wall (L54 best, five at L46+)."""
+        from knowledge.growth import exp_for_level
+        from knowledge.growth_data import GROWTH_RATE
+        for slot, mon in enumerate(self.r.read_party()):
+            self.patch_mon(slot, level=level, exp=exp_for_level(GROWTH_RATE.get(mon.species_id, 0), level))
         self.boost_party()
 
     def boost_party(self, hp: int = 400, stat: int = 220) -> None:
