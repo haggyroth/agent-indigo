@@ -102,6 +102,25 @@ class FieldItemMixin:
             used.append(ITEM_NAMES[item])
         return used
 
+    def _field_cure(self, max_uses: int = 6) -> list[str]:
+        """Cure the party's major statuses from the Bag with the cheapest item that does it (Antidote / Burn Heal / Ice Heal / Awakening / Paralyze Heal, then Full Heal — never a Full
+        Restore, which is worth more as HP). Returns 'Item on Species' for each use; stops at the first refusal."""
+        from knowledge.status_cure import NAMES, cure_ids
+        used: list[str] = []
+        for _ in range(max_uses):
+            party = self.reader.read_party()
+            bag = dict(self.reader.read_items_pocket())
+            todo = [(i, p, [c for c in cure_ids(p.status, bag) if c != 19]) for i, p in enumerate(party) if p.current_hp > 0]
+            todo = [(i, p, ids) for i, p, ids in todo if ids]
+            if not todo:
+                break
+            i, p, ids = todo[0]
+            res = self._field_use_item(NAMES[ids[0]], target=str(i + 1))
+            if not res.startswith("Used"):
+                break
+            used.append(f"{NAMES[ids[0]]} on {p.species_name}")
+        return used
+
     def _field_use_item(self, item: str, target: str = "") -> str:
         ctx = self.reader.detect_context()
         if ctx == GameContext.IN_BATTLE:

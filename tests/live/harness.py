@@ -152,6 +152,14 @@ class Live:
         self.patch_mon(0, level=level, exp=exp)
         self.boost_party()
 
+    def league_ready(self, level: int = 58) -> None:
+        """Stage: every party member at `level` with an exp total consistent with its growth rate — a team past quest('elite_four')'s level wall (L54 best, five at L46+)."""
+        from knowledge.growth import exp_for_level
+        from knowledge.growth_data import GROWTH_RATE
+        for slot, mon in enumerate(self.r.read_party()):
+            self.patch_mon(slot, level=level, exp=exp_for_level(GROWTH_RATE.get(mon.species_id, 0), level))
+        self.boost_party()
+
     def boost_party(self, hp: int = 400, stat: int = 220) -> None:
         """Stage: raise every party member's stored battle stats (HP, Atk, Def, Spe, SpA, SpD) and refill HP, so a test about a long dungeon is not
         decided by a fixture party that is 10-20 levels under the trainers (the level and exp are left alone: the exp text stays consistent)."""

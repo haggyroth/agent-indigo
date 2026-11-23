@@ -1267,6 +1267,8 @@ def test_elite_four_quest_clears_the_league_to_the_hall_of_fame(live):
     c._execute("go_to", json.dumps({"destination": "Celadon City"}))
     live.fly_to("indigo plateau", badges=0xFF)
     live.strong_lead(level=70, exp=344960)
+    live.league_ready(58)
+    live.patch_mon(0, level=70, exp=344960)
     foe = Addr.BATTLE_MON0_SPECIES + 0x58
     use_move = c._use_move
 
@@ -1276,15 +1278,18 @@ def test_elite_four_quest_clears_the_league_to_the_hall_of_fame(live):
         return use_move(name)
     c._use_move = weak_foe
     out = ""
-    for _ in range(60):
-        if live.r.detect_context().name == "IN_BATTLE":
-            c._auto_fight()
-            continue
-        live.boost_party()
-        live.patch_mon(0, moves=[63, 89, 58, 57], pps=[5, 10, 10, 15])
-        out = c._execute("quest", json.dumps({"name": "elite_four", "auto_trainers": True}))
-        if live.r.read_flag(0x82C):
-            break
+    try:
+        for _ in range(60):
+            if live.r.detect_context().name == "IN_BATTLE":
+                c._auto_fight()
+                continue
+            live.boost_party()
+            live.patch_mon(0, moves=[63, 89, 58, 57], pps=[5, 10, 10, 15])
+            out = c._execute("quest", json.dumps({"name": "elite_four", "auto_trainers": True}))
+            if live.r.read_flag(0x82C):
+                break
+    finally:
+        del c._use_move                                                                  # the shared client must not keep the one-hit foes for the next test
     assert live.r.read_flag(0x82C), out                                                  # FLAG_SYS_GAME_CLEAR
     assert tuple(live.r.read_current_map()) == (1, 80), live.r.read_current_map()        # the Hall of Fame
 
@@ -1310,6 +1315,7 @@ def test_a_league_loss_resets_the_rooms_and_quest_elite_four_starts_over(live):
     from game.constants import Addr
     live.load("league_agatha")
     c = live.c
+    live.league_ready(58)
     assert live.r.read_flag(0x4B8) and live.r.read_flag(0x4B9) and not live.r.read_flag(0x4BA)
     money = live.r.read_money()
     for _ in range(6):                                           # talk to Agatha without the autopilot: a battle starts
@@ -2609,6 +2615,22 @@ def test_inside_an_elite_four_room_heal_uses_the_bag_and_nothing_leaves_the_room
     assert tuple(live.r.read_current_map()) == here
     p = live.r.read_party()
     assert p[0].current_hp > 0 and p[1].current_hp >= 0.6 * p[1].max_hp, [(m.current_hp, m.max_hp) for m in p[:2]]
+    live.m.write32(Addr.PARTY_DATA + 100 * 1 + 0x50, 0x40)         # the second Pokémon is paralysed (the fixture Bag holds Paralyze Heals)
+    out = c._execute("heal", "{}")
+    assert "Paralyze Heal on" in out, out                           # the cheap specific cure, not a Full Heal
+    assert live.m.read32(Addr.PARTY_DATA + 100 * 1 + 0x50) == 0
     out = c._execute("go_to", json.dumps({"destination": "Pokemon Center"}))
     assert "SEALED IN" in out and tuple(live.r.read_current_map()) == here, out
     from agent.observation import build_observation  # noqa: F401  (the section is exercised by the unit tests)
+
+
+def test_the_elite_four_level_wall_refuses_every_call(live):
+    """A run threw itself at the League eleven times with a team under its recommended levels: the first call warned, every later one went ahead. The level shortfall is a wall now."""
+    live.load("league_door")
+    c = live.c
+    for slot in range(len(live.r.read_party())):
+        live.patch_mon(slot, level=40, exp=64000)
+    for _ in range(3):
+        out = c._execute("quest", json.dumps({"name": "elite_four"}))
+        assert out.startswith("Not ready for quest('elite_four')") and "cannot be skipped" in out, out
+        assert tuple(live.r.read_current_map()) == (13, 0)               # it never walked to the door
