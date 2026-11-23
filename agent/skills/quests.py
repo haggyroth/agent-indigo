@@ -133,8 +133,8 @@ class QuestMixin:
         beat = sb.resolve(name)
         if beat is None:
             return f"No quest called {name!r}. " + sb.listing(status)
-        if status.get(beat.key) == "done":
-            return f"{beat.title}: already done."
+        if status.get(beat.key) == "done" and not (beat.key == "victory_road" and not self._plateau_side()):
+            return f"{beat.title}: already done."              # Victory Road is "done" once the Plateau was visited, but from inside the cave / south of it the quest is still the way through (the boulders reset)
         if not beat.driver:
             return "No script for this one yet — here is the plan:\n" + sb.plan(beat, status)
         if beat.driver in ("brock", "misty", "surge", "erika", "koga", "sabrina", "blaine", "giovanni") and status.get(beat.key) == "blocked":
