@@ -39,3 +39,38 @@ def test_the_elite_four_level_wall_has_no_second_call_override():
     assert hard_wall("elite_four", weak) == wall                       # every call, not once
     assert hard_wall("elite_four", strong) == ""
     assert hard_wall("victory_road", weak) == ""                       # other beats keep their one-time warning
+
+
+# ── the optional League loss rule ──────────────────────────────────────────────────────────────────
+from knowledge.beat_readiness import MAX_FLOOR, MAX_TOP, league_need, loss_advice  # noqa: E402
+
+
+def _team(*levels):
+    return [NS(level=lv) for lv in levels]
+
+
+def test_each_loss_raises_the_levels_by_the_bump_up_to_a_cap():
+    assert (league_need(0, 2).top, league_need(0, 2).floor) == (54, 46)
+    assert (league_need(2, 2).top, league_need(2, 2).floor) == (58, 50)
+    assert (league_need(50, 3).top, league_need(50, 3).floor) == (MAX_TOP, MAX_FLOOR)
+    assert league_need(3, 0).top == 54                                  # a bump of 0 is the rule switched off
+
+
+def test_the_advice_is_silent_without_losses_or_when_the_rule_is_off_or_the_team_is_ready():
+    weak = _team(55, 50, 49, 48, 47, 46)
+    assert loss_advice(weak, 0, 2) == "" and loss_advice(weak, 3, 0) == "" and loss_advice(weak, 3, 2, "off") == ""
+    assert loss_advice(_team(60, 55, 52, 51, 50, 50), 2, 2) == ""
+
+
+def test_the_advice_says_training_is_encouraged_not_required():
+    out = loss_advice(_team(55, 50, 49, 48, 47, 46), 2, 2)               # the base levels are met; two losses raise them to L58 / L50
+    assert "lost in the Pokémon League 2 losses" in out and "L58" in out and "L50+" in out
+    assert "encouraged, not required" in out and "call quest('elite_four') again to go anyway" in out
+    assert "refuse" in loss_advice(_team(55, 50, 49, 48, 47, 46), 2, 2, "wall")
+
+
+def test_in_wall_mode_the_raised_levels_are_the_wall():
+    team = _team(55, 50, 49, 48, 47, 46)                                 # meets the base (54 / 46) but not 2 losses' worth (58 / 50)
+    assert hard_wall("elite_four", team) == "" and hard_wall("elite_four", team, 2, 2, "advise") == ""
+    assert "L58" in hard_wall("elite_four", team, 2, 2, "wall")
+    assert hard_wall("elite_four", team, 0, 2, "wall") == ""             # no losses, no escalation

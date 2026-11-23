@@ -37,6 +37,7 @@ class SkillState:
     _in_puzzle = False           # a gym/cave puzzle solver is running (don't recurse into it)
     _in_town_visit = False       # first-visit town heal in progress
     _surf_retry = False          # one Surf retry per trip
+    _league_room = None          # the Elite Four room the last quest('elite_four') call was in (a later arrival at the Plateau's Center from it = a loss)
     _ready_warned = lazy(set)    # story beats whose 'party not ready' warning was already given (a 2nd quest() call proceeds)
     _gym_warned = None           # gym map where the under-levelled warning was already given (a 2nd call proceeds)
     _balance_warned = None       # …and the lopsided-team warning

@@ -146,9 +146,17 @@ class QuestMixin:
         if beat.key == "victory_road" and not self.reader.read_flag(0x899) and not self._fly_ready():
             from knowledge.gates import _FLY_HINT
             return f"Not yet — Fly first. {_FLY_HINT}"              # a gate, not a warning: the cave has no way home without it
-        from knowledge.beat_readiness import hard_wall, readiness
-        if (wall := hard_wall(beat.key, self.reader.read_party())):
+        from config import LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE
+        from knowledge.beat_readiness import hard_wall, loss_advice, readiness
+        losses = int(self.ltm.data.get("league_losses", 0)) if beat.key == "elite_four" else 0
+        if (wall := hard_wall(beat.key, self.reader.read_party(), losses, LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE)):
             return wall                                          # the League's level wall: every call, no "go anyway" (a run threw itself at it eleven times)
+        if beat.key == "elite_four" and (advice := loss_advice(self.reader.read_party(), losses, LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE)):
+            if LEAGUE_LOSS_RULE == "wall":
+                return advice
+            if f"elite_four:loss{losses}" not in self._ready_warned:
+                self._ready_warned.add(f"elite_four:loss{losses}")      # once per loss count: encouraged, never forced — the next call goes ahead
+                return advice
         if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party(), self._bag_or_none())):
             self._ready_warned.add(beat.key)            # once per beat: a second call (or a resumed one) goes ahead
             return warn

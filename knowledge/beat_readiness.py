@@ -45,13 +45,18 @@ def supplies_short(key: str, bag) -> list:
     return out
 
 
-HARD_LEVELS = frozenset({"elite_four"})      # beats whose LEVEL shortfall is a wall, not a warning (a loss resets the whole League, the rooms seal, no Center): no 'call again to go anyway'
+MAX_TOP, MAX_FLOOR = 70, 62                  # the raised League levels stop here (no team needs more; keeps the rule from asking for the impossible)
 
 
-def level_shortfall(key: str, party) -> list[str]:
-    """['your best Pokémon is L52 (L54 recommended)', 'only 3 of your team are L46+ (5 recommended)'] — the level gaps for beat `key`, [] when there are none."""
-    need = NEEDS.get(key)
-    if need is None or not party:
+def league_need(losses: int = 0, bump: int = 0) -> Need:
+    """The Elite Four's Need with the optional loss rule applied: `bump` levels more for the best Pokémon and the depth floor per loss so far."""
+    base = NEEDS["elite_four"]
+    extra = max(0, int(losses)) * max(0, int(bump))
+    return Need(min(base.top + extra, MAX_TOP), min(base.floor + extra, MAX_FLOOR), base.depth, base.why, base.potions, base.revives)
+
+
+def _shortfall(need: Need, party) -> list:
+    if not party:
         return []
     levels = sorted((p.level for p in party), reverse=True)
     deep = sum(1 for lv in levels if lv >= need.floor)
@@ -63,12 +68,41 @@ def level_shortfall(key: str, party) -> list[str]:
     return short
 
 
-def hard_wall(key: str, party) -> str:
-    """'' unless beat `key` is level-gated for good (HARD_LEVELS) and the party falls short: then the refusal, which no second call overrides."""
-    short = level_shortfall(key, party) if key in HARD_LEVELS else []
+def loss_advice(party, losses: int, bump: int, rule: str = "advise") -> str:
+    """The optional LEAGUE_LOSS_RULE's nudge: '' when the rule is off, there are no losses, or the party already meets the raised levels; else why the bar went up
+    and what is short. Encouragement, not force: the caller shows it once per loss count in "advise" mode (the next call goes ahead) and on every call in "wall" mode."""
+    if rule == "off" or bump <= 0 or losses <= 0:
+        return ""
+    short = _shortfall(league_need(losses, bump), party)
     if not short:
         return ""
-    need = NEEDS[key]
+    need = league_need(losses, bump)
+    plural = "loss" if losses == 1 else "losses"
+    tail = ("Training is encouraged, not required — call quest('elite_four') again to go anyway." if rule != "wall"
+            else "Train first — this rule is set to refuse until the party meets them.")
+    return (f"You have lost in the Pokémon League {losses} {plural} so far, so the bar has gone up {bump} level{'s' if bump != 1 else ''} per loss to L{need.top} for the best Pokémon and "
+            f"{need.depth} at L{need.floor}+: {'; '.join(short)}. Each loss resets the whole League and the rooms are sealed, so the same team tends to fall at the same trainer. "
+            f"grind() with no level lifts the weaker members, grind({need.top}) the ace; Victory Road's wild L32-48 are nearest. {tail}")
+
+
+HARD_LEVELS = frozenset({"elite_four"})      # beats whose LEVEL shortfall is a wall, not a warning (a loss resets the whole League, the rooms seal, no Center): no 'call again to go anyway'
+
+
+def level_shortfall(key: str, party) -> list[str]:
+    """['your best Pokémon is L52 (L54 recommended)', 'only 3 of your team are L46+ (5 recommended)'] — the level gaps for beat `key`, [] when there are none."""
+    need = NEEDS.get(key)
+    return _shortfall(need, party) if need is not None else []
+
+
+def hard_wall(key: str, party, losses: int = 0, bump: int = 0, rule: str = "advise") -> str:
+    """'' unless beat `key` is level-gated for good (HARD_LEVELS) and the party falls short: then the refusal, which no second call overrides. With LEAGUE_LOSS_RULE="wall" the
+    Elite Four's levels are the raised ones (after `losses` losses, `bump` levels each); otherwise the base levels."""
+    if key not in HARD_LEVELS:
+        return ""
+    need = league_need(losses, bump) if (key == "elite_four" and rule == "wall") else NEEDS[key]
+    short = _shortfall(need, party)
+    if not short:
+        return ""
     return (f"Not ready for quest('{key}') — and this one cannot be skipped: {'; '.join(short)}. It means {need.why}. Throwing a team this far under at it only costs "
             f"money and time: a loss resets the whole League and sends you back to the Plateau's Center, and the rooms are sealed (no Center, no shop), so every fight is the same fight "
             f"with what the Bag holds. Train first: grind() with no level lifts the weaker members, grind({need.top}) the ace (Victory Road's wild L32-48 are nearest); then call quest('{key}') again.")

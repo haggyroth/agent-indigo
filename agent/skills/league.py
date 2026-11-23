@@ -62,6 +62,9 @@ class LeagueMixin:
         call = "quest('elite_four')"
         if self.reader.read_flag(FLAG_GAME_CLEAR) and tuple(self.reader.read_current_map()) not in (*ROOM_BY_MAP, HALL_OF_FAME):
             return "The Pokémon League is beaten — you are the Champion and the game is cleared. (Rematches are not scripted.)"
+        start = tuple(self.reader.read_current_map())
+        if start in ROOM_BY_MAP:
+            self._league_room = start                          # remembered even when the call only says "finish the battle": a whiteout from here is a loss
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
         if bin(int(self.reader.read_badges()[1])).count("1") < 8:
@@ -78,8 +81,14 @@ class LeagueMixin:
             pos = tuple(self.reader.read_player_pos())
             if here == HALL_OF_FAME or self.reader.read_flag(FLAG_DEFEATED_CHAMP):
                 return self._league_finish(call)
+            if self._league_room is not None and here not in ROOM_BY_MAP:
+                # We were in a room and are now outside it (and not in the Hall of Fame): the only way out of a sealed room is a whiteout — the League reset and a respawn at the Center.
+                self._league_room = None
+                n = self.ltm.add_league_loss()
+                events.emit("note", f"Elite Four: lost in the League (#{n}) — the whole League is reset", log=False)
             if here in ROOM_BY_MAP:
                 _m, flag, stand, who, exit_tile = ROOM_BY_MAP[here]
+                self._league_room = here
                 state = (here, pos)
                 stuck = stuck + 1 if state == last else 0
                 last = state
