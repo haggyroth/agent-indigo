@@ -1358,7 +1358,7 @@ def test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town(live)
             live.m.write16(foe + 0x28, 1)
         return use_move(name)
     c._use_move = weak_foe
-    live.boost_party()
+    live.league_ready(58)
     for _ in range(40):
         if live.r.detect_context().name == "IN_BATTLE":
             c._auto_fight()
