@@ -49,8 +49,9 @@ your lead is strong enough and has the right move:
 - **Inside the gym, `go_to` does nothing — to fight the Leader, call
   `challenge_leader()`.** It walks up to the Leader and talks to them to start the
   battle (don't just press Up — you have to talk to them). Then attack with
-  `use_move` (Vine Whip vs Brock). If you faint, `load_state` and grind a bit more.
-- After a loss, `load_state` (or recover from the blackout) and either grind more or
+  `use_move` (Vine Whip vs Brock). If you faint you black out, wake up healed at the last
+  Pokémon Center and keep every level and Exp the fight gave you: grind a bit more.
+- After a loss, do NOT `load_state` — that rewinds the Exp the loss earned. Either grind more or
   try again.
 
 """
@@ -256,7 +257,7 @@ You can never deposit your last battle-ready Pokémon.
    Getting out without walking (see the 'Exit shortcut' / 'Shortcut' line when one applies): in a cave, forest or dungeon an
    Escape Rope or use_hm('Dig') warps you to its entrance; OUTDOORS use_hm('Teleport') warps to the last Pokémon Center you healed
    at. They never work in a town building, and they abandon the trip or quest you are on.
-9. After a loss: load_state and try a different strategy.
+9. After a loss you wake up healed at a Pokémon Center with the Exp you earned: do NOT load_state (it throws that Exp away) — train or change strategy, then try again.
 10. In DIALOG_OPEN: press A to advance. In IN_MENU: navigate with the D-pad + A, or press B to close it — do not press movement to "walk".
 11. In TRANSITIONING: call wait_frames(30) and re-read; do not act until the context changes.
 

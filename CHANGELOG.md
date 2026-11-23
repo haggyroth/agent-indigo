@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — a loss keeps the Exp it earned (no reload after a blackout)
+- `main._handle_blackout` used to load the most recent save of the session after every all-fainted blackout (the League's pre-door slot 3, a pre-gym slot…). That rewound every level and
+  Exp the losing fight had given, so the model re-fought at the same levels (a watched run: 2 of 3 blackouts were undone). It now only advances the game's own whiteout (healed at a Center,
+  half the money gone, Exp kept) and the model decides whether to train before retrying.
+- The model was also *told* to `load_state` after a loss (system prompt, `load_state` description, the Elite Four beat tip, CLAUDE.md). All now say the opposite: `load_state` is for retrying a catch (slot 9).
+  `NativeMGBAClient.latest_session_slot` (only the reload used it) is removed.
+
 ### Added — the full story chain clears without a model (#260)
 - `python tools/scripted_run.py --goal clear --chain` drives the whole story with `ChainPolicy` (`agent/scripted_policy.py`): at each free moment it runs the next open beat's `quest(...)`, prepares when a quest
   says the team is not ready (grind, heal, shop) and hands every fight to the scripted battle rules. A **stall detector** names the first beat that cannot progress (the same failure three times, or 40

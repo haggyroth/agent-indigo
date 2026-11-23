@@ -396,7 +396,7 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "load_state",
-        "description": "Load a save state. Used after a loss.",
+        "description": "Load a save state — to retry a CATCH (slot 9). NOT after a loss: that discards the Exp it earned.",
         "parameters": {"type": "object", "properties": {
             "slot": {"type": "integer", "default": 0},
         }},

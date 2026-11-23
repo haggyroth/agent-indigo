@@ -26,7 +26,7 @@ ROOMS = (
 )
 ROOM_BY_MAP = {r[0]: r for r in ROOMS}
 ITEM_LABELS_BY_ID = {24: "Revive", 19: "Full Restore"}
-SAVE_SLOT = 3                            # the pre-door save (load_state(3)). A loss needs no reload: the whiteout runs EventScript_ResetEliteFourEnd (every
+SAVE_SLOT = 3                            # the pre-door save. A loss needs no reload (and must not get one: it would discard the Exp the loss earned): the whiteout runs EventScript_ResetEliteFourEnd (every
                                          # FLAG_DEFEATED_* cleared), heals the party, takes some money and respawns at the Plateau's Center, so the quest just starts over
 
 
