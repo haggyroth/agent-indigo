@@ -220,7 +220,11 @@ class OverworldMixin:
         the trip, it stops and reports so the caller can resume."""
         from game.state import GameContext
         from knowledge.map_graph import MAP_KIND
-        if tuple(self.reader.read_current_map()) in LEAGUE_ROOM_MAPS:
+        try:
+            sealed = tuple(self.reader.read_current_map()) in LEAGUE_ROOM_MAPS
+        except Exception:
+            sealed = False                                   # a half-loaded screen: not the League
+        if sealed:
             return self._league_heal()                       # sealed in: no Center, so the Bag's cures count too (a status is not "full HP and PP")
         if not force and not self._party_needs_heal():
             return "Party is already at full HP and PP — no need to heal."
