@@ -16,6 +16,7 @@ DEFAULTS = {
     "total_battles": 0,   "battles_won": 0,
     "battles_lost": 0,
     "battles_fled": 0,    "battles_caught": 0,
+    "league_losses": 0,   # whiteouts in the Elite Four's rooms (the optional LEAGUE_LOSS_RULE raises the recommended levels per loss)
     "saved_badges": None, "saved_battles": 0,    # badges / battles when the game was last saved to the cartridge (save_game)
 }
 
@@ -128,6 +129,12 @@ class LongTermMemory:
             self.data["notes"].append(f"{name}: {note}")
         self.save()
         return True
+
+    def add_league_loss(self) -> int:
+        """One more whiteout in the Elite Four's rooms; returns the running count."""
+        self.data["league_losses"] = int(self.data.get("league_losses", 0)) + 1
+        self.save()
+        return self.data["league_losses"]
 
     def add_town(self, town_name: str) -> bool:
         if town_name in self.data["towns_visited"]:

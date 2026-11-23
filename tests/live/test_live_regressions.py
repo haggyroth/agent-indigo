@@ -1316,6 +1316,8 @@ def test_a_league_loss_resets_the_rooms_and_quest_elite_four_starts_over(live):
     live.load("league_agatha")
     c = live.c
     live.league_ready(58)
+    live.give_item(13, 14)                                       # supplies enough that the one-time supplies warning does not eat the first quest call
+    live.give_item(24, 4)
     assert live.r.read_flag(0x4B8) and live.r.read_flag(0x4B9) and not live.r.read_flag(0x4BA)
     money = live.r.read_money()
     for _ in range(6):                                           # talk to Agatha without the autopilot: a battle starts
@@ -1340,6 +1342,7 @@ def test_a_league_loss_resets_the_rooms_and_quest_elite_four_starts_over(live):
         if live.r.detect_context().name == "IN_BATTLE":
             break
     assert tuple(live.r.read_current_map()) == (1, 75)                                   # back in Lorelei's room
+    assert c.ltm.data["league_losses"] == 1                                              # the loss was counted (the optional level rule raises the bar from it)
 
 
 def test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town(live):
@@ -2634,3 +2637,24 @@ def test_the_elite_four_level_wall_refuses_every_call(live):
         out = c._execute("quest", json.dumps({"name": "elite_four"}))
         assert out.startswith("Not ready for quest('elite_four')") and "cannot be skipped" in out, out
         assert tuple(live.r.read_current_map()) == (13, 0)               # it never walked to the door
+
+
+def test_the_optional_loss_rule_raises_the_bar_once_per_loss_and_then_lets_the_model_decide(live):
+    """LEAGUE_LOSS_RULE=advise (default): after two losses the League's recommended levels rise by 2 each (L58 / L50+). A team that meets the BASE levels but not the raised ones is told so
+    once — training is encouraged, not forced — and the next quest call goes ahead (the model keeps its autonomy)."""
+    from knowledge.growth import exp_for_level
+    from knowledge.growth_data import GROWTH_RATE
+    live.load("league_door")
+    c = live.c
+    live.league_ready(49)                                            # five at L49 (base: L46+), ...
+    mon = live.r.read_party()[0]
+    live.patch_mon(0, level=55, exp=exp_for_level(GROWTH_RATE.get(mon.species_id, 0), 55))      # ... and a L55 ace (base: L54): the base levels are met, two losses' worth (L58 / L50+) are not
+    c.ltm.data["league_losses"] = 2
+    live.give_item(13, 14)                                           # Potions and Revives enough that the (separate, one-time) supplies warning stays quiet
+    live.give_item(24, 4)
+    out = c._execute("quest", json.dumps({"name": "elite_four"}))
+    assert "lost in the Pokémon League 2 losses" in out and "encouraged, not required" in out, out
+    assert tuple(live.r.read_current_map()) == (13, 0)
+    out = c._execute("quest", json.dumps({"name": "elite_four"}))
+    assert "lost in the Pokémon League" not in out and not out.startswith("Not ready"), out          # the second call goes ahead
+    assert tuple(live.r.read_current_map()) != (13, 0) or live.r.detect_context().name == "IN_BATTLE"

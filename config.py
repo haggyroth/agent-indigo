@@ -88,6 +88,12 @@ MAX_STEPS         = _env_int("MAX_STEPS", 0, minimum=0)
 #   the next one comes out — a FREE switch (no turn lost), which is how a lagging teammate gets into the fight. "set" = no such prompt. "" = leave
 #   whatever the save has. Written into SaveBlock2 every step (game/options.py), so a loaded state or a fresh save cannot undo it.
 BATTLE_STYLE      = os.getenv("BATTLE_STYLE", "shift").strip().lower()
+# LEAGUE_LOSS_RULE / LEAGUE_LOSS_BUMP: an OPTIONAL rule that raises the Elite Four's recommended levels after every loss in the League (the base levels are always a wall, see
+#   knowledge/beat_readiness.py). LEAGUE_LOSS_BUMP levels (default 2) are added to the best-Pokémon and team-depth levels per loss. LEAGUE_LOSS_RULE: "advise" (default) = after a loss,
+#   quest('elite_four') tells the model once per loss that the bar went up and training is encouraged, then lets the next call go ahead (the model keeps its autonomy);
+#   "wall" = the raised levels are refused on every call too; "off" = no escalation at all (base levels only).
+LEAGUE_LOSS_RULE  = os.getenv("LEAGUE_LOSS_RULE", "advise").strip().lower()
+LEAGUE_LOSS_BUMP  = _env_int("LEAGUE_LOSS_BUMP", 2, minimum=0)
 # LOG_LEVEL: how much of the game-event stream (agent/events.py) the terminal shows — "quiet" (milestones: catches,
 #   badges, level-ups, battle results, faints), "events" (default: + every tool call and the quieter events),
 #   "debug" (+ observations/reasoning). STATUS_EVERY: a one-line status (party, money, balls, tokens) every N ticks.
