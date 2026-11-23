@@ -151,3 +151,30 @@ def test_the_league_observation_rooms_have_scouting_briefs():
     assert set(LEAGUE_TRAINER) == set(LEAGUE_ROOMS) and list(LEAGUE_TRAINER.values()) == list(LEAGUE_ORDER)
     for name in LEAGUE_ORDER:
         assert brief(name).startswith(name + ":"), name                  # every room's trainer has a team brief to show
+
+
+def test_the_boss_lead_is_the_best_matchup_not_just_the_highest_level():
+    """Charizard (L54) leading Lorelei's Water / Ice team eats a super-effective hit on turn one and cannot answer it; Pikachu (L45, Thunder) hits most of her team for double."""
+    from knowledge.party import boss_lead, boss_lead_vs
+    zard = mon("Charizard", ["Flamethrower", "Slash"], 54)
+    pika = mon("Pikachu", ["Thunder", "Thunder Shock"], 45)
+    lapras = mon("Lapras", ["Surf", "Ice Beam"], 50)
+    for m in (zard, pika, lapras):
+        m.pp = [10, 10, 0, 0]
+    party = [zard, pika, lapras]
+    assert boss_lead(party) == 0                                         # the old rule: the strongest
+    assert boss_lead_vs(party, "Lorelei") == 1                           # the matchup: Pikachu
+    assert boss_lead_vs(party, "Brock") in (1, 2)                        # vs Rock / Ground: Water or Electric… not the Fire starter
+    assert boss_lead_vs(party, "Nobody") == boss_lead(party)             # no team data: the old rule
+    pika.current_hp = 0
+    assert boss_lead_vs(party, "Lorelei") in (0, 2)                      # a fainted Pokémon never leads
+    assert boss_lead_vs([], "Lorelei") is None
+
+
+def test_a_status_only_pokemon_never_leads():
+    from knowledge.party import boss_lead_vs
+    growl = mon("Pikachu", ["Growl", "Tail Whip"], 60)
+    growl.pp = [10, 10, 0, 0]
+    solid = mon("Charizard", ["Flamethrower"], 40)
+    solid.pp = [10, 0, 0, 0]
+    assert boss_lead_vs([growl, solid], "Lorelei") == 1

@@ -1418,7 +1418,8 @@ class NavMixin:
                 return res
         if (msg := self._gym_puzzle(cur, approach)):
             return msg
-        self._set_boss_lead()                       # the strongest leads the leader's fight (everywhere else the lowest viable one does)
+        from knowledge.leafgreen_data import GYM_MAP_LEADER
+        self._set_boss_lead(GYM_MAP_LEADER.get(tuple(cur), ""))      # the best matchup against the leader leads (everywhere else the lowest viable one does)
         self._walk_to(*approach)
         # Face the Leader (they stand just NORTH of the approach tile) and talk.
         for _ in range(5):

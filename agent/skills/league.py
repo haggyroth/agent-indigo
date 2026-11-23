@@ -100,7 +100,7 @@ class LeagueMixin:
                     used = self._field_heal(max_uses=12, below=0.6) + self._field_cure() + self._field_pp()      # sealed in: the Bag is the only Center, so top the team up before this trainer
                     if used:
                         events.emit("note", f"Elite Four: healed from the Bag before {who}: {', '.join(used)}", log=False)
-                    self._set_boss_lead()                          # the strongest leads each Elite Four / Champion fight
+                    self._set_boss_lead("Gary" if who == "the Champion" else who)      # the best matchup against THIS trainer leads (not simply the strongest)
                     self._walk_to(*stand)
                     if tuple(self.reader.read_player_pos()) == stand:
                         self.mgba.tap("Up")
