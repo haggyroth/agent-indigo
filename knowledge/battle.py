@@ -304,7 +304,25 @@ def xp_share_hint(party, active_species: int, foe_level: int = 0) -> str:
             "both gain XP. Trainer battles pay 1.5×.")
 
 
-def shift_switch_offer(party, active_idx: int, foes_left: int, foe_level: int = 0) -> str:
+def _next_foe_note(party, me, next_foe) -> str:
+    """' NEXT FOE: …' — WHO the trainer has already chosen to send out (the box says only 'is about to use <it>'), its types and moves, how each of our healthy
+    Pokémon fares against it and, when the one out is badly placed, the better switch-in. '' when the choice could not be read. Pure."""
+    if next_foe is None or not getattr(next_foe, "species_name", ""):
+        return ""
+    from knowledge.matchup import Foe, better_matchup, roster
+    foe = Foe(name=next_foe.species_name, level=next_foe.level, hp=next_foe.current_hp, max_hp=next_foe.max_hp,
+              moves=tuple(m for m in next_foe.move_names if m))
+    types = "/".join(_type_label(t) for t in foe.types)
+    knows = f"; knows {', '.join(foe.moves)}" if foe.moves else ""
+    out = f" NEXT FOE: the trainer has already chosen {foe.name.title()} (L{foe.level}{f', {types}' if types else ''}{knows})."
+    line = roster(party, me.species_id, foe=foe)
+    if line:
+        out += " " + line + "."
+    better = better_matchup(party, me.species_id, foe=foe)
+    return out + (" " + better if better else "")
+
+
+def shift_switch_offer(party, active_idx: int, foes_left: int, foe_level: int = 0, next_foe=None) -> str:
     """The text for the trainer's 'Will you change POKéMON?' box (Battle Style SHIFT): a switch now is FREE (no turn lost). Names the lagging
     teammate worth sending in, or says to stay. '' when there is nobody healthy to switch to. Pure."""
     from knowledge.party import lagging_mons
@@ -316,6 +334,7 @@ def shift_switch_offer(party, active_idx: int, foes_left: int, foe_level: int = 
     head = (f"FREE SWITCH: the trainer is about to send out its next Pokémon"
             f"{f' ({foes_left} left)' if foes_left > 0 else ''} and the game asks if you want to change yours — a switch now costs NO turn.")
     me = party[active_idx]
+    head += _next_foe_note(party, me, next_foe)
     trail = [(i, p) for i, p in lagging_mons(party) if i != active_idx and p.current_hp / p.max_hp >= 0.6]
     top = max(p.level for p in party)
     if trail and me.level >= top - 7:

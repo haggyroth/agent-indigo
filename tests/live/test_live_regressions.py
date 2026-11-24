@@ -1184,6 +1184,30 @@ def test_shift_style_hands_the_free_switch_to_a_lagging_teammate_after_a_trainer
     assert live.r.read_active_battle_species() != ace and live.r.read_party()[0].level >= 22
 
 
+def test_free_switch_offer_names_the_trainers_next_pokemon(live, monkeypatch):
+    """Watched-run request: the 'Surge is about to use <it>! Will you change POKéMON?' box names the NEXT foe, but the model only got 'its next Pokémon'.
+    The game has already chosen it (gBattleTextBuff2 holds its gEnemyParty index), so the offer must name that exact Pokémon with its types."""
+    from game.options import apply_battle_style
+    live.load("vermilion_gym_surge")
+    apply_battle_style(live.m, "shift")
+    c = live.c
+    monkeypatch.setattr(c, "_shift_to_trainee", lambda: "")          # leave the box to the model (no automatic switch)
+    out = ""
+    for _ in range(40):
+        live.heal_hp()
+        if live.r.detect_context().name != "IN_BATTLE":
+            c._execute("challenge_leader", json.dumps({}))
+            continue
+        out = c._execute("use_move", json.dumps({"move": live.r.read_active_battle_moves()[1][0]}))
+        if c._shift_prompt_live():
+            break
+    assert c._shift_prompt_live(), out
+    nxt = live.r.read_next_foe()
+    assert nxt is not None and nxt.current_hp > 0
+    assert "NEXT FOE" in out and nxt.species_name.title() in out, out
+    c._decline_shift_prompt()
+
+
 def test_grind_walks_through_route_9s_cut_tree_to_the_grass(live):
     """Regression (watched run): Route 9's grass is behind a Cut tree AND a ledge hop. The Cut planner ignored ledges, so walk_to said 'no path' at the
     map's west edge and grind() relocated Route 11 <-> Route 9 six times. The tree must be cut and the grass reached."""

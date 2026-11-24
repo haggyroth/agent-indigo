@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the free-switch box names the trainer's NEXT Pokémon
+The "<Trainer> is about to use <Pokémon>! Will you change POKéMON?" box (Battle Style SHIFT) shows the name in-game, but the model was only told "its next Pokémon (N left)", so it could not choose a
+matchup-based switch-in.
+- The game has already picked the Pokémon when the box is up: `gBattleTextBuff2` (`0x02022AC8`) holds `[0xFD, 7, battler, gEnemyParty index, 0xFF]`. `MemoryReader.read_next_foe()` decodes that slot
+  (None when the buffer is not that message, the slot is empty or fainted).
+- `shift_switch_offer` adds `NEXT FOE: the trainer has already chosen <Pokémon> (L<n>, <types>; knows <moves>)`, the party-vs-foe roster (each teammate's best move and how hard it is hit) and, when the
+  Pokémon on the field is badly placed, the better switch-in.
+- Live regression on the Surge fight (real ROM): the offer names exactly the Pokémon `read_next_foe` reads.
+
 ### Fixed — the foe's ability counts (Levitate), and the League's shopping buys Revives and Hyper Potions
 A watched League run (27 losses) kept using Earthquake / Magnitude on Gengar and Haunter (the observation said `×2 SUPER STAB`; their Levitate makes Ground moves do nothing), and restocked at the
 Plateau's clerk — Max Potions ¥2500, Full Restores ¥3000, Revives last — when Hyper Potions (¥1200, 200 HP) and Revives (¥1500) are far better value.

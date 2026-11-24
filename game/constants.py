@@ -188,6 +188,9 @@ class Addr:
     # pointer sits there the Yes/No box is up: A = YES (opens an optional party screen = a free switch), B = NO. Only exists in Battle Style SHIFT.
     BATTLE_SCRIPT_PTR   = 0x02023D74
     SCRIPT_SHIFT_PROMPT = 0x081D872B
+    # gBattleTextBuff2 (16 bytes): while that box is up it holds the "{B_BUFF2}" of "is about to use {B_BUFF2}" — [0xFD, B_BUFF_MON_NICK=7, battler, PARTY INDEX, 0xFF],
+    # i.e. WHICH of gEnemyParty the trainer has already chosen to send out next (found by scanning EWRAM at the prompt; BUFF1 sits 0x10 before it).
+    BATTLE_TEXT_BUFF2   = 0x02022AC8
     # …and the level-up move-learn prompts (read live from the delete_box fixture: the pointer waits on the command while the box is up): "Delete a move to make room?"
     # and, after B, "Stop learning X?". learnMoveState alone is not proof — it LINGERS at 1 after a decline, and a driver that trusted it pressed A into the ordinary
     # battle menu (a watched run used Foresight ~24 times, 13 min of game time, until the Pokémon fainted).

@@ -329,6 +329,22 @@ class LeafGreenReader:
             pass
         return mon
 
+    def read_next_foe(self) -> "PokemonStatus | None":
+        """The trainer's NEXT Pokémon — the one the 'X is about to use Y! Will you change POKéMON?' box (Battle Style SHIFT) names. The game has already picked it
+        when the box is up (gBattleTextBuff2 = [0xFD, 7, battler, gEnemyParty index, 0xFF]); the party index decodes it from gEnemyParty. None when the buffer
+        is not that message, the slot is empty or already fainted. Only meaningful while the prompt is live (the buffer is stale otherwise)."""
+        try:
+            buf = self.client.read_range(Addr.BATTLE_TEXT_BUFF2, 5)
+            if len(buf) < 5 or buf[0] != 0xFD or buf[1] != 7 or buf[4] != 0xFF or buf[3] > 5:
+                return None
+            raw = self.client.read_range(Addr.ENEMY_PARTY + 100 * buf[3], 100)
+            if len(raw) < 100 or raw[0x54] == 0:
+                return None
+            mon = self._decode_mon(raw, 0)
+            return mon if mon.current_hp > 0 else None
+        except Exception:
+            return None
+
     def read_wild_shiny(self) -> "PokemonStatus | None":
         """The SHINY wild Pokémon in front of us (still standing), or None — no battle, a trainer's, or an ordinary foe."""
         try:
