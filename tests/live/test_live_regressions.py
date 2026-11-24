@@ -2673,6 +2673,7 @@ def test_a_connection_the_map_calls_unreachable_is_dead_at_once_not_retried_for_
     def fake_route(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True):
         return None if avoid_edges else [("connection", "North", (3, 9))]
     monkeypatch.setattr(mg, "route_to", fake_route)
+    monkeypatch.setattr(c, "_fly_towns", lambda: {})                  # this test is about the walking planner: a Fly user would simply fly to the Plateau
 
     def fake_go_to_map(direction, dest=None):
         calls.append(direction)
@@ -2801,7 +2802,7 @@ def test_a_wedged_victory_road_floor_is_reset_by_leaving_and_coming_back(live, m
     live.strong_lead()
     warps = []
     orig = c._vr_warp
-    c._vr_warp = lambda pos, tile, button, here: (warps.append(tuple(tile)), orig(pos, tile, button, here))[1]
+    monkeypatch.setattr(c, "_vr_warp", lambda pos, tile, button, here: (warps.append(tuple(tile)), orig(pos, tile, button, here))[1])
     orig_plan = vr_route.plan
     monkeypatch.setattr(vr_route, "plan", lambda here, pos, boulders, *a, **k:
                         None if (11, 20) not in warps and set(map(tuple, boulders)) != set(vr_route.initial_boulders(here)) else orig_plan(here, pos, boulders, *a, **k))
