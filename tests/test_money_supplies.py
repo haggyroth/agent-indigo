@@ -14,9 +14,10 @@ def team(*levels):
 
 def test_a_strong_team_with_an_empty_bag_is_still_not_ready_for_victory_road():
     out = readiness("victory_road", team(44, 40, 38, 36, 30), {13: 2})
-    assert "Not ready" in out and "2 Potions / Restores in the bag (10 recommended)" in out and "0 Revives (3 recommended)" in out
+    assert "Not ready" in out and "0.4 Potions / Restores in the bag (10 recommended" in out and "0 Revives (3 recommended)" in out      # 2 Potions (20 HP each) are 0.4 of a full heal at L44
     assert "best Pokémon" not in out                                       # the levels are fine: only the supplies are named
-    assert readiness("victory_road", team(44, 40, 38, 36, 30), {13: 6, 22: 4, 24: 3}) == ""      # any grade of potion counts; Revive too
+    assert readiness("victory_road", team(44, 40, 38, 36, 30), {21: 10, 24: 3}) == ""             # Hyper Potions count in full; Revives too
+    assert readiness("victory_road", team(44, 40, 38, 36, 30), {13: 6, 22: 4, 24: 3}) != ""       # …but 10 weak potions are not 10 heals at this level
 
 
 def test_without_a_bag_only_levels_are_checked_and_both_shortfalls_are_reported_together():
@@ -66,13 +67,21 @@ def test_the_quest_gate_warns_about_supplies_once_then_goes_ahead():
     assert c._quest_tool("rocket_hideout") == "driver ran"
 
 
-def test_league_supplies_are_bought_revives_first_then_full_restores_within_the_money():
-    from knowledge.money import FULL_RESTORE, REVIVE, supply_purchases
-    assert supply_purchases("elite_four", 21500, {}) == [(REVIVE, 4), (FULL_RESTORE, 5)]
-    assert supply_purchases("elite_four", 3000, {}) == [(REVIVE, 2)]                     # not enough for a Full Restore after the first Revives
+def test_league_supplies_are_bought_revives_first_then_max_potions_within_the_money():
+    from knowledge.money import MAX_POTION, REVIVE, supply_purchases
+    assert supply_purchases("elite_four", 21500, {}) == [(REVIVE, 4), (MAX_POTION, 6)]
+    assert supply_purchases("elite_four", 3000, {}) == [(REVIVE, 2)]                     # not enough for a Max Potion after the first Revives
     assert supply_purchases("elite_four", 99999, {24: 4, 19: 12}) == []                  # already stocked
-    assert supply_purchases("elite_four", 99999, {13: 5, 24: 1}) == [(REVIVE, 3), (FULL_RESTORE, 7)]       # any heal item counts toward the 12
+    assert supply_purchases("elite_four", 99999, {21: 12, 24: 4}) == []                  # Hyper Potions count in full
+    assert supply_purchases("elite_four", 99999, {13: 5, 24: 1}) == [(REVIVE, 3), (MAX_POTION, 12)]       # 5 Potions are not 5 heals for a L54 team (they are ~0.9)
     assert supply_purchases("tea", 99999, {}) == [] and supply_purchases("elite_four", 0, {}) == []
+
+
+def test_effective_heals_count_by_strength_only_for_the_late_beats():
+    from knowledge.beat_readiness import effective_heals
+    assert effective_heals({13: 10}, 26) == 10                                           # early beats: every grade is one
+    assert effective_heals({13: 10}, 54) == pytest.approx(10 * 20 / 135)
+    assert effective_heals({21: 3, 20: 1, 19: 1, 22: 2}, 54) == pytest.approx(3 + 1 + 1 + 2 * 50 / 135)
 
 
 def test_a_potion_is_never_replaced_by_a_revive_at_a_mart_that_lacks_potions():

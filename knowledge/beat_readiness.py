@@ -7,6 +7,9 @@ from dataclasses import dataclass
 
 HEAL_ITEMS = frozenset({13, 22, 21, 20, 19})       # Potion, Super / Hyper / Max Potion, Full Restore
 REVIVES = frozenset({24, 25})                      # Revive, Max Revive
+HEAL_HP = {13: 20, 22: 50, 21: 200, 20: 999, 19: 999}      # HP each restores
+GRADE_FROM_TOP = 40        # from this level up, a heal counts for what it restores: 10 Potions (20 HP) do not heal a L50 team (a watched run reached the League with ¥0 and no real heals)
+HP_PER_LEVEL = 2.5         # one "full" heal restores about this × the best Pokémon's level in HP (a Hyper Potion's 200 at L80); smaller potions count for the fraction
 
 
 @dataclass(frozen=True)
@@ -30,16 +33,26 @@ NEEDS: dict[str, Need] = {
 }
 
 
+def effective_heals(bag, top: int) -> float:
+    """HP-restoring items in `bag` ({item id: count}) as full-strength heals for a team whose best Pokémon is L`top`: each grade counts min(1, HP restored / (HP_PER_LEVEL × top))
+    — below GRADE_FROM_TOP every grade counts as one (the early beats' Potions are fine)."""
+    cap = HP_PER_LEVEL * top if top >= GRADE_FROM_TOP else 0
+    return sum(n * (min(1.0, HEAL_HP[i] / cap) if cap else 1.0) for i, n in bag.items() if i in HEAL_ITEMS)
+
+
 def supplies_short(key: str, bag) -> list:
-    """['N HP items (M recommended)', 'K Revives (J recommended)'] that fall short for beat `key`, [] when stocked or `bag` is None. `bag` is {item id: count}."""
+    """['N HP items (M recommended)', 'K Revives (J recommended)'] that fall short for beat `key`, [] when stocked or `bag` is None. `bag` is {item id: count}.
+    For the late beats the HP items are counted by strength (see effective_heals) and the message says which grade to buy."""
     need = NEEDS.get(key)
     if need is None or bag is None:
         return []
-    have_p = sum(n for i, n in bag.items() if i in HEAL_ITEMS)
+    have_p = effective_heals(bag, need.top)
     have_r = sum(n for i, n in bag.items() if i in REVIVES)
     out = []
     if have_p < need.potions:
-        out.append(f"{have_p} Potions / Restores in the bag ({need.potions} recommended)")
+        shown = int(have_p) if have_p == int(have_p) else round(have_p, 1)
+        graded = " — counted by strength: a Hyper Potion / Max Potion / Full Restore is 1, a Super Potion or Potion a fraction" if need.top >= GRADE_FROM_TOP and any(i in HEAL_ITEMS for i in bag) else ""
+        out.append(f"{shown} Potions / Restores in the bag ({need.potions} recommended{graded})")
     if have_r < need.revives:
         out.append(f"{have_r} Revives ({need.revives} recommended)")
     return out
@@ -122,7 +135,7 @@ def readiness(key: str, party, bag=None) -> str:
     if short:
         parts.append(f"{'; '.join(short)} — it means {need.why}. grind() with no level lifts the weaker members (grind({need.top}) the ace)")
     if stock:
-        parts.append(f"only {'; '.join(stock)} — shop() for Potions and Revives (shop(sell=true) turns spare treasure into money)")
+        parts.append(f"only {'; '.join(stock)} — shop() for Potions and Revives — Hyper Potions (¥1,200, +200 HP) are the best value and are sold in Saffron, Fuchsia, Cinnabar and Celadon, not at the Plateau (its clerk has Max Potions ¥2,500 and Full Restores ¥3,000); fly_to a mart town first when you are at the Plateau (shop(sell=true) turns spare treasure into money)")
     return f"Not ready for quest('{key}'): " + "; and ".join(parts) + f". Call quest('{key}') again to go anyway."
 
 

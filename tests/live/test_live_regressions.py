@@ -1294,19 +1294,19 @@ def test_elite_four_quest_clears_the_league_to_the_hall_of_fame(live):
     assert tuple(live.r.read_current_map()) == (1, 80), live.r.read_current_map()        # the Hall of Fame
 
 
-def test_league_prep_sells_treasure_at_the_plateau_clerk_and_buys_revives_and_full_restores(live):
+def test_league_prep_sells_treasure_at_the_plateau_clerk_and_buys_revives_and_max_potions(live):
     """The Plateau's Pokémon Center has a clerk (Full Restores, Max Potions, Revives): with ¥1500 and four Nuggets the League prep sells the treasure there
     (the sell bag opens on the LAST used pocket — here the empty Poké Balls pocket — so the driver must switch to Items) and spends the money on Revives, then
-    Full Restores; team_report shows the MONEY line while the money is short."""
+    Max Potions (the cheaper full heal); team_report shows the MONEY line while the money is short."""
     live.load("league_door")
     c = live.c
     live.set_money(1500)
     live.give_item(110, 3)
     assert "MONEY:" in c._execute("team_report", json.dumps({}))
     note = c._league_prep("quest('elite_four')")
-    assert "Sold" in note and "Revive" in note and "Full Restore" in note, note
+    assert "Sold" in note and "Revive" in note and "Max Potion" in note, note
     bag = live.r.read_bag()
-    assert 110 not in bag and bag.get(24, 0) >= 4 and bag.get(19, 0) >= 1, bag
+    assert 110 not in bag and bag.get(24, 0) >= 4 and bag.get(20, 0) >= 1, bag
 
 
 def test_a_league_loss_resets_the_rooms_and_quest_elite_four_starts_over(live):
@@ -1316,7 +1316,7 @@ def test_a_league_loss_resets_the_rooms_and_quest_elite_four_starts_over(live):
     live.load("league_agatha")
     c = live.c
     live.league_ready(58)
-    live.give_item(13, 14)                                       # supplies enough that the one-time supplies warning does not eat the first quest call
+    live.give_item(21, 12)                                       # supplies enough that the one-time supplies warning does not eat the first quest call
     live.give_item(24, 4)
     assert live.r.read_flag(0x4B8) and live.r.read_flag(0x4B9) and not live.r.read_flag(0x4BA)
     money = live.r.read_money()
@@ -2650,7 +2650,7 @@ def test_the_optional_loss_rule_raises_the_bar_once_per_loss_and_then_lets_the_m
     mon = live.r.read_party()[0]
     live.patch_mon(0, level=55, exp=exp_for_level(GROWTH_RATE.get(mon.species_id, 0), 55))      # ... and a L55 ace (base: L54): the base levels are met, two losses' worth (L58 / L50+) are not
     c.ltm.data["league_losses"] = 2
-    live.give_item(13, 14)                                           # Potions and Revives enough that the (separate, one-time) supplies warning stays quiet
+    live.give_item(21, 12)                                           # Potions and Revives enough that the (separate, one-time) supplies warning stays quiet
     live.give_item(24, 4)
     out = c._execute("quest", json.dumps({"name": "elite_four"}))
     assert "lost in the Pokémon League 2 losses" in out and "encouraged, not required" in out, out
@@ -2710,7 +2710,7 @@ def test_quest_victory_road_is_not_done_from_inside_the_cave_but_is_on_the_plate
     live.load("vr_2f_stuck")
     c = live.c
     live.set_flag(0x899, True)
-    live.give_item(13, 12)                                                           # supplies enough that the (separate, one-time) supplies warning stays quiet
+    live.give_item(21, 12)                                                           # supplies enough that the (separate, one-time) supplies warning stays quiet
     live.give_item(24, 4)
     assert not c._plateau_side()
     c._get_victory_road = lambda auto_trainers=False: "DRIVER"
