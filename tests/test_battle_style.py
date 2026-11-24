@@ -99,3 +99,48 @@ def test_no_auto_switch_when_the_field_mon_already_trails_or_the_team_is_even():
     assert pick_shift_trainee(party, 1, [20]) is None             # Mankey is the laggard already: leave it fighting
     assert pick_shift_trainee([mon(30), mon(28), mon(27)], 0, [20]) is None
     assert pick_shift_trainee(party, 9, [20]) is None
+
+
+def named(species, level, moves=(), hp=50, mx=50):
+    return PokemonStatus(slot=0, level=level, current_hp=hp, max_hp=mx, status="healthy", species_id=level, species_name=species,
+                         move_names=list(moves) + [""] * (4 - len(moves)))
+
+
+def test_free_switch_offer_names_the_trainers_next_pokemon_with_its_types_and_how_the_party_fares():
+    """The box only says 'is about to use <it>'. The game has chosen already, so the offer names it, shows its types/moves and ranks the party against it."""
+    party = [named("Pidgeot", 40, ["Wing Attack"]), named("Onix", 30, ["Rock Throw"]), named("Squirtle", 22, ["Water Gun"])]
+    nxt = named("Pikachu", 28, ["Thunderbolt", "Quick Attack"], 40, 40)
+    out = shift_switch_offer(party, 0, 2, 24, nxt)
+    assert "NEXT FOE" in out and "Pikachu" in out and "Electric" in out and "Thunderbolt" in out
+    assert "Party vs Pikachu" in out and "Onix" in out          # the roster line names every healthy teammate against it
+    assert "NEXT FOE" in shift_switch_offer(party, 0, 2, 24, nxt) and "NEXT FOE" not in shift_switch_offer(party, 0, 2, 24)
+
+
+def test_free_switch_offer_without_a_readable_next_pokemon_is_the_old_text():
+    party = [mon(31, "Ivysaur"), mon(22, "Mankey")]
+    assert "NEXT FOE" not in shift_switch_offer(party, 0, 2, 24, None)
+    assert "NEXT FOE" not in shift_switch_offer(party, 0, 2, 24, NS(species_name=""))
+
+
+def _reader(buf, slot_byte, foe):
+    """A MemoryReader over a stub client: gBattleTextBuff2 = buf, every other range = slot_byte x100 (so byte 0x54 decides 'slot empty'); _decode_mon returns foe."""
+    from game.memory_reader import LeafGreenReader as MemoryReader
+    reads = []
+    def read_range(addr, n):
+        reads.append(addr)
+        return bytes(buf)[:n] if addr == Addr.BATTLE_TEXT_BUFF2 else bytes([slot_byte]) * n
+    r = MemoryReader.__new__(MemoryReader)
+    r.client = NS(read_range=read_range)
+    r._decode_mon = lambda raw, slot: foe
+    return r, reads
+
+
+def test_read_next_foe_reads_the_party_index_the_game_buffered_for_the_prompt():
+    foe = named("Raichu", 62, hp=70, mx=70)
+    r, reads = _reader([0xFD, 7, 1, 2, 0xFF], 1, foe)
+    assert r.read_next_foe().species_name == "Raichu"
+    assert Addr.ENEMY_PARTY + 200 in reads                    # party index 2 -> the third gEnemyParty slot
+    assert _reader([0, 0, 0, 0, 0], 1, foe)[0].read_next_foe() is None          # not the 'about to use' message (stale / other text)
+    assert _reader([0xFD, 7, 1, 9, 0xFF], 1, foe)[0].read_next_foe() is None    # an impossible party index
+    assert _reader([0xFD, 7, 1, 2, 0xFF], 0, foe)[0].read_next_foe() is None    # empty slot
+    assert _reader([0xFD, 7, 1, 2, 0xFF], 1, named("Raichu", 62, hp=0, mx=70))[0].read_next_foe() is None   # already fainted

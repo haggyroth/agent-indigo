@@ -453,7 +453,7 @@ class BattleMixin:
             idx = next((i for i, p in enumerate(party) if p.species_id == active), -1)
             foe = self.reader.read_enemy_lead()
             left = sum(1 for m in self.reader.read_enemy_party() if m.current_hp > 0)
-            return shift_switch_offer(party, idx, left, (foe.level or 0) if foe else 0)
+            return shift_switch_offer(party, idx, left, (foe.level or 0) if foe else 0, self.reader.read_next_foe())
         except Exception:
             log_once("battle._shift_offer", "battle._shift_offer: tolerated failure (declining the switch)")
             return ""
