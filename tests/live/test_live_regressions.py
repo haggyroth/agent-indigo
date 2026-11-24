@@ -2824,7 +2824,6 @@ def test_a_potion_for_a_fainted_pokemon_is_refused_with_the_revive_rule(live):
     c = live.c
     live.give_item(13, 2)
     live.give_item(24, 1)
-    party = live.r.read_party()
     live.m.write16(Addr.PARTY_DATA + 100 * 1 + 0x56, 0)                    # slot 2 faints
     out = c._field_use_item("Potion", target="2")
     assert "fainted" in out and "Revive" in out, out
