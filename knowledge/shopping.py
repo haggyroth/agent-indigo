@@ -187,17 +187,22 @@ BASE_PAR = {2: 10, 3: 10, 4: 10, 19: 3, 20: 4, 21: 6, 22: 8, 13: 8, 23: 5, 24: 2
 STOCK_PAR = {2: 25, 3: 25, 4: 25, 19: 5, 20: 6, 21: 10, 22: 15, 13: 15, 23: 10, 24: 5}
 # the most of the budget each family may take in the base pass, so a ball tier cannot eat the potion money
 FAMILY_SHARE = {"ball": 0.4, "heal": 0.5, "full_heal": 0.25, "revive": 0.25, "cure": 0.1}
+LATE_BADGES = 7                      # the Elite Four is next: it wants ~12 strong heals (knowledge.beat_readiness) and no mart sells them past the Plateau, so stock deeper
+LATE_PAR = {19: 4, 20: 6, 21: 12}    # base par from LATE_BADGES badges (STOCK_PAR is raised to match when money allows)
+LATE_STOCK_PAR = {19: 6, 20: 8, 21: 14}
+LATE_HEAL_TIERS = (21, 22, 13)        # Hyper Potion heals 200 for ¥1200: a full heal for a L50-60 team, 2× the HP per yen of a Max Potion (¥2500) — so it wins whenever the mart sells it
+LATE_SHARE = {"ball": 0.15, "heal": 0.6}   # the League is next: Balls matter less than the heals no mart will sell inside it
 UPGRADE_HALF_PARS = 0.5              # a better tier is chosen once its budget covers this share of its par
 STOCK_UP_FLOOR = 3000                # spare yen (after the base par) before it stocks up beyond par
 STOCK_UP_SHARE = 0.6                 # …and it spends this share of the spare yen on the extra stock
 
 
-def best_tier(tiers, sold, money: int) -> int | None:
+def best_tier(tiers, sold, money: int, par=None, max_units: int = 99) -> int | None:
     """The best item of `tiers` (best first) that the mart sells and that `money` covers UPGRADE_HALF_PARS of its par of; else the cheapest tier it sells."""
     from knowledge.shop_stock import PRICES
     offered = [t for t in tiers if t in sold and PRICES.get(t)]
     for t in offered:
-        if money >= PRICES[t] * max(1, int(BASE_PAR[t] * UPGRADE_HALF_PARS)):
+        if money >= PRICES[t] * max(1, min(max_units, int((par or BASE_PAR)[t] * UPGRADE_HALF_PARS))):
             return t
     return offered[-1] if offered else None
 
@@ -209,8 +214,13 @@ def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reser
     from knowledge.shop_stock import PRICES, SHOPS
     sold = set(sold)
     budget = max(0, money - reserve)
-    ball = best_tier(BALL_TIERS, sold, budget * FAMILY_SHARE["ball"])
-    heal = best_tier(HEAL_TIERS, sold, budget * FAMILY_SHARE["heal"])
+    late = badges >= LATE_BADGES
+    par = {**BASE_PAR, **(LATE_PAR if late else {})}
+    stock_par = {**STOCK_PAR, **(LATE_STOCK_PAR if late else {})}
+    share = {**FAMILY_SHARE, **(LATE_SHARE if late else {})}
+    heal_tiers = LATE_HEAL_TIERS if late and 21 in sold else HEAL_TIERS
+    ball = best_tier(BALL_TIERS, sold, budget * share["ball"])
+    heal = best_tier(heal_tiers, sold, budget * share["heal"], par, max_units=3 if late else 99)
     wants: list[tuple[int, str]] = []                       # (item id, family) in priority order
     if ball:
         wants.append((ball, "ball"))
@@ -231,7 +241,10 @@ def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reser
         for tiers in (BALL_TIERS, HEAL_TIERS):
             if item_id in tiers:
                 i = tiers.index(item_id)
-                have += sum(bag.get(t, 0) for t in tiers[:i]) + sum(bag.get(t, 0) for t in tiers[i + 1:]) // 2
+                cheaper = sum(bag.get(t, 0) for t in tiers[i + 1:]) // 2
+                if late and tiers is HEAL_TIERS:
+                    cheaper = 0                                  # a Potion / Super Potion does not heal a L50+ team: it is no stock toward the Hyper Potions the Elite Four needs
+                have += sum(bag.get(t, 0) for t in tiers[:i]) + cheaper
         return have
 
     def buy(item_id: int, upto: int, cap: int) -> None:
@@ -246,14 +259,14 @@ def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reser
     base_spent: dict[str, int] = {}
     for item_id, fam in wants:
         before = spent
-        buy(item_id, BASE_PAR[item_id], spent + max(0, int(budget * FAMILY_SHARE[fam]) - base_spent.get(fam, 0)))
+        buy(item_id, par[item_id], spent + max(0, int(budget * share[fam]) - base_spent.get(fam, 0)))
         base_spent[fam] = base_spent.get(fam, 0) + spent - before
     spare = budget - spent
     if spare >= STOCK_UP_FLOOR:
         cap = spent + int(spare * STOCK_UP_SHARE)
         for item_id, _fam in wants:
-            if item_id in STOCK_PAR:
-                buy(item_id, STOCK_PAR[item_id], cap)
+            if item_id in stock_par:
+                buy(item_id, stock_par[item_id], cap)
     lines = [{"item_id": i, "name": ITEM_NAMES.get(i, item_label(i)), "qty": q, "unit_price": PRICES[i], "subtotal": q * PRICES[i]} for i, q in got.items()]
     others = {i for _b, _m, _x, _y, items in SHOPS for i in items}
     missing = [ITEM_NAMES[t] for t in (next((t for t in BALL_TIERS if t in others and t not in sold), None), next((t for t in HEAL_TIERS if t in others and t not in sold), None)) if t

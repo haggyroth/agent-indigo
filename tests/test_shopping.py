@@ -71,3 +71,30 @@ def test_fully_stocked_buys_nothing():
 def test_summary_string_is_readable():
     s = shopping_summary(bag={}, badges=0, money=99999)
     assert "Poké Ball" in s and "¥" in s
+
+
+# ── late game: the Elite Four wants ~12 strong heals and sealed rooms sell none ─────────────────────────────────────
+def _plan(sold, badges, money, bag=None):
+    from knowledge.shopping import compute_stock_plan
+    return {ln["item_id"]: ln["qty"] for ln in compute_stock_plan(bag or {}, badges, money, sold, reserve=500)["lines"]}
+
+
+FUCHSIA = (2, 3, 21, 22, 23, 24)
+
+
+def test_before_the_late_badges_the_plan_is_unchanged():
+    assert _plan(FUCHSIA, 6, 9000, {13: 9}) == {3: 5, 21: 2, 23: 3}
+
+
+def test_with_seven_badges_hyper_potions_win_and_balls_take_a_smaller_share():
+    late = _plan(FUCHSIA, 8, 9000, {13: 9})
+    assert late[21] >= 4 and late.get(3, 0) <= 2                      # 4 Hyper Potions, not 6 Super Potions + 5 Great Balls
+    assert _plan(FUCHSIA, 8, 20000, {13: 9})[21] >= 8                  # a rich player stocks toward the 12
+
+
+def test_weak_potions_are_no_stock_toward_the_late_hyper_potion_par():
+    assert _plan(FUCHSIA, 8, 20000, {13: 15})[21] == _plan(FUCHSIA, 8, 20000, {})[21]
+
+
+def test_a_mart_without_hyper_potions_still_gets_the_best_full_heal_it_has():
+    assert _plan((2, 3, 19, 20, 24, 23), 8, 9000).get(20, 0) >= 1

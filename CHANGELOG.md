@@ -5,6 +5,16 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — late-game heal stocking (the League was reached with no real heals)
+- A watched run stood at the Elite Four with 0 Potions and ¥0: the readiness check counted 10 Potions (20 HP) the same as 10 Hyper Potions, the stock plan kept buying Great Balls and
+  one ¥2,500 Max Potion per visit at the Plateau, and nothing said the Plateau's clerk is the worst place to buy heals. Now:
+  - `beat_readiness.effective_heals`: from a best Pokémon of L40 on (Victory Road, Elite Four) a heal counts for what it restores (HP ÷ 2.5 × level, at most 1): Hyper / Max Potion / Full Restore
+    are 1, a Super Potion or Potion a fraction. The shortfall message names the grade and says Hyper Potions (¥1,200, +200 HP) come from the Saffron / Fuchsia / Cinnabar / Celadon marts.
+  - `shopping.compute_stock_plan` with 7+ badges: Hyper Potions preferred whenever sold (the best HP per yen), par 12 (stock-up 14), heals get 60% of the budget and balls 15%, and Potions in the
+    bag no longer count as stock toward Hyper Potions.
+  - `money.supply_purchases` (the League prep at the Plateau) buys Revives then **Max Potions** (¥2,500, cheaper than Full Restores at ¥3,000; Full Heals cure status for ¥600), counting the heals
+    already in the Bag by strength. The `elite_four` MONEY line explains where the money buys the most.
+
 ### Fixed — a loss keeps the Exp it earned (no reload after a blackout)
 - `main._handle_blackout` used to load the most recent save of the session after every all-fainted blackout (the League's pre-door slot 3, a pre-gym slot…). That rewound every level and
   Exp the losing fight had given, so the model re-fought at the same levels (a watched run: 2 of 3 blackouts were undone). It now only advances the game's own whiteout (healed at a Center,
