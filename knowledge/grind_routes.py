@@ -39,10 +39,23 @@ def site_cost(map_key, level: int, to_site: float, to_pc: float, detour: float |
     return route_fit(map_key, level) + trip / TILES_PER_LEVEL + HEAL_TRIPS * 2 * to_pc / TILES_PER_LEVEL
 
 
-def best_grass(start, level: int, exclude_current: bool = False, avoid=(), objective=None):
+def _with_fly(walk: float | None, site, fly_towns) -> float | None:
+    """`walk` tiles to `site`, or the cheaper way when Fly can take the party to a visited town near it first (None stays None: no route either way)."""
+    from knowledge.distance import tiles_between
+    from knowledge.flight import FLY_TILES
+    best = walk
+    for town in fly_towns:
+        rest = 0.0 if tuple(town[:2]) == tuple(site[:2]) else tiles_between(tuple(town[:2]), tuple(site[:2]))
+        if rest is not None and (best is None or FLY_TILES + rest < best):
+            best = FLY_TILES + rest
+    return best
+
+
+def best_grass(start, level: int, exclude_current: bool = False, avoid=(), objective=None, fly_towns=()):
     """(goal_map, steps) of the grass map that is the best place to train a Pokémon at `level`: wild levels that fit, close to the Pokémon Centers it will heal at,
     and (when `objective` — the map of the next goal — is given) on the way to it. Falls back to the nearest grass when there is no level / no data. Same return
-    shape as map_graph.nearest_grass."""
+    shape as map_graph.nearest_grass. `fly_towns` = the maps of the towns Fly can reach right now (empty without Fly): the walk to a site and the heal trips are priced at
+    the cheaper of walking and flying to the town nearest it — a site two towns from the Center is not far when the party can fly there."""
     from knowledge.distance import pokecenter_tiles, route_tiles, tiles_between
     avoid = {tuple(a[:2]) for a in avoid}
     if not level:
@@ -52,8 +65,8 @@ def best_grass(start, level: int, exclude_current: bool = False, avoid=(), objec
     for m in GRASS_MAPS:
         if m in avoid or m not in LAND_LEVELS or (exclude_current and m == tuple(start[:2])):
             continue
-        if m in VICTORY_ROAD_MAPS and m != (1, 39) and tuple(start[:2]) not in VICTORY_ROAD_MAPS:
-            continue             # 2F / 3F sit behind the boulder puzzles: a site only for someone already inside the cave (1F is open from the entrance)
+        if m in VICTORY_ROAD_MAPS and m != (1, 39) and tuple(start[:2]) != m:
+            continue             # 2F / 3F sit behind the boulder puzzles that go_to cannot solve (a watched run's relocation ended 'blocked' on 2F twelve times from 1F): a site only for someone already standing there
         steps = route_to(start, m)
         if steps is None:
             steps = route_to(tuple(start[:2]), m)
@@ -61,6 +74,9 @@ def best_grass(start, level: int, exclude_current: bool = False, avoid=(), objec
             continue
         to_site = route_tiles(steps, start)
         pc = pokecenter_tiles(m)
+        if fly_towns:
+            to_site = _with_fly(to_site, m, fly_towns)
+            pc = _with_fly(pc, m, fly_towns) if pc is not None else None
         onward = tiles_between(m, tuple(objective[:2])) if objective else None
         detour = max(0.0, to_site + onward - direct) if onward is not None and direct is not None else None
         score = site_cost(m, level, to_site, pc if pc is not None else to_site, detour)

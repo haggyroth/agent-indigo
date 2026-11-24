@@ -125,3 +125,31 @@ def test_a_boulder_on_another_level_cannot_be_pushed_from_below():
     assert bp.solve(f, (1, 0), [(2, 0)], (), [(3, 0)]) is not None or True
     g = bp.Floor(("...", "###"), warps=[(2, 0)], elev=("344", "000"))
     assert bp.solve(g, (0, 0), [(1, 0)], (), [(2, 0)]) is None                       # 3 -> 4 step into the boulder tile is refused
+
+
+def test_a_wedged_floor_is_reset_by_leaving_and_the_untouched_floor_is_not():
+    """A watched run pushed 1F's west boulder into the corridor's dead end, then looped 'No route through Victory Road 1F' — the cave puts every boulder back when the floor loads."""
+    from knowledge import vr_route as v
+    wedged = [(7, 18), (4, 11), (16, 3)]
+    assert v.reset_action(v.VR_1F, (4, 12), wedged) == ("warp", (11, 20), "Down")      # out by the entrance arrow
+    assert v.reset_action(v.VR_1F, (4, 12), v.initial_boulders(v.VR_1F)) is None          # nothing was moved: the puzzle itself has no route, a reset would not help
+    assert v.reset_action(v.VR_1F, (3, 2), wedged) in (("warp", (11, 20), "Down"), ("warp", (3, 2), None), None)
+
+
+def test_boulder_memory_restarts_whenever_the_floor_was_left_and_entered_again():
+    from types import SimpleNamespace as NS
+    from agent.skills.victory import VictoryMixin
+    from agent.skills.state import SkillState
+    from knowledge import vr_route as v
+
+    class C(VictoryMixin, SkillState):
+        pass
+    c = C()
+    r = NS(map_epoch=1, read_objects_by_gfx=lambda ids: [], read_player_pos=lambda: (40, 1), read_flag=lambda n: True)
+    c.reader = r
+    start = sorted(v.initial_boulders(v.VR_1F))
+    assert c._vr_boulders(v.VR_1F) == start
+    c._vr_known = {(4, 11)}                                          # what our pushes / reads left behind
+    assert c._vr_boulders(v.VR_1F) == [(4, 11)]                      # same visit: remembered
+    r.map_epoch = 3                                                  # out to Route 23 and in again (a heal trip)
+    assert c._vr_boulders(v.VR_1F) == start

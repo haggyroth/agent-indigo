@@ -763,7 +763,7 @@ class OverworldMixin:
         for _attempt in range(3):
             found = None
             for _probe in range(16):                       # skip grass behind a gate (Brock, a ticket…) without spending an attempt
-                found = best_grass(self._routing_start(), level, exclude_current=exclude_current, avoid=avoid, objective=self._grind_objective())
+                found = best_grass(self._routing_start(), level, exclude_current=exclude_current, avoid=avoid, objective=self._grind_objective(), fly_towns=tuple(self._fly_towns()))
                 if found is None:
                     break
                 walkable = not no_walk_reason((bank, mid), found[0], self.reader.read_player_pos())      # e.g. back west across Route 4's ledges

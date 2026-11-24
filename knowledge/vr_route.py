@@ -190,6 +190,22 @@ def waypoints(here, pos, target, boulders, pressed=frozenset(), leg: int = 8):
     return out
 
 
+def reset_action(here, pos, boulders, pressed=frozenset(), revealed: bool = False):
+    """The way out of a wedged floor: ("warp", tile, button) to a warp the player can WALK to, to leave and come back — the cave puts every boulder back where the decomp has it each
+    time a floor loads. None when the floor is untouched (nothing to reset: the puzzle itself has no route), or nothing is reachable. A watched run pushed a 1F boulder into the corridor's
+    dead end and then looped on 'No route through Victory Road 1F' for 200 calls."""
+    pos, boulders = tuple(pos), frozenset(map(tuple, boulders))
+    if boulders == frozenset(initial_boulders(here, revealed)):
+        return None
+    f = floor(here)
+    tiles = sorted(f.warps - {EXIT[1]} if here == EXIT[0] else f.warps) + [t for (k, t) in sorted(DOWN_ARROW) if k == here and (k, t) != EXIT]
+    reach = _region(f, pos, boulders, frozenset(pressed), frozenset(tiles))
+    for tile in sorted(tiles, key=lambda t: (t not in {d for (k, d) in DOWN_ARROW if k == here}, t)):       # the entrance arrow first: it lands outside, where the re-entry is the planner's own
+        if tile in reach and tile != pos:
+            return ("warp", tile, button(here, tile))
+    return None
+
+
 EXIT_SOUTH = (VR_1F, (11, 20))                   # the entrance arrow warp: holding Down on it walks out to Route 23's south half
 _BACK: dict = {}                                 # the hop list last found by plan_back, keyed by the situation it was solved in
 

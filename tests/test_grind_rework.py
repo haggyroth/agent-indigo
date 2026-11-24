@@ -292,7 +292,7 @@ def test_gate_ok_level_compares_the_best_party_member():
 def test_a_route_that_beat_us_is_skipped_until_we_are_three_levels_stronger(monkeypatch):
     import knowledge.grind_routes as gr
     seen = []
-    monkeypatch.setattr(gr, "best_grass", lambda start, level, exclude_current=False, avoid=(), objective=None: seen.append(set(avoid)) or None)
+    monkeypatch.setattr(gr, "best_grass", lambda start, level, exclude_current=False, avoid=(), objective=None, fly_towns=(): seen.append(set(avoid)) or None)
     c = _cerulean_client(19)
     c._lost_goals = {(3, 43): 19}
     assert c._relocate_to_grass() is False

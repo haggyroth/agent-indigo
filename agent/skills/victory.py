@@ -26,8 +26,9 @@ class VictoryMixin:
         anything reported is added."""
         rows = FLOORS[here]["rows"]
         live = [o for o in self.reader.read_objects_by_gfx([Addr.OBJ_GFX_BOULDER]) if 0 <= o[0] < len(rows[0]) and 0 <= o[1] < len(rows)]
-        if self._vr_floor != here:
-            self._vr_floor = here
+        epoch = getattr(self.reader, "map_epoch", 0)
+        if self._vr_floor != here or self._vr_epoch != epoch:        # a floor left and entered again (a heal trip, a grind relocation) has reloaded: its boulders are back where the decomp has them
+            self._vr_floor, self._vr_epoch = here, epoch
             self._vr_known = set(vr_route.initial_boulders(here, self._vr_revealed()))
         px, py = self.reader.read_player_pos()
         kept = {k for k in self._vr_known if abs(k[0] - px) > 7 or abs(k[1] - py) > 4}
@@ -134,7 +135,7 @@ class VictoryMixin:
             return "Route 23's guards want all eight badges before Victory Road."
         if not self._knows_move(STRENGTH_MOVE):
             return "Victory Road's boulders need a Pokémon that knows Strength: quest('strength')."
-        stuck, last = 0, None
+        stuck, last, resets = 0, None, 0
         for _ in range(160):
             if (b := self._hideout_fight(call, "Victory Road", auto_trainers)):
                 return b
@@ -158,7 +159,9 @@ class VictoryMixin:
             all_pressed = {fl: self._vr_pressed(fl) for fl in FLOORS}
             act = (vr_route.plan_back(here, pos, boulders, pressed, all_pressed) if back
                    else vr_route.plan(here, pos, boulders, pressed, self._vr_revealed(), all_pressed))
-            if act is None:
+            if act is None and (resets := resets + 1) <= 60 and (act := vr_route.reset_action(here, pos, boulders, pressed, self._vr_revealed())):
+                pass                                    # a boulder sits where the puzzle cannot use it: leave the floor and come back (the cave reloads its boulders)
+            elif act is None:
                 return (f"No route through Victory Road {FLOORS[here]['name']} from {pos} — a trainer may be in the way. Clear it, then call {call} again.")
             state = (here, pos, tuple(sorted(boulders)), act)
             stuck = stuck + 1 if state == last else 0

@@ -26,3 +26,15 @@ def test_no_heal_trip_is_counted_to_the_plateaus_center():
     """From the cave's floors the Plateau's Center looked 63-104 tiles away (through the puzzles); the walk that is open is Viridian's."""
     assert PLATEAU_CENTER == (13, 0)
     assert pokecenter_tiles(VR_1F) > 110
+
+
+def test_from_floor_one_the_floors_behind_the_puzzles_are_not_offered_and_a_flight_makes_a_far_site_cheaper():
+    """A watched run's relocation tried 'go_to Victory Road 2F' from 1F twelve times — it ended 'blocked' every time (the warp graph cannot push the boulders)."""
+    assert best_grass(VR_1F, 52, exclude_current=True)[0] != VR_2F
+    far = (3, 10)                                                # Saffron: a few hundred tiles from the cave
+    from knowledge.grind_routes import _with_fly
+    walking = _with_fly(900.0, VR_1F, ())
+    flying = _with_fly(900.0, VR_1F, [(3, 1)])                   # Fly can take the party to Viridian first
+    assert walking == 900.0 and flying < 300
+    assert _with_fly(None, VR_1F, [(3, 1)]) is not None and _with_fly(None, VR_1F, []) is None
+    assert best_grass(far, 52, fly_towns=[(3, 1)])[0] in GRASS_MAPS

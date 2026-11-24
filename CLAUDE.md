@@ -107,6 +107,7 @@ Pokemon_LeafGreen.gba
    └── knowledge/
        ├── type_chart.py        Gen III type effectiveness
        ├── leafgreen_data.py    Gyms, moves (type/power), Pokémon types, milestones
+       ├── flight.py            When go_to should Fly instead of walk (best_flight; pure)
        ├── navigation.py        Map names, route/building guidance, area maps
        ├── map_graph.py         GENERATED map connection+warp graph + BFS routing
        │                        (tools/gen_map_graph.py, from the pokefirered decomp)

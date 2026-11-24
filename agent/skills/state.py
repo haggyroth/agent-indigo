@@ -30,6 +30,8 @@ class SkillState:
     # ── nav: travel (go_to / go_to_map / challenge_leader) ───────────────────────────────────────
     _trip = None                 # {"dest", "target", "call"?} of a trip an encounter interrupted; cleared on arrival / a new go_to
     _go_depth = 0                # nesting of _go_to (re-entrancy guard, MAX_TRIP_DEPTH); always unwinds to 0
+    _flying_ahead = False        # a go_to is already flying (or walking out to fly): its nested travel must not plan a second flight
+    _fly_failed = lazy(set)      # maps a flight toward a destination failed from (the Fly user fainted, a menu would not open): walk from there, don't retry the menus every call
     _stop_reason = None          # why the current trip stopped (set by _stop, read by the _go_to wrapper)
     last_trip_stop = None        # {"reason", "target", "map"} of the last outermost trip (also emitted as a `trip` event)
     _go_to_last_end = None       # map where the previous trip ended …
@@ -58,6 +60,7 @@ class SkillState:
     _avoid_maps = ()              # maps travel must not route through (the Safari Zone quest keeps clear of its own exit)
     _vr_floor = None              # Victory Road: the floor whose boulders _vr_known describes (the cave reloads them on every entry)
     _vr_known = lazy(set)         # Victory Road: remembered boulder tiles (the game only reports objects near the camera)
+    _vr_epoch = -1                # reader.map_epoch when _vr_known was last valid: any map change since means the floor was reloaded (boulders reset), so the memory is stale
     _sf_floor = None              # Seafoam B3F: the floor whose boulders _sf_known describes (the cave reloads them on every entry)
     _sf_known = lazy(set)         # Seafoam B3F: remembered boulder tiles
 
