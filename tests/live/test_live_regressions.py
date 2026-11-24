@@ -2816,3 +2816,17 @@ def test_a_wedged_victory_road_floor_is_reset_by_leaving_and_coming_back(live, m
             break
     assert live.r.read_flag(0x899)
     assert (11, 20) in warps, warps                                  # out by the entrance arrow and back in
+
+
+def test_a_potion_for_a_fainted_pokemon_is_refused_with_the_revive_rule(live):
+    """The model asked for a Potion on a fainted team mate and got 'no effect' after driving the whole Bag menu. Now the refusal says a Revive (or heal()) is what a fainted Pokémon needs."""
+    live.load("threemon")
+    c = live.c
+    live.give_item(13, 2)
+    live.give_item(24, 1)
+    live.m.write16(Addr.PARTY_DATA + 100 * 1 + 0x56, 0)                    # slot 2 faints
+    out = c._field_use_item("Potion", target="2")
+    assert "fainted" in out and "Revive" in out, out
+    out = c._field_use_item("Revive", target="1")
+    assert "has not fainted" in out, out
+    assert "fainted" in c._field_use_item("Potion"), "no target: nobody hurt but one fainted → say why"

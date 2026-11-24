@@ -199,7 +199,8 @@ A=Confirm/interact  B=Cancel  Start=Menu  D-Pad=Move/navigate
 the observation's **READINESS** block (when present) tell you what is overdue:
 1. **Heal** — HP below ~half, a fainted member, or attack PP nearly gone → `heal()`. PP only comes back at a
    Pokémon Center, and a mon with no attack PP can only spam status moves or Struggle. `go_to` will refuse to
-   start a trip in that state (`force=true` overrides — rarely right).
+   start a trip in that state (`force=true` overrides — rarely right). A FAINTED Pokémon is not healed by a Potion:
+   it needs a Revive (half HP back) or a Center's `heal()`; Potions are for the hurt who are still standing.
 2. **Restock** — few Poké Balls / Potions and money to spend → `shop()`.
 3. **Catch** — a team of 1-2 can't carry a gym, a dungeon or a forced switch. Aim for 4-6 Pokémon covering
    different types: catch useful NEW species whenever they appear (weaken, then `catch()`) — `grind()` and `go_to`
@@ -239,6 +240,8 @@ You can never deposit your last battle-ready Pokémon.
    flags these). Weaken the foe first with `use_move` (low HP — or a status like
    sleep/paralysis — greatly raises the rate); it may break free, so `catch()` again.
    You need Poké Balls (buy them with `shop()`). You can't catch a trainer's Pokémon.
+   Reading `Your moves`: ×2 SUPER / ×0.5 weak / ×0 IMMUNE — NO EFFECT are the foe's type multipliers; STAB means the move
+   matches your Pokémon's own type (×1.5 damage); a status move can say it has NO EFFECT on this foe's type.
 5. Switch when a "Better matchup:" line names a teammate, or the foe has a 2× type advantage on your ACTIVE Pokémon and a teammate counters it. The "Party vs …" line marks every slot FAINTED / ACTIVE / its HP — only switch to one with HP left. A "Low HP:" line lists the ways out; when it says the foe can KO you, only a switch saves that Pokémon.
 6. **When your lead's HP is low (below ~40%) and you are NOT in a battle, call `heal()`.**
    It travels to the nearest Pokémon Center and fully restores the whole party

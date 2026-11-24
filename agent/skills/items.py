@@ -209,8 +209,16 @@ class FieldItemMixin:
                     return why
             slot = self._pick_field_target(iid, party, target)
             if slot is None:
+                fainted = [p.species_name for p in party if p.current_hp == 0]
+                tip = (f" {', '.join(fainted)} fainted — a Potion cannot help a fainted Pokémon: use a Revive (or heal() at a Center)."
+                       if iid in _HEAL_HP and fainted else "")
                 return (f"Nobody needs {ITEM_NAMES[iid]} right now"
-                        f"{' (' + target + ' is not a valid target)' if target else ''}.")
+                        f"{' (' + target + ' is not a valid target)' if target else ''}.{tip}")
+            if iid in _HEAL_HP and party[slot].current_hp == 0:
+                return (f"{party[slot].species_name} has fainted — {ITEM_NAMES[iid]} cannot heal a fainted Pokémon. A Revive brings it back at half HP "
+                        "(use_item('Revive', target=…)); heal() at a Pokémon Center restores everyone for free.")
+            if iid in _REVIVE and party[slot].current_hp > 0:
+                return f"{party[slot].species_name} has not fainted — a Revive only works on a fainted Pokémon (a Potion heals one that is hurt)."
         qty0 = dict(pocket)[iid]
         before = {i: (p.current_hp, p.status) for i, p in enumerate(party)}
 

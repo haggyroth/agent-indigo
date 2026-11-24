@@ -141,6 +141,37 @@ def role_tag(name: str, *, wild: bool | None = None, foe_asleep: bool = False, u
     return t
 
 
+# what a move cannot do ----------------------------------------------------------------------------------------
+# Status moves the type chart does not catch: the game refuses them on these types (Gen III).
+STATUS_IMMUNE: dict[str, tuple[tuple[str, ...], str]] = {
+    "Thunder Wave": (("GRD",), "Ground types cannot be paralysed by it"),
+    "Toxic": (("POI", "STL"), "Poison and Steel types cannot be poisoned"),
+    "Poison Powder": (("POI", "STL"), "Poison and Steel types cannot be poisoned"),
+    "Poison Gas": (("POI", "STL"), "Poison and Steel types cannot be poisoned"),
+    "Will-O-Wisp": (("FIR",), "Fire types cannot be burned"),
+    "Leech Seed": (("GRS",), "Grass types are immune to it"),
+}
+
+
+def status_blocked(name: str, defender_types) -> str:
+    """Why the status move `name` does nothing to a foe of `defender_types` ('' when it can work)."""
+    row = STATUS_IMMUNE.get(name)
+    if row and defender_types and set(row[0]) & set(defender_types):
+        return row[1]
+    return ""
+
+
+def gets_stab(name: str, attacker_types=(), hidden_power: tuple | None = None) -> bool:
+    """Does `name` earn the same-type attack bonus (×1.5) for an attacker of `attacker_types`? Only damaging moves of the attacker's own type — not fixed-damage ones (Seismic Toss…)."""
+    from knowledge.leafgreen_data import MOVE_POWER, MOVE_TYPE
+    kind = kind_of(name)
+    if kind in ("fixed", "ohko", "suicide", "reactive", "focus"):
+        return False
+    if kind == "hidden_power":
+        return bool(hidden_power) and hidden_power[0] in attacker_types
+    return MOVE_POWER.get(name, 0) > 0 and MOVE_TYPE.get(name) in attacker_types
+
+
 # damage scoring ---------------------------------------------------------------------------------------------
 def _power_equivalent(damage: float, level: int) -> float:
     """Express a flat `damage` as the base power of a neutral attack from a `level` mon (A/D = 1)."""
