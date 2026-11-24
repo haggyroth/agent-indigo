@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — travel flies when it saves walking; Victory Road no longer wedges; grind sites price Fly in
+A watched run (Fly on the team, Thunder Badge) walked from the Plateau to Route 15 through Victory Road, Viridian Forest and Mt. Moon, to Saffron the same way and back through Diglett's Cave
+— a wild battle every few tiles, each a model decision — and never called `fly_to`. It then ended wedged on Victory Road 1F ("No route through Victory Road 1F", 200 calls) after twelve
+"trip to Victory Road 2F ended: blocked".
+- `go_to` (and everything that travels through it: `heal`, `shop`, grind relocation, the quests) now flies first when that beats walking by 30+ tiles (`knowledge/flight.py`: a flight costs
+  ~40 tiles; pure + tested). From open air it flies to the visited town nearest the destination; from inside a building it walks out when the door is near (≤ 60 tiles), then flies; with no
+  walking route at all (Cerulean back west of Route 4) any flight wins. The result gets a "(Flew to X on the way — saves about N tiles…)" note. A failed flight (the Fly user fainted, a menu
+  would not open) walks as before and is not retried from that map. `AgentClient._fly_ahead`.
+- Victory Road: the boulder memory (`_vr_known`) was reset only when the FLOOR changed, so a heal trip out to Route 23 and back to 1F kept the old picture — a boulder dropped as "not
+  reported" never came back and the planner found no route. `reader.map_epoch` (counts map changes) now resets it on every re-entry. And when the planner still finds no route with the boulders
+  off their start tiles, `vr_route.reset_action` walks out of the floor (the entrance arrow on 1F) and back in: the cave reloads its boulders every time.
+- Grind sites: `best_grass` no longer offers Victory Road 2F / 3F to someone not already standing there (go_to cannot solve the puzzles), and with Fly the walk to a site and the heal trips are
+  priced at the cheaper of walking and flying to the town nearest it (`fly_towns`).
+- Live tests: `go_to` flies from the street and from inside a Pokémon Center; the wedged 1F floor is reset (`vr1f_wedged` fixture).
+
 ### Fixed — late-game heal stocking (the League was reached with no real heals)
 - A watched run stood at the Elite Four with 0 Potions and ¥0: the readiness check counted 10 Potions (20 HP) the same as 10 Hyper Potions, the stock plan kept buying Great Balls and
   one ¥2,500 Max Potion per visit at the Plateau, and nothing said the Plateau's clerk is the worst place to buy heals. Now:

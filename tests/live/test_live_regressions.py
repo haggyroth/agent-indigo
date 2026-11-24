@@ -2673,6 +2673,7 @@ def test_a_connection_the_map_calls_unreachable_is_dead_at_once_not_retried_for_
     def fake_route(start, goal, warps=True, avoid_edges=(), avoid_maps=(), coarse=True):
         return None if avoid_edges else [("connection", "North", (3, 9))]
     monkeypatch.setattr(mg, "route_to", fake_route)
+    monkeypatch.setattr(c, "_fly_towns", lambda: {})                  # this test is about the walking planner: a Fly user would simply fly to the Plateau
 
     def fake_go_to_map(direction, dest=None):
         calls.append(direction)
@@ -2764,3 +2765,54 @@ def test_ether_in_battle_restores_the_chosen_move_and_costs_the_turn(live):
         got = live.r.read_party()[slot].pp
         assert got[idx] == 11 and sum(got) == 14, (move, got)       # only that move gained 10
     assert live.r.detect_context().name == "IN_BATTLE"
+
+
+def _stage_fly(live):
+    """The lead knows Fly, all eight badges, every town visited, trainers beaten (navigation tests: a fight on the way is noise)."""
+    from agent.skills.hm import FLY_SPOTS
+    live.patch_mon(0, moves=[33, 19, 0, 0], pps=[35, 15, 0, 0])
+    live.set_badges(0b11111111)
+    for spot in FLY_SPOTS.values():
+        live.set_flag(spot[2])
+    live.defeat_all_trainers()
+
+
+def test_go_to_flies_when_the_walk_is_long_from_the_street_and_from_inside_a_center(live):
+    """A watched run with Fly on the team walked Plateau → Route 15 through Victory Road, Viridian Forest and Mt. Moon, and to Saffron and back the same way, never calling fly_to.
+    go_to now flies to the visited town nearest the destination when that saves enough walking — and walks out of a Pokémon Center's door first."""
+    live.load("vermilion")
+    _stage_fly(live)
+    c = live.c
+    out = c._execute("go_to", json.dumps({"destination": "Pewter City", "force": True}))
+    assert tuple(live.r.read_current_map()) == (3, 2) and "Flew to Pewter City" in out, out
+    live.load("vermilion")
+    _stage_fly(live)
+    c._go_to("Pokemon Center", mode="flee")
+    assert tuple(live.r.read_current_map())[0] != 3                  # inside the Center
+    out = c._execute("go_to", json.dumps({"destination": "Pewter City", "force": True}))
+    assert tuple(live.r.read_current_map()) == (3, 2) and "Flew to Pewter City" in out, out
+
+
+def test_a_wedged_victory_road_floor_is_reset_by_leaving_and_coming_back(live, monkeypatch):
+    """A watched run looped on 'No route through Victory Road 1F' (boulders where the puzzle cannot use them) for 200 calls. The cave reloads its boulders every time a floor loads, so
+    the planner now leaves by the entrance arrow and walks back in. `vr1f_wedged` = the run's checkpoint on 1F, a boulder pushed to (4,11). The wedge is simulated: no route until the reset."""
+    from knowledge import vr_route
+    live.load("vr1f_wedged")
+    c = live.c
+    live.strong_lead()
+    warps = []
+    orig = c._vr_warp
+    monkeypatch.setattr(c, "_vr_warp", lambda pos, tile, button, here: (warps.append(tuple(tile)), orig(pos, tile, button, here))[1])
+    orig_plan = vr_route.plan
+    monkeypatch.setattr(vr_route, "plan", lambda here, pos, boulders, *a, **k:
+                        None if (11, 20) not in warps and set(map(tuple, boulders)) != set(vr_route.initial_boulders(here)) else orig_plan(here, pos, boulders, *a, **k))
+    for _ in range(40):
+        if live.r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        live.boost_party()
+        c._execute("go_to", json.dumps({"destination": "Indigo Plateau", "force": True, "auto_trainers": True}))
+        if live.r.read_flag(0x899):
+            break
+    assert live.r.read_flag(0x899)
+    assert (11, 20) in warps, warps                                  # out by the entrance arrow and back in

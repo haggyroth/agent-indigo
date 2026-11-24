@@ -32,6 +32,7 @@ python tools/live_suite.py --changed origin/main --post-status      # only if th
 | `league_champion.ss1` | The Champion's room just entered, a boosted L70 team — for the Hall of Fame / credits test |
 | `post_hof.ss1` | **Post-game**: Pallet Town after the Hall of Fame, the credits and the soft reset (`FLAG_SYS_GAME_CLEAR` set, 8 badges, a boosted L72 lead + five teammates, Seagallop scene `VAR_MAP_SCENE_VERMILION_CITY` = 3). Written as a side-effect of `test_the_credits_end_in_a_soft_reset_and_continue_lands_in_pallet_town` — the start of the Sevii / Mewtwo / roaming-beast work (#261-#265) |
 | `route3_weak_team.ss1` | Route 3 east end, 1 badge, Ivysaur L17 with five L11-12 teammates (run checkpoint) |
+| `vr1f_wedged.ss1` | Victory Road 1F at (4,12), 8 badges, a Fly-capable team, the west boulder pushed to (4,11) (run `20261123-202826` checkpoint 61) — the wedge the floor reset recovers from |
 | `vermilion.ss1` | Vermilion City (arrived via the Underground Path), Ivysaur L30, SS Ticket held, no Cut yet |
 | `forced.ss1` | mid-battle, the active mon fainted → forced party screen |
 | `route8.ss1` | Route 8 (east end, (71,9)), Venusaur knows Cut, Cascade Badge — the fenced tall-grass pocket sealed by two Cut trees |

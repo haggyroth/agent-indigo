@@ -75,6 +75,7 @@ class LeafGreenReader:
         self._last_badges: tuple[int, int] = (0, 0)
         self._last_pos:    tuple[int, int] = (0, 0)
         self._last_map:    tuple[int, int] = (0, 0)
+        self.map_epoch:    int = 0          # counts map changes seen by read_current_map: a floor that was left and entered again has been reloaded (its boulders reset)
         self._last_good_party: list | None = None
 
     @staticmethod
@@ -672,8 +673,10 @@ class LeafGreenReader:
         ptr = self.client.read32(Addr.PLAYER_PTR)
         if not self._valid_ewram_ptr(ptr):
             return self._last_map
-        self._last_map = (self.client.read8(ptr + Addr.MAP_GROUP_OFFSET),
-                          self.client.read8(ptr + Addr.MAP_NUM_OFFSET))
+        now = (self.client.read8(ptr + Addr.MAP_GROUP_OFFSET), self.client.read8(ptr + Addr.MAP_NUM_OFFSET))
+        if now != self._last_map:
+            self.map_epoch += 1
+        self._last_map = now
         return self._last_map
 
     def read_state(self) -> GameState:

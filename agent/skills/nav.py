@@ -1066,7 +1066,10 @@ class NavMixin:
         self._go_depth = depth + 1
         self._stop_reason = None
         try:
+            flew = self._fly_ahead(destination)
             out = self._go_to_inner(destination, mode, auto_trainers, resume_call)
+            if flew:
+                out = f"{out} {flew}"
         finally:
             self._go_depth = depth
         reason = self._stop_reason or ("arrived" if str(out).startswith("Arrived") else "stopped")
@@ -1079,6 +1082,84 @@ class NavMixin:
             from agent import events
             events.emit("trip", f"trip to {destination} ended: {reason}", major=False, reason=reason, target=destination)
         return out
+
+    _FLY_LEAVE_MAX = 60          # tiles of walking to open air (a Pokémon Center's door) that still leave a flight worth taking
+
+    def _fly_ahead(self, destination: str) -> str:
+        """Fly toward `destination` first when that beats walking there: the note to append to the trip's result ("" when it walks). A watched run with Fly on the team walked from the
+        Plateau to Route 15 through Victory Road, Viridian Forest and Mt. Moon — every wild battle on the way a model decision — and never called fly_to. The model names places, not routes,
+        so the travel code takes the cheaper one: from open air it flies to the visited town nearest the destination (knowledge.flight); from inside a building it walks out first. Never
+        blocks a trip — any failure walks as before."""
+        if self._flying_ahead:
+            return ""
+        try:
+            self._flying_ahead = True
+            return self._fly_ahead_inner(destination)
+        except Exception:
+            log_once("nav._fly_ahead", "nav._fly_ahead: tolerated failure (walking instead)")
+            return ""
+        finally:
+            self._flying_ahead = False
+
+    def _fly_towns(self) -> dict:
+        """{town map: Fly name} of the towns the party can fly to right now ({} without a Pokémon that knows Fly and the Thunder Badge, or before any town was visited)."""
+        from agent.skills.hm import FLY_SPOTS
+        from knowledge.team import hm_status
+        try:
+            if not self.reader.read_badges()[1] >> 2 & 1 or not hm_status(self.reader.read_party(), "Fly")[0]:
+                return {}
+            return {spot[0]: key for key, spot in FLY_SPOTS.items() if self.reader.read_flag(spot[2])}
+        except Exception:
+            log_once("nav._fly_towns", "nav._fly_towns: tolerated failure (no flying)")
+            return {}
+
+    def _fly_ahead_inner(self, destination: str) -> str:
+        from game.state import GameContext
+        from knowledge.distance import route_tiles
+        from knowledge.escape import can_teleport
+        from knowledge.flight import best_flight
+        from knowledge.map_graph import node_for, route_to
+        if self.reader.detect_context() != GameContext.OVERWORLD:
+            return ""
+        towns = self._fly_towns()
+        if not towns:
+            return ""
+        target, _name = self._resolve_destination(destination)
+        cur = tuple(self.reader.read_current_map())
+        if target is None or cur == tuple(target) or cur in self._fly_failed:
+            return ""
+        px, py = self.reader.read_player_pos()
+        start = node_for(*cur, px, py)
+        route = route_to(start, target, avoid_maps=self._avoid_maps)
+        if no_walk_reason(cur, target, (px, py)):
+            walk, route = None, None                         # no walking route at all: any flight is the way (the advice used to say "fly there if you can")
+        else:
+            walk = route_tiles(route, cur) if route else None
+        leave, out_map = 0.0, None
+        if not can_teleport(cur):                            # indoors: Fly works only outdoors — walk out first when the door is near
+            if not route:
+                return ""
+            for i, (_kind, _arg, dest) in enumerate(route):
+                if can_teleport(tuple(dest[:2])):
+                    leave, out_map = route_tiles(route[:i + 1], cur), tuple(dest[:2])
+                    break
+            if out_map is None or leave > self._FLY_LEAVE_MAX:
+                return ""
+        pick = best_flight(walk, target, towns, leave=leave, here=out_map or cur)
+        if pick is None:
+            return ""
+        town, saved = pick
+        name = MAP_NAMES.get(town, str(town))
+        if out_map is not None:
+            self._go_to(MAP_NAMES.get(out_map, ""), mode="flee")                     # out of the building, onto the street
+            if tuple(self.reader.read_current_map()) != out_map:
+                return ""
+        res = self._fly_to(towns[town])
+        if not res.startswith("Flew"):
+            self._fly_failed.add(tuple(self.reader.read_current_map()))
+            return ""
+        how = "no walking route" if saved == float("inf") else f"saves about {int(saved)} tiles of walking and its wild battles"
+        return f"(Flew to {name} on the way — {how}.)"
 
     def _go_to_inner(self, destination: str, mode: str = "yield", auto_trainers: bool = False,
                      resume_call: str | None = None) -> str:
