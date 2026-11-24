@@ -174,7 +174,7 @@ BEATS: tuple[Beat, ...] = (
          steps=("Prep BEFORE the first door: heal, shop (Full Restores, Revives, Max Potions), save_state — the League's doors seal behind you, there is no healing or leaving until the Champion. Inside, heal() heals from the Bag only (Revives, Full Restores, Potions), and the quest tops the team up before each leader.",
                 "Lorelei (Ice, L51-56) → Bruno (Fighting/Rock) → Agatha (Ghost/Poison) → Lance (Dragon/Flying, L56-62) → your rival the Champion (L53-65, a mixed team that counters your starter).",
                 "Every room: walk up to the leader and talk; each win opens the next door. After the Champion: the Hall of Fame, Oak's speech and the credits."),
-         tip="A loss resets the whole League (the decomp's EventScript_ResetEliteFourEnd clears every defeated flag), heals the party, costs some money and respawns you in the Plateau's Center: quest('elite_four') starts again from the first door (load_state(3) restores the pre-door save if you prefer)."),
+         tip="A loss resets the whole League (the decomp's EventScript_ResetEliteFourEnd clears every defeated flag), heals the party, costs some money and respawns you in the Plateau's Center: quest('elite_four') starts again from the first door. You keep every level the losing fights gave you — train first if the shortfall is large; don't load_state (it discards that Exp)."),
 )
 BY_KEY = {b.key: b for b in BEATS}
 CHAIN_KEYS = tuple(b.key for b in BEATS)

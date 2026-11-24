@@ -243,7 +243,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `game_corner` | overworld | action?, amount? | The Celadon Game Corner (needs the Coin Case: quest('coin_case')). |
 | `save_game` | overworld | — | Write a REAL cartridge save (the in-game SAVE: Start → Save → Yes → Yes), confirmed by the game's save counter. |
 | `save_state` | overworld | slot? | Save state to a slot.  Call before gym leaders and Elite Four. |
-| `load_state` | overworld | slot? | Load a save state.  Used after a loss. |
+| `load_state` | overworld | slot? | Load a save state — to retry a CATCH (slot 9). |
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, got_fly, woke_snorlax_12, woke_snorlax_16. |
 
@@ -260,7 +260,7 @@ The opponent is identified from memory (`gEnemyParty`), so there is no
 3. `switch_pokemon(...)` if the opponent has a 2× type advantage and you have a better counter.
 4. Heal a low mon mid-battle with `use_item("Potion")`; out of battle `heal()` if HP/PP low.
 5. `catch()` a weakened wild Pokémon to build a team (a lone mon can't sustain a dungeon/E4).
-6. Save state before every gym leader and every E4 trainer; after a loss, load and retry.
+6. Save state before every gym leader and every E4 trainer. After a loss do NOT load it: the whiteout heals the party and the Exp the loss earned is kept — train, then retry (load_state is for retrying a catch).
 
 ### Run statistics (there is no reward)
 

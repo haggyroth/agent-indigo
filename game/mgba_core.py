@@ -216,10 +216,6 @@ class NativeMGBAClient:
         old (a title-screen state from July): loading it 'recovered' a blackout by resetting the game to its new-game intro."""
         return int(slot) in self._session_saves
 
-    def latest_session_slot(self) -> int | None:
-        """The slot this process saved most recently, or None when it has not saved yet."""
-        return max(self._session_saves, key=self._session_saves.get) if self._session_saves else None
-
     def load_state(self, slot: int = 0) -> bool:
         """Load from a numbered slot. Returns False if the slot file is missing
         or the core rejected it — callers must handle a failed load (e.g. no state

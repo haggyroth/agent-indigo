@@ -472,11 +472,10 @@ def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
 
 def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenReader,
                      ltm: LongTermMemory) -> bool:
-    """Handle an all-fainted party: announce the blackout once, then recover.
+    """Handle an all-fainted party: announce the blackout once, then advance the game's own whiteout sequence with A (no save reload — that
+    would throw away the Exp the loss earned).
 
-    Returns True if the caller should `continue` (the blackout path never falls
-    through to the LLM decision step). Tries a reload of the state saved most recently THIS session first; if none
-    was saved, advances the game's own whiteout sequence with A."""
+    Returns True if the caller should `continue` (the blackout path never falls through to the LLM decision step)."""
     party_wiped = bool(state.party) and all(p.current_hp == 0 for p in state.party)
     if not party_wiped:
         run.blackout_active = False   # recovered (respawn/heal) → re-arm
@@ -493,31 +492,16 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
         except Exception:
             pass
         ltm.save()
-    # Try to reload the pre-fight state. If none was saved this session the load
-    # FAILS (slot file missing) — don't pretend it worked and spin; let the game's
-    # own whiteout sequence carry the player to the last Pokémon Center by advancing
-    # its dialog with A.
-    # Only a slot saved by THIS process counts: saves/slot_*.ss1 survive between runs, and a months-old slot 0 reset a run to the
-    # new-game intro (party gone, naming screen) instead of recovering it. Native backend only (the http client can't tell).
-    slot = mgba.latest_session_slot() if hasattr(mgba, "latest_session_slot") else 0
-    if slot is not None and mgba.load_state(slot):
-        events.emit("note", f"loaded slot {slot} after the blackout")
-        mgba.tick(60)
-        run.prev_state = None
-        run.battle_was_active = False
-        run.blackout_active = False   # recovered via reload
-    else:
-        events.emit("note", "no state saved this session — advancing the whiteout / Nurse Joy recovery")
-        # The blackout plays a multi-box sequence (out of Pokémon → scurried to a
-        # Center → warp → auto-heal) that only advances on A. Press it several times
-        # per pass (not once) so recovery actually progresses instead of crawling one
-        # box per tick.
-        for _ in range(6):
-            mgba.tap("A")
-            mgba.tick(12)
-            if bool(reader.read_party()) and any(
-                    p.current_hp > 0 for p in reader.read_party()):
-                break   # auto-heal landed — party revived
+    # A loss is NOT undone: the game's own whiteout (out of Pokémon → rushed to a Center → auto-heal) keeps every level and Exp the party
+    # earned in the fight. Reloading a save used to rewind all of that (a watched run re-fought the Elite Four at the levels it had just lost
+    # at, throwing away the Exp from the losing attempts). A loss costs only half the money; the model decides whether to train before trying again. The blackout plays a multi-box sequence that only advances on A: press it several times per pass
+    # so recovery progresses instead of crawling one box per tick.
+    events.emit("note", "advancing the whiteout — the party keeps its Exp, the Center heals it")
+    for _ in range(6):
+        mgba.tap("A")
+        mgba.tick(12)
+        if bool(reader.read_party()) and any(p.current_hp > 0 for p in reader.read_party()):
+            break   # auto-heal landed — party revived
     return True
 
 
