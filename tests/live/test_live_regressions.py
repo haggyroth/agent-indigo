@@ -2830,3 +2830,19 @@ def test_a_potion_for_a_fainted_pokemon_is_refused_with_the_revive_rule(live):
     out = c._field_use_item("Revive", target="1")
     assert "has not fainted" in out, out
     assert "fainted" in c._field_use_item("Potion"), "no target: nobody hurt but one fainted → say why"
+
+
+def test_shop_before_the_league_flies_to_a_mart_that_sells_hyper_potions(live):
+    """A watched League run (27 losses) restocked at the Plateau's clerk — Max Potions ¥2500, Full Restores ¥3000, no Hyper Potions — and bought its Revives last. With eight badges and the
+    money, shop() now goes where Hyper Potions (¥1200 for 200 HP) are sold (Saffron by Fly), and buys Revives first. shop(item=…) still buys from the nearest mart."""
+    live.load("league_door")
+    _stage_fly(live)
+    c = live.c
+    c.ltm.data["badges_earned"] = 8
+    live.set_money(12000)
+    before = dict(live.r.read_bag())
+    out = c._execute("shop", "{}")
+    assert tuple(live.r.read_current_map()) == (14, 5), out                  # inside Saffron's Mart
+    bag = dict(live.r.read_bag())
+    assert bag.get(21, 0) > before.get(21, 0) and bag.get(24, 0) > before.get(24, 0), (out, bag)         # Hyper Potions and Revives
+    assert bag.get(20, 0) == before.get(20, 0) and bag.get(19, 0) == before.get(19, 0), out               # no Max Potions / Full Restores

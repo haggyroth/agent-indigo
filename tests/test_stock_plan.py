@@ -76,3 +76,32 @@ def test_no_stone_is_wanted_when_one_is_held_unaffordable_or_nobody_evolves_with
     assert stone_wants(party, {96: 1}, 20000) == []
     assert stone_wants(party, {}, 1000) == []
     assert stone_wants([mon(26, "Raichu")], {}, 20000) == []
+
+
+# ── the League's shopping: Revives and Hyper Potions, not Max Potions and Full Restores ──────────────────────────────────
+
+def test_the_plateau_clerk_buys_revives_first_and_max_potions_before_full_restores():
+    plan = compute_stock_plan({}, 8, 11000, INDIGO, reserve=500)
+    g = got(plan)
+    assert g.get(24, 0) >= 3                                          # Revives are funded before the heals
+    assert 19 not in g and g.get(20, 0) <= 3                          # no Full Restores while Max Potions are sold; few Max Potions at ¥2500
+    assert "Hyper Potion" in plan["missing"]                          # and it says where the better value is
+
+
+def test_a_mart_that_sells_hyper_potions_gets_hypers_and_revives_late():
+    g = got(compute_stock_plan({}, 8, 20000, SAFFRON, reserve=500))
+    assert g.get(21, 0) >= 8 and g.get(24, 0) >= 4
+    assert 20 not in g and 19 not in g
+
+
+def test_the_late_family_shares_never_overspend():
+    for money in (1500, 4000, 11000, 30000):
+        for sold in (INDIGO, SAFFRON, FUCHSIA):
+            assert compute_stock_plan({}, 8, money, sold, reserve=500)["total"] <= max(0, money - 500)
+
+
+def test_a_hyper_mart_trip_is_wanted_from_seven_badges_with_money_unless_already_at_one():
+    from knowledge.shopping import hyper_marts, wants_hyper_mart
+    assert hyper_marts()[0] == (14, 5) and (12, 7) in hyper_marts() and all(b <= 14 for b, _m in hyper_marts())
+    assert wants_hyper_mart(8, 11000, (13, 0)) and not wants_hyper_mart(8, 11000, (14, 5))
+    assert not wants_hyper_mart(8, 2000, (13, 0)) and not wants_hyper_mart(5, 11000, (13, 0))

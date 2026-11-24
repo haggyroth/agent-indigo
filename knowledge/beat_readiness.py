@@ -135,7 +135,7 @@ def readiness(key: str, party, bag=None) -> str:
     if short:
         parts.append(f"{'; '.join(short)} — it means {need.why}. grind() with no level lifts the weaker members (grind({need.top}) the ace)")
     if stock:
-        parts.append(f"only {'; '.join(stock)} — shop() for Potions and Revives — Hyper Potions (¥1,200, +200 HP) are the best value and are sold in Saffron, Fuchsia, Cinnabar and Celadon, not at the Plateau (its clerk has Max Potions ¥2,500 and Full Restores ¥3,000); fly_to a mart town first when you are at the Plateau (shop(sell=true) turns spare treasure into money)")
+        parts.append(f"only {'; '.join(stock)} — shop() for Potions and Revives — Hyper Potions (¥1,200, +200 HP) and Revives are the best value; Hyper Potions are sold only in Saffron and Cinnabar, not at the Plateau (its clerk has Max Potions ¥2,500 and Full Restores ¥3,000), so shop() flies you to Saffron for them from the Plateau when you have the money (shop(sell=true) turns spare treasure into money)")
     return f"Not ready for quest('{key}'): " + "; and ".join(parts) + f". Call quest('{key}') again to go anyway."
 
 

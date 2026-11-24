@@ -88,7 +88,7 @@ def test_before_the_late_badges_the_plan_is_unchanged():
 
 def test_with_seven_badges_hyper_potions_win_and_balls_take_a_smaller_share():
     late = _plan(FUCHSIA, 8, 9000, {13: 9})
-    assert late[21] >= 4 and late.get(3, 0) <= 2                      # 4 Hyper Potions, not 6 Super Potions + 5 Great Balls
+    assert late[21] >= 3 and late.get(24, 0) >= 1 and late.get(3, 0) <= 2   # Hyper Potions and a Revive, not 6 Super Potions + 5 Great Balls
     assert _plan(FUCHSIA, 8, 20000, {13: 9})[21] >= 8                  # a rich player stocks toward the 12
 
 

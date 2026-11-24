@@ -65,7 +65,8 @@ def annotate_moves(move_names: list[str],
                    user_level: int = 0,
                    foe_level: int = 0,
                    hidden_power: tuple | None = None,
-                   attacker_types=()) -> str:
+                   attacker_types=(),
+                   foe_ability: int = 0) -> str:
     """Return a compact summary of each move with slot number, type, damage
     category, PP remaining, and effectiveness vs the opponent.
 
@@ -74,9 +75,10 @@ def annotate_moves(move_names: list[str],
     already has a major status, status-inflicting moves are flagged WON'T STICK.
     ×0=immune  ×0.5=not very  ×1=normal  ×2=super  ×4=super super
     STAB marks a damaging move of the attacker's own type (×1.5); a status move the foe's type blocks says so.
+    `foe_ability` (gBattleMons[1]) adds the type-wide immunities the chart cannot see: Levitate vs Ground, Volt Absorb, Water Absorb, Flash Fire.
     """
     from knowledge.leafgreen_data import STATUS_INFLICTING_MOVES
-    from knowledge.move_semantics import gets_stab, role_tag, status_blocked
+    from knowledge.move_semantics import ability_blocks, gets_stab, role_tag, status_blocked
     opp_types = POKEMON_TYPES.get(opponent_name.upper().strip())
 
     parts: list[str] = []
@@ -116,7 +118,9 @@ def annotate_moves(move_names: list[str],
         cat_short = "Phys" if category == "Physical" else "Spec"
 
         stab = " STAB" if gets_stab(name, attacker_types, hidden_power) else ""
-        if opp_types:
+        if (ab := ability_blocks(mtype, foe_ability)):
+            parts.append(f"[{slot}]{name}[{_type_label(mtype)}/{cat_short} ×0 IMMUNE — NO EFFECT: this foe's {ab} ability{pp_tag}]")
+        elif opp_types:
             mult = effectiveness_vs(mtype, opp_types)
             if mult == 0:
                 stab = ""
@@ -157,7 +161,8 @@ def battle_summary(move_names: list[str],
                    foe_level: int = 0,
                    foe_hp: int = 0,
                    user_hp_frac: float = 1.0,
-                   hidden_power: tuple | None = None) -> str:
+                   hidden_power: tuple | None = None,
+                   foe_ability: int = 0) -> str:
     """Full battle analysis block injected into the obs string during IN_BATTLE.
 
     `attacker_types` (the acting Pokémon's types) enables a STAB bonus when
@@ -179,7 +184,8 @@ def battle_summary(move_names: list[str],
 
     foe_asleep = "asleep" in (opponent_status or "").lower()
     lines.append("Your moves: " + annotate_moves(move_names, opponent_name, pp_list, opp_statused, disabled_slot,
-                                                 disabled_turns, wild, foe_asleep, user_level, foe_level, hidden_power, attacker_types))
+                                                 disabled_turns, wild, foe_asleep, user_level, foe_level, hidden_power, attacker_types,
+                                                 foe_ability))
     if pp_list is not None and move_names and not any(
             n and idx < len(pp_list) and pp_list[idx] > 0 for idx, n in enumerate(move_names)):
         lines.append("No usable move left (all out of PP or Disabled): call use_move('Struggle') — it is "
@@ -210,7 +216,7 @@ def battle_summary(move_names: list[str],
         # can't work right now — Dream Eater on an awake foe, one-hit KOs, counters — at zero). Skip 0-PP moves and
         # known status (non-damaging) moves so e.g. Growl is never proposed, and
         # so a strong neutral move can outrank a weak super-effective one.
-        from knowledge.move_semantics import move_score
+        from knowledge.move_semantics import ability_blocks, move_score
         scored = []
         for idx, name in enumerate(move_names):
             if not name or name in STATUS_MOVES or name in SUICIDE_MOVES:
@@ -221,8 +227,8 @@ def battle_summary(move_names: list[str],
                 continue
             mt = hidden_power[0] if (name == "Hidden Power" and hidden_power) else MOVE_TYPE.get(name)
             if mt:
-                eff = effectiveness_vs(mt, opp_types)
-                score = move_score(name, attacker_types, opp_types, user_level=user_level, foe_level=foe_level,
+                eff = 0.0 if ability_blocks(mt, foe_ability) else effectiveness_vs(mt, opp_types)
+                score = 0.0 if eff == 0 else move_score(name, attacker_types, opp_types, user_level=user_level, foe_level=foe_level,
                                    foe_asleep=foe_asleep, user_hp_frac=user_hp_frac, foe_hp=foe_hp,
                                    hidden_power=hidden_power)
                 if score > 0 or eff == 0:          # an immune move stays in the list so the all-immune warning fires

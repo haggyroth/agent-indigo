@@ -21,8 +21,7 @@ SWITCH_HP_FLOOR = 0.4          # a teammate under this share of its HP is not of
 LOW_HP = 0.34                  # at or under this share of its HP the active mon gets "switch or heal" advice
 KO_WATCH = 0.6                 # …and up to this share when the foe's best hit would KO it (a full-HP one-shot is not worth a line)
 FINISH_FRAC = 0.25             # a foe at/below this share of its HP may be worth finishing instead of retreating
-# abilities that make a whole attacking type do nothing (id -> (name, type)); ids are Gen III
-ABILITY_IMMUNITY = {10: ("Volt Absorb", "ELE"), 11: ("Water Absorb", "WAT"), 18: ("Flash Fire", "FIR"), 26: ("Levitate", "GRD")}
+from knowledge.move_semantics import ABILITY_IMMUNITY    # abilities that make a whole attacking type do nothing (id -> (name, type)); ids are Gen III
 
 
 @dataclass(frozen=True)

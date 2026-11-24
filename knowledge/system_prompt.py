@@ -241,7 +241,8 @@ You can never deposit your last battle-ready Pokémon.
    sleep/paralysis — greatly raises the rate); it may break free, so `catch()` again.
    You need Poké Balls (buy them with `shop()`). You can't catch a trainer's Pokémon.
    Reading `Your moves`: ×2 SUPER / ×0.5 weak / ×0 IMMUNE — NO EFFECT are the foe's type multipliers; STAB means the move
-   matches your Pokémon's own type (×1.5 damage); a status move can say it has NO EFFECT on this foe's type.
+   matches your Pokémon's own type (×1.5 damage); a status move can say it has NO EFFECT on this foe's type. The foe's ABILITY is counted too: Levitate
+   (Gastly / Haunter / Gengar, Koffing / Weezing) makes Ground moves do nothing, Volt Absorb / Water Absorb / Flash Fire the same for Electric / Water / Fire.
 5. Switch when a "Better matchup:" line names a teammate, or the foe has a 2× type advantage on your ACTIVE Pokémon and a teammate counters it. The "Party vs …" line marks every slot FAINTED / ACTIVE / its HP — only switch to one with HP left. A "Low HP:" line lists the ways out; when it says the foe can KO you, only a switch saves that Pokémon.
 6. **When your lead's HP is low (below ~40%) and you are NOT in a battle, call `heal()`.**
    It travels to the nearest Pokémon Center and fully restores the whole party
