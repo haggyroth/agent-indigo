@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — the model is told about STAB, type immunities and the Revive rule
+- `Your moves` marks a damaging move of the attacker's own type `STAB` (×1.5; not fixed-damage moves), the "Best move" line says `+ STAB`, an immune target reads `×0 IMMUNE — NO EFFECT`
+  (and drops STAB), and a status move the foe's type blocks says so (`knowledge.move_semantics.STATUS_IMMUNE`: Thunder Wave vs Ground, Toxic / Poison Powder / Poison Gas vs Poison and Steel,
+  Will-O-Wisp vs Fire, Leech Seed vs Grass). The system prompt explains the tags.
+- Fainted Pokémon: the prompt says a Potion cannot help one (Revive, or `heal()` at a Center), and `use_item` refuses a Potion for a fainted target (and a Revive for a standing one) before
+  driving the Bag menus, naming the fix.
+
 ### Fixed — travel flies when it saves walking; Victory Road no longer wedges; grind sites price Fly in
 A watched run (Fly on the team, Thunder Badge) walked from the Plateau to Route 15 through Victory Road, Viridian Forest and Mt. Moon, to Saffron the same way and back through Diglett's Cave
 — a wild battle every few tiles, each a model decision — and never called `fly_to`. It then ended wedged on Victory Road 1F ("No route through Victory Road 1F", 200 calls) after twelve

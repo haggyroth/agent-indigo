@@ -64,7 +64,8 @@ def annotate_moves(move_names: list[str],
                    foe_asleep: bool = False,
                    user_level: int = 0,
                    foe_level: int = 0,
-                   hidden_power: tuple | None = None) -> str:
+                   hidden_power: tuple | None = None,
+                   attacker_types=()) -> str:
     """Return a compact summary of each move with slot number, type, damage
     category, PP remaining, and effectiveness vs the opponent.
 
@@ -72,9 +73,10 @@ def annotate_moves(move_names: list[str],
     Moves with PP=0 are flagged NO PP — they cannot be selected. When the opponent
     already has a major status, status-inflicting moves are flagged WON'T STICK.
     ×0=immune  ×0.5=not very  ×1=normal  ×2=super  ×4=super super
+    STAB marks a damaging move of the attacker's own type (×1.5); a status move the foe's type blocks says so.
     """
     from knowledge.leafgreen_data import STATUS_INFLICTING_MOVES
-    from knowledge.move_semantics import role_tag
+    from knowledge.move_semantics import gets_stab, role_tag, status_blocked
     opp_types = POKEMON_TYPES.get(opponent_name.upper().strip())
 
     parts: list[str] = []
@@ -101,6 +103,9 @@ def annotate_moves(move_names: list[str],
         if name in STATUS_MOVES:
             # No damage, so type effectiveness is meaningless (it used to read "Leech Seed ×4 SUPER").
             tl = f"{_type_label(mtype)}/" if mtype else ""
+            blocked = status_blocked(name, opp_types) if opp_types else ""
+            if blocked:
+                role = f" — NO EFFECT on this foe: {blocked}"
             parts.append(f"[{slot}]{name}[{tl}Status — deals NO damage{role}{pp_tag}]")
             continue
         if mtype is None:
@@ -110,10 +115,12 @@ def annotate_moves(move_names: list[str],
         category = GEN3_CATEGORY.get(mtype, "?")
         cat_short = "Phys" if category == "Physical" else "Spec"
 
+        stab = " STAB" if gets_stab(name, attacker_types, hidden_power) else ""
         if opp_types:
             mult = effectiveness_vs(mtype, opp_types)
             if mult == 0:
-                eff = "×0 IMMUNE"
+                stab = ""
+                eff = "×0 IMMUNE — NO EFFECT"
             elif mult < 1:
                 eff = f"×{mult:.1g} weak"
             elif mult == 1:
@@ -122,9 +129,9 @@ def annotate_moves(move_names: list[str],
                 eff = "×2 SUPER"
             else:
                 eff = f"×{mult:.0f} SUPER"
-            parts.append(f"[{slot}]{name}[{_type_label(mtype)}/{cat_short} {eff}{pp_tag}]")
+            parts.append(f"[{slot}]{name}[{_type_label(mtype)}/{cat_short} {eff}{stab}{pp_tag}]")
         else:
-            parts.append(f"[{slot}]{name}[{_type_label(mtype)}/{cat_short}{pp_tag}]")
+            parts.append(f"[{slot}]{name}[{_type_label(mtype)}/{cat_short}{stab}{pp_tag}]")
 
     return "  ".join(parts)
 
@@ -172,7 +179,7 @@ def battle_summary(move_names: list[str],
 
     foe_asleep = "asleep" in (opponent_status or "").lower()
     lines.append("Your moves: " + annotate_moves(move_names, opponent_name, pp_list, opp_statused, disabled_slot,
-                                                 disabled_turns, wild, foe_asleep, user_level, foe_level, hidden_power))
+                                                 disabled_turns, wild, foe_asleep, user_level, foe_level, hidden_power, attacker_types))
     if pp_list is not None and move_names and not any(
             n and idx < len(pp_list) and pp_list[idx] > 0 for idx, n in enumerate(move_names)):
         lines.append("No usable move left (all out of PP or Disabled): call use_move('Struggle') — it is "
@@ -224,10 +231,12 @@ def battle_summary(move_names: list[str],
         if scored:
             scored.sort(reverse=True)
             _score, best_eff, best_move = scored[0]
+            from knowledge.move_semantics import gets_stab
+            stab_note = " + STAB" if gets_stab(best_move, attacker_types, hidden_power) else ""
             if best_eff >= 2:
-                lines.append(f"Best move: {best_move} (×{best_eff:.0f} super effective)")
+                lines.append(f"Best move: {best_move} (×{best_eff:.0f} super effective{stab_note})")
             elif best_eff == 1:
-                lines.append(f"Best move: {best_move} (no super effective option)")
+                lines.append(f"Best move: {best_move} (no super effective option{stab_note})")
             elif best_eff == 0:
                 lines.append("WARNING: all damaging moves immune to opponent — consider switching")
         elif pp_list and all(p == 0 for p in pp_list if p is not None):
