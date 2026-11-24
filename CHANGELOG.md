@@ -5,6 +5,18 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed — the foe's ability counts (Levitate), and the League's shopping buys Revives and Hyper Potions
+A watched League run (27 losses) kept using Earthquake / Magnitude on Gengar and Haunter (the observation said `×2 SUPER STAB`; their Levitate makes Ground moves do nothing), and restocked at the
+Plateau's clerk — Max Potions ¥2500, Full Restores ¥3000, Revives last — when Hyper Potions (¥1200, 200 HP) and Revives (¥1500) are far better value.
+- `annotate_moves` / `battle_summary` take the foe's live ability (`gBattleMons[1]`, already read for the party roster): a damaging move its ability blocks reads `×0 IMMUNE — NO EFFECT: this
+  foe's Levitate ability` (Levitate vs Ground, Volt Absorb vs Electric, Water Absorb vs Water, Flash Fire vs Fire), is never the "Best move", and an all-blocked set raises the all-immune
+  warning. `ABILITY_IMMUNITY` moved to `knowledge.move_semantics` (`ability_blocks`). The system prompt's legend says abilities count.
+- `compute_stock_plan` from 7 badges: Revives are funded before the heals (par 5, stock-up 8, 45% of the money); at a mart with no Hyper Potion it buys Max Potions (par 3) before Full Restores
+  (par 1), says "Hyper Potion" is the better grade elsewhere, and Full Heals' late par is 3. With Hyper Potions on the shelf (Saffron, Cinnabar) it buys up to 12.
+- `shop()` with 7+ badges and ≥ ¥3600 goes to a mart that sells Hyper Potions first (Saffron when Fly can reach it — `go_to` flies; otherwise the nearest within ~150 tiles) instead of the
+  Plateau's clerk; `shop(item=…)` still buys from the nearest mart. The "Bag is already stocked" early-out is the early game's only: late, the stock plan decides.
+  The readiness text no longer claims Fuchsia / Celadon sell Hyper Potions (only Saffron and Cinnabar do).
+
 ### Added — the model is told about STAB, type immunities and the Revive rule
 - `Your moves` marks a damaging move of the attacker's own type `STAB` (×1.5; not fixed-damage moves), the "Best move" line says `+ STAB`, an immune target reads `×0 IMMUNE — NO EFFECT`
   (and drops STAB), and a status move the foe's type blocks says so (`knowledge.move_semantics.STATUS_IMMUNE`: Thunder Wave vs Ground, Toxic / Poison Powder / Poison Gas vs Poison and Steel,

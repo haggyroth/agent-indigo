@@ -544,6 +544,23 @@ class OverworldMixin:
                     "Oak gives you the first Poké Balls; shop() works at the next Mart.")
         return ""
 
+    def _hyper_mart(self) -> tuple | None:
+        """None normally; from 7 badges with the money for a few, the (bank, id) of the Kanto mart that sells Hyper Potions to restock at (Saffron when Fly can get there, else the
+        nearest) when this one does not. The Elite Four's rooms are sealed, so the stock for it is bought before."""
+        from knowledge.shopping import hyper_marts, wants_hyper_mart
+        cur = tuple(self.reader.read_current_map())
+        if not wants_hyper_mart(self.ltm.data["badges_earned"], self.reader.read_money(), cur):
+            return None
+        marts = hyper_marts()
+        if not self._fly_towns():
+            from knowledge.distance import tiles_between
+            from knowledge.map_graph import node_for
+            px, py = self.reader.read_player_pos()
+            here = node_for(cur[0], cur[1], px, py)
+            dist = sorted((d, m) for d, m in ((tiles_between(here, m), m) for m in marts) if d is not None)
+            marts = [m for d, m in dist if d <= 150]            # no Fly: only a mart a short walk away (not back through Victory Road)
+        return marts[0] if marts else None
+
     def _shop(self, item: str = "", quantity: int = 1) -> str:
         """Restock at the Poké Mart per the badge-gated purchase policy: travel to a
         Mart if needed, open the buy menu, buy the affordable par-level list of items
@@ -553,14 +570,23 @@ class OverworldMixin:
         if str(item or "").strip():
             return self._shop_for(str(item), quantity)
         from knowledge.shopping import compute_shopping_list, ITEM_NAMES, ITEM_PRICES
-        if not self._at_a_shop():
+        detour = self._hyper_mart()
+        if detour:
+            # The League is next and this clerk sells no Hyper Potion (the Plateau's has only Max Potions and Full Restores): go where ¥1200 buys 200 HP.
+            from knowledge.shop_stock import SHOP_NAMES
+            res = self._go_to(f"map:{detour[0]},{detour[1]}")
+            if tuple(self.reader.read_current_map()) != detour:
+                return (f"On the way to {SHOP_NAMES.get(detour, 'a Mart')} — Hyper Potions (¥1200, 200 HP) are twice the HP per yen of Max Potions, and Revives are cheaper than Full Restores: {res} "
+                        "(shop(item='Max Potion') buys from the nearest mart instead.)")
+        elif not self._at_a_shop():
             res = self._go_to("Mart")
             if not self._at_a_shop():
                 return f"On the way to a Mart to restock: {res}"
         money = self.reader.read_money()
         plan = compute_shopping_list(self.reader.read_bag(),
                                      self.ltm.data["badges_earned"], money)
-        if not plan["lines"]:
+        from knowledge.shopping import LATE_BADGES
+        if not plan["lines"] and self.ltm.data["badges_earned"] < LATE_BADGES:          # the badge policy is the early game's: from the late par the stock plan below decides
             return f"Bag is already stocked (¥{money}) — nothing to buy."
         approach, face = None, "Up"
         cur = tuple(self.reader.read_current_map())
@@ -614,7 +640,7 @@ class OverworldMixin:
         if skipped:
             msg += f" (Not sold here: {', '.join(dict.fromkeys(skipped))}.)"
         if stock["missing"]:
-            msg += f" (A better grade: {', '.join(stock['missing'])} — other marts sell it: Fuchsia / Cinnabar / Saffron / Indigo.)"
+            msg += f" (A better grade: {', '.join(stock['missing'])} — other marts sell it: Saffron / Cinnabar for Hyper Potions, Fuchsia / Celadon / Indigo for the rest.)"
         return msg
 
     _OPPOSITE = {"Up": "Down", "Down": "Up", "Left": "Right", "Right": "Left"}

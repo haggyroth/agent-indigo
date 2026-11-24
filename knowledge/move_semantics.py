@@ -161,6 +161,17 @@ def status_blocked(name: str, defender_types) -> str:
     return ""
 
 
+# Abilities that make a whole attacking type do nothing (Gen III ids -> (name, type)). The foe's live ability is in gBattleMons[1] (MemoryReader.read_foe_battler);
+# Gastly / Haunter / Gengar, Koffing / Weezing and Misdreavus all have Levitate, so Earthquake, Magnitude and Dig do nothing to them whatever the type chart says.
+ABILITY_IMMUNITY = {10: ("Volt Absorb", "ELE"), 11: ("Water Absorb", "WAT"), 18: ("Flash Fire", "FIR"), 26: ("Levitate", "GRD")}
+
+
+def ability_blocks(mtype: str, foe_ability: int = 0) -> str:
+    """The foe ability that makes a damaging move of type `mtype` do nothing ('Levitate'), '' when there is none. Status moves are the caller's business."""
+    row = ABILITY_IMMUNITY.get(foe_ability or 0)
+    return row[0] if row and row[1] == mtype else ""
+
+
 def gets_stab(name: str, attacker_types=(), hidden_power: tuple | None = None) -> bool:
     """Does `name` earn the same-type attack bonus (×1.5) for an attacker of `attacker_types`? Only damaging moves of the attacker's own type — not fixed-damage ones (Seismic Toss…)."""
     from knowledge.leafgreen_data import MOVE_POWER, MOVE_TYPE

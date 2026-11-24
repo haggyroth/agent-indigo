@@ -188,13 +188,28 @@ STOCK_PAR = {2: 25, 3: 25, 4: 25, 19: 5, 20: 6, 21: 10, 22: 15, 13: 15, 23: 10, 
 # the most of the budget each family may take in the base pass, so a ball tier cannot eat the potion money
 FAMILY_SHARE = {"ball": 0.4, "heal": 0.5, "full_heal": 0.25, "revive": 0.25, "cure": 0.1}
 LATE_BADGES = 7                      # the Elite Four is next: it wants ~12 strong heals (knowledge.beat_readiness) and no mart sells them past the Plateau, so stock deeper
-LATE_PAR = {19: 4, 20: 6, 21: 12}    # base par from LATE_BADGES badges (STOCK_PAR is raised to match when money allows)
-LATE_STOCK_PAR = {19: 6, 20: 8, 21: 14}
+# Revives and Hyper Potions are what the League runs on: a Revive (¥1500) brings a whole Pokémon back for the rest of the fight, a Hyper Potion (¥1200) heals 200 HP — twice the HP per yen of a Max
+# Potion (¥2500) and 2.5× a Full Restore (¥3000). A watched League run (27 losses) bought Max Potions and Full Restores at the Plateau's clerk, which sells no Hyper Potion, and Revives last.
+LATE_PAR = {19: 1, 20: 3, 21: 12, 24: 5, 23: 3}    # base par from LATE_BADGES badges (STOCK_PAR is raised to match when money allows); Full Restore / Max Potion only matter where no Hyper Potion is sold
+LATE_STOCK_PAR = {19: 2, 20: 4, 21: 14, 24: 8, 23: 5}
 LATE_HEAL_TIERS = (21, 22, 13)        # Hyper Potion heals 200 for ¥1200: a full heal for a L50-60 team, 2× the HP per yen of a Max Potion (¥2500) — so it wins whenever the mart sells it
-LATE_SHARE = {"ball": 0.15, "heal": 0.6}   # the League is next: Balls matter less than the heals no mart will sell inside it
+LATE_NO_HYPER_TIERS = (20, 19)        # a mart with no Hyper Potion (the Plateau's): Max Potion (¥2500) before Full Restore (¥3000 for the same HP; Full Heals cure status for ¥600)
+LATE_SHARE = {"ball": 0.1, "heal": 0.5, "revive": 0.45}   # the League is next: Balls matter less than the Revives and heals no mart will sell inside it
+HYPER, HYPER_DETOUR_YEN = 21, 3600   # three Hyper Potions: the money from which shop() goes to a mart that sells them instead of buying Max Potions at one that does not
 UPGRADE_HALF_PARS = 0.5              # a better tier is chosen once its budget covers this share of its par
 STOCK_UP_FLOOR = 3000                # spare yen (after the base par) before it stocks up beyond par
 STOCK_UP_SHARE = 0.6                 # …and it spends this share of the spare yen on the extra stock
+
+
+def hyper_marts() -> list[tuple[int, int]]:
+    """The Kanto marts that sell Hyper Potions, Saffron's first (the most central, and a Fly town): Saffron and Cinnabar. (The Sevii marts need a ferry ticket.)"""
+    from knowledge.shop_stock import SHOPS
+    return sorted(((b, m) for b, m, _x, _y, items in SHOPS if HYPER in items and b <= 14), key=lambda bm: bm != (14, 5))
+
+
+def wants_hyper_mart(badges: int, money: int, here) -> bool:
+    """Is it worth a trip to a mart that sells Hyper Potions before the Elite Four? From LATE_BADGES badges, with the money for a few of them, unless this IS such a mart."""
+    return badges >= LATE_BADGES and money >= HYPER_DETOUR_YEN and tuple(here[:2]) not in hyper_marts()
 
 
 def best_tier(tiers, sold, money: int, par=None, max_units: int = 99) -> int | None:
@@ -218,7 +233,7 @@ def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reser
     par = {**BASE_PAR, **(LATE_PAR if late else {})}
     stock_par = {**STOCK_PAR, **(LATE_STOCK_PAR if late else {})}
     share = {**FAMILY_SHARE, **(LATE_SHARE if late else {})}
-    heal_tiers = LATE_HEAL_TIERS if late and 21 in sold else HEAL_TIERS
+    heal_tiers = (LATE_HEAL_TIERS if HYPER in sold else LATE_NO_HYPER_TIERS) if late else HEAL_TIERS
     ball = best_tier(BALL_TIERS, sold, budget * share["ball"])
     heal = best_tier(heal_tiers, sold, budget * share["heal"], par, max_units=3 if late else 99)
     wants: list[tuple[int, str]] = []                       # (item id, family) in priority order
@@ -226,11 +241,13 @@ def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reser
         wants.append((ball, "ball"))
     if heal:
         wants.append((heal, "heal"))
+    if late and REVIVE in sold:
+        wants.insert(1 if ball else 0, (REVIVE, "revive"))      # before the heals: the League's Revives cannot be bought inside it
     if badges >= 4 and FULL_HEAL in sold:
         wants.append((FULL_HEAL, "full_heal"))
     elif badges < 4:
         wants += [(c, "cure") for c in CURES if c in sold]
-    if badges >= 4 and REVIVE in sold:
+    if badges >= 4 and not late and REVIVE in sold:
         wants.append((REVIVE, "revive"))
     spent = 0
     got: dict[int, int] = {}                                 # item id -> quantity planned (the base pass and the stock-up pass add to one line)
@@ -269,7 +286,8 @@ def compute_stock_plan(bag: dict[int, int], badges: int, money: int, sold, reser
                 buy(item_id, stock_par[item_id], cap)
     lines = [{"item_id": i, "name": ITEM_NAMES.get(i, item_label(i)), "qty": q, "unit_price": PRICES[i], "subtotal": q * PRICES[i]} for i, q in got.items()]
     others = {i for _b, _m, _x, _y, items in SHOPS for i in items}
-    missing = [ITEM_NAMES[t] for t in (next((t for t in BALL_TIERS if t in others and t not in sold), None), next((t for t in HEAL_TIERS if t in others and t not in sold), None)) if t
+    missing_hyper = ["Hyper Potion"] if late and HYPER not in sold and budget >= HYPER_DETOUR_YEN else []
+    missing = missing_hyper + [ITEM_NAMES[t] for t in (next((t for t in BALL_TIERS if t in others and t not in sold), None), next((t for t in HEAL_TIERS if t in others and t not in sold), None)) if t
                and PRICES.get(t) and budget >= PRICES[t] * 4 and t not in (ball, heal)
                and ((t in BALL_TIERS and ball is not None and BALL_TIERS.index(t) < BALL_TIERS.index(ball)) or (t in HEAL_TIERS and heal is not None and HEAL_TIERS.index(t) < HEAL_TIERS.index(heal)))]
     return {"lines": lines, "total": spent, "affordable": True, "missing": missing}

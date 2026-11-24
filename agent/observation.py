@@ -348,7 +348,8 @@ def _battle(t: Tick) -> list[str]:
                               opponent_status=enemy.status if enemy else "", disabled_slot=d_slot, disabled_turns=d_turns,
                               backup_hint=hint, wild=not run.battle_is_trainer, user_level=me.level, user_hp_frac=me.hp_percent,
                               foe_level=(enemy.level or 0) if enemy else 0, foe_hp=enemy.current_hp if enemy else 0,
-                              hidden_power=hidden_power(me.ivs)))
+                              hidden_power=hidden_power(me.ivs),
+                              foe_ability=_safe("foe_ability", lambda: r.read_foe_battler().get("ability", 0), 0)))
     if enemy and enemy.max_hp:           # who is down, who is up, and who matches up well against THIS foe
         foe = _foe_info(t, enemy)
         heals = _safe("heals", lambda: [HEAL_HP[i] for i, q in r.read_items_pocket() if q and i in HEAL_HP], [])
