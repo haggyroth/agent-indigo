@@ -79,3 +79,20 @@ def test_a_species_already_stored_in_the_pc_is_not_worth_another_ball():
     v = evaluate(weak, GROWLITHE, 20, dex_owned=True, stored={GROWLITHE})
     assert not v.catch and "PC box" in v.reason
     assert evaluate(weak, GROWLITHE, 20, dex_owned=True, stored={999}).catch    # a different species in the PC changes nothing
+
+
+FOUR = party((BULBASAUR + 1, "Ivysaur", 30), (PIKACHU, "Pikachu", 30), (GROWLITHE, "Growlithe", 30), (PIDGEY, "Pidgey", 30))
+
+
+def test_a_core_of_four_does_not_take_filler_that_merely_adds_a_type_or_sits_near_the_level():
+    """Quality over slots: a weak line (Geodude, best form BST 390) near the team's level used to pass on 'adds a type'; with a core of four it must be an upgrade."""
+    v = evaluate(FOUR, GEODUDE, 29)
+    assert not v.catch and "core of 4" in v.reason
+    assert evaluate(FOUR[:3], GEODUDE, 29).catch              # a team of three still needs bodies: unchanged
+
+
+def test_a_core_of_four_still_takes_a_premium_line_an_upgrade_a_team_gap_or_a_new_dex_entry():
+    assert evaluate(FOUR, MAGIKARP + 1, 29).catch or evaluate(FOUR, ABRA - 1, 29, wanted={ABRA - 1: "a Psychic counter"}).catch
+    assert evaluate(FOUR, GEODUDE, 29, wanted={GEODUDE: "counter to the next gym"}).catch              # a team gap
+    v = evaluate(FOUR, GEODUDE, 29, dex_owned=False)
+    assert v.catch and "pc('deposit')" in v.reason                                                      # Pokédex is secondary but still allowed
