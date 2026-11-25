@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — quality over a full party of six
+The prompt said "Aim for a full party of 6 with different types", and the catch policy took any near-level line that "adds a new type", so watched teams filled slots with filler (Wigglytuff, Raichu, a
+Pidgeot…) whose XP was then split six ways.
+- System prompt: six is a ceiling, not a goal; a strong 4-5 beats six diluted ones; the model is told it is FREE to restructure the party at any time (`pc('swap'|'deposit'|'withdraw')`, an empty slot is
+  fine, `team_report()` / `pc('list', detail=true)` to decide), and to box members that aren't pulling their weight instead of grinding them up. The "level the whole team" step now says to level the team that fights.
+- `catch_policy.evaluate`: from a core of four (`CORE_SIZE`) a catch must strengthen the team — a premium line, an upgrade over the weakest line, a team gap (`wanted`) — rather than just sit near the
+  level or add a type. A new Pokédex entry is still allowed (with a hint to box it). Teams under four are unchanged (they need bodies).
+
 ### Added — the free-switch box names the trainer's NEXT Pokémon
 The "<Trainer> is about to use <Pokémon>! Will you change POKéMON?" box (Battle Style SHIFT) shows the name in-game, but the model was only told "its next Pokémon (N left)", so it could not choose a
 matchup-based switch-in.

@@ -19,6 +19,7 @@ PREMIUM_DEBT = 16         # …and for a premium line / a clear upgrade (tag-tra
                           #    low catch quickly: it earns half of every kill)
 WEAK_LINE = 400           # best evolution below this is only worth it as a type-coverage pickup
 UPGRADE_MARGIN = 50       # a line this much stronger than the team's weakest line is an upgrade
+CORE_SIZE = 4             # from this many party members on, a catch must STRENGTHEN the team (a premium line, an upgrade, or a team gap): six is a ceiling, not a goal
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,12 @@ def evaluate(party, species_id: int, level: int, max_team: int = 6, dex_owned: b
         return Verdict(False, "your party is full — it would go to the PC box")
     premium = line_best >= PREMIUM_LINE
     new_type = bool(set(types) - _team_types(party))
+    if len(party) >= CORE_SIZE and not premium and not upgrade:
+        # Quality over slots: a filler catch that merely "adds a type" or sits near the level floor dilutes the XP of a team that is already set.
+        if dex_owned is False:
+            return Verdict(True, "a NEW Pokédex entry, not a team upgrade (it joins the party — pc('deposit') it afterwards)")
+        return Verdict(False, f"your core of {len(party)} is already set and this line (best form BST {line_best}) would not strengthen it "
+                              "— a strong team beats a full one", debt)
 
     if debt <= FREE_DEBT and (line_best >= WEAK_LINE or upgrade):
         extra = ", adds a new type" if new_type else (", a stronger line than your " + weak[1] if upgrade else "")

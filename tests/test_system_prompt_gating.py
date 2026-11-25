@@ -23,3 +23,11 @@ def test_sections_unlock_with_badges_and_vision():
     assert "Safari Zone" in prompt(4, False)
     assert "Screenshot — How to Read" in prompt(0, True) and "Overworld Orientation" in prompt(0, True)
     assert len(prompt(1, False)) < len(prompt(4, True)) - 2500           # the trim is real (~700+ tokens)
+
+
+def test_the_prompt_says_six_is_a_ceiling_and_the_party_is_free_to_reshape():
+    """A watched team of filler (Wigglytuff, Raichu, a Pidgeot…) followed 'aim for a full party of 6': quality over slots, and the PC is the model's to use."""
+    for s in (prompt(0, False), prompt(8, False)):
+        assert "quality over slots" in s and "CEILING, not a goal" in s
+        assert "FREE to restructure the party" in s and "leaving a slot EMPTY is fine" in s
+        assert "full party of 6" not in s

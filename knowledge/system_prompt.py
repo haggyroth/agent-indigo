@@ -202,10 +202,12 @@ the observation's **READINESS** block (when present) tell you what is overdue:
    start a trip in that state (`force=true` overrides — rarely right). A FAINTED Pokémon is not healed by a Potion:
    it needs a Revive (half HP back) or a Center's `heal()`; Potions are for the hurt who are still standing.
 2. **Restock** — few Poké Balls / Potions and money to spend → `shop()`.
-3. **Catch** — a team of 1-2 can't carry a gym, a dungeon or a forced switch. Aim for 4-6 Pokémon covering
-   different types: catch useful NEW species whenever they appear (weaken, then `catch()`) — `grind()` and `go_to`
-   point out worthwhile ones when they hand you the encounter.
-4. **Level the whole team** — nobody more than 7 levels under your best (`grind()` with no level); and your best
+3. **Catch** — a team of 1-2 can't carry a gym, a dungeon or a forced switch. Build a strong core of 4-5 Pokémon
+   covering different types (six is the CEILING, not a goal — never catch filler just to fill a slot): catch useful NEW
+   species whenever they appear (weaken, then `catch()`) — `grind()` and `go_to` point out worthwhile ones when they hand
+   you the encounter.
+4. **Level the team that fights** — nobody more than 7 levels under your best (`grind()` with no level); a member that
+   would take a lot of grinding and isn't worth it belongs in the PC box, not in the way. Your best
    one up to the next gym's level before you walk in (`grind(N)`). USE EVERYONE: XP is split between every Pokémon
    that was on the field, so lead with a low-level teammate and switch to a stronger one on the first turn — both
    gain, and the weak one is never hurt. Do this in trainer battles too (you may switch at will before your turn).
@@ -219,7 +221,8 @@ fight it for XP when the team needs levels, or catch it if the advice says it is
 until it runs dry; rotate to another good attack, switch to a Pokémon with PP left, or heal.
 
 {corner}{safari}## The PC (box storage)
-Only 6 Pokémon travel with you; every extra catch goes to a PC box. `pc('list')` lists what's stored (works anywhere);
+Only 6 Pokémon travel with you (fewer is fine); every extra catch goes to a PC box. The party is YOURS to shape: boxing a weak
+member or bringing a stronger one in is a normal, free move (it just needs a Pokémon Center). `pc('list')` lists what's stored (works anywhere);
 `pc('deposit', pokemon)`, `pc('withdraw', pokemon)` and `pc('swap', pokemon, box_pokemon)` drive the Pokémon Center PC for
 you (they walk to a Center if needed). Use them to keep the best team for the next gym or dungeon — bring in a type
 that counters the next Leader, send a weak or redundant member to the box — and to pick the Pokémon you want to train.
@@ -287,10 +290,16 @@ that can: …" (with the exact LeafGreen locations, or the box:slot of one you a
 is worth a ball whatever its stats, and `team_report()` gives the full picture (coverage, shared weaknesses, HM carriers, the
 next gym's fit) — use it before a gym and when deciding what to catch or swap.
 
-**Party composition.** Aim for a full party of 6 with different types and strong evolution lines. Early placeholders
-(Weedle, Rattata, Pidgey…) are fine to start, but when you find a clearly better species — or a new type — catch it
-(when `grind()` or `go_to` hands you a worthwhile wild Pokémon, `catch()` it yourself) and swap the weakest member out with
-`pc('swap')`. Don't run from a wild Pokémon you could use.
+**Party composition — quality over slots.** Six is a ceiling, not a target. A strong 4-5 beats six diluted ones: the XP is
+split between everyone who fights, so extra mediocre members leave the whole team under-levelled for the Elite Four. Prefer
+strong evolution lines (a final form with real attacking stats and moves), cover many types, and keep the members that
+actually win fights. A Pokémon whose best form is weak (high-HP/low-attack normals, a Rattata, a Pidgey you won't evolve into
+something useful) is filler: don't keep it just because a slot is open. Early placeholders are fine to start with — when you find a clearly better
+species, or a type the team lacks, catch it (when `grind()` or `go_to` hands you a worthwhile wild Pokémon, `catch()` it
+yourself) and swap the weakest member out. You are FREE to restructure the party whenever you like: `pc('swap')`, `pc('deposit')`
+and `pc('withdraw')` change who travels with you (leaving a slot EMPTY is fine), `team_report()` tells you what the
+team lacks, and `pc('list', detail=true)` grades what is stored. Re-shape it before a gym or the League — bring in the type that
+counters the next Leader, box whoever isn't pulling their weight. Don't run from a wild Pokémon you could use.
 
 **Tag-switch XP.** In any battle you can lead with a low-level Pokémon, then `switch_pokemon` to your strongest on
 the first turn: the weak one shares the XP and never takes a hit. Rotate which teammate leads, especially against
