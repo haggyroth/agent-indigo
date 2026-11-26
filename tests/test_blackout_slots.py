@@ -57,14 +57,15 @@ def test_load_state_tool_refuses_a_slot_this_session_never_saved():
     assert "loaded" in c._execute("load_state", '{"slot": 1}').lower() and c.mgba.loaded == [1]
 
 
-def test_native_client_tracks_only_the_slots_it_wrote(monkeypatch):
+def test_native_client_tracks_only_the_slots_it_wrote(monkeypatch, tmp_path):
     try:
         import game.mgba_core as core
     except Exception:
         pytest.skip("native binding unavailable")
     c = core.NativeMGBAClient.__new__(core.NativeMGBAClient)
     c._h, c._session_saves, c._save_seq = None, {}, 0
-    monkeypatch.setattr(core, "lib", SimpleNamespace(pycore_save_state=lambda h, p: 1))
+    monkeypatch.setattr(core, "SAVE_DIR", tmp_path)                              # states are written beside their target and renamed into place
+    monkeypatch.setattr(core, "lib", SimpleNamespace(pycore_save_state=lambda h, p: (open(p, "wb").write(b"state"), 1)[1]))
     assert not c.saved_this_session(0)                                           # slot_0.ss1 on disk does not count
     assert c.save_state(1) and c.save_state(3) and c.save_state(1)
     assert c.saved_this_session(1) and c.saved_this_session(3) and not c.saved_this_session(0)

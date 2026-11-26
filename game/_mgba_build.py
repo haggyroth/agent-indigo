@@ -74,19 +74,21 @@ ffi.set_source(
         if (!core) return NULL;
         if (!core->init(core)) return NULL;
         mCoreInitConfig(core, NULL);
-        if (!mCoreLoadFile(core, path)) { core->deinit(core); return NULL; }
+        if (!mCoreLoadFile(core, path)) { mCoreConfigDeinit(&core->config); core->deinit(core); return NULL; }
         unsigned w = 0, h = 0;
         core->desiredVideoDimensions(core, &w, &h);
         color_t* buf = calloc((size_t)w * h, sizeof(color_t));
+        PyCore* pc = malloc(sizeof(PyCore));
+        if (!buf || !pc) { free(buf); free(pc); mCoreConfigDeinit(&core->config); core->deinit(core); return NULL; }   /* out of memory: fail the load, don't crash */
         core->setVideoBuffer(core, buf, w);
         core->reset(core);
-        PyCore* pc = malloc(sizeof(PyCore));
         pc->core = core; pc->video = buf; pc->vw = w; pc->vh = h;
         return pc;
     }
     void pycore_destroy(void* h) {
         PyCore* pc = (PyCore*)h;
         if (!pc) return;
+        mCoreConfigDeinit(&pc->core->config);
         pc->core->deinit(pc->core);
         free(pc->video);
         free(pc);
