@@ -592,7 +592,13 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                 ms_name = args.get("name", "")
                 if ms_name not in MILESTONES:
                     return f"Invalid milestone '{ms_name}'. Valid: {', '.join(MILESTONES)}"
-                added = self.ltm.add_milestone(ms_name, args.get("note", ""))
-                return f"Milestone '{ms_name}' {'recorded' if added else 'already recorded'}."
+                from agent.story import make_done_check
+                from knowledge.milestone_evidence import verify, is_verifiable
+                ok, why = verify(ms_name, make_done_check(self.reader, self.ltm))
+                if not ok:
+                    return f"Not recorded: {why}"
+                added = self.ltm.add_milestone(ms_name, args.get("note", ""), source="model")
+                return (f"Milestone '{ms_name}' {'recorded' if added else 'already recorded'}"
+                        + ("" if is_verifiable(ms_name) else " (the game has no signal for this one — taken on your word)") + ".")
             case _:
                 return f"Unknown tool: {name}"
