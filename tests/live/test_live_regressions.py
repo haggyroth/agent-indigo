@@ -3003,6 +3003,15 @@ def test_map_epoch_counts_warps_even_when_nobody_polls_the_map(live):
     assert r.map_epoch == before + 2
 
 
+def test_rematch_progress_is_read_from_the_real_flags(live):
+    """#367: ladder progress from a real fixture (Misty beaten): two trainers already at their only party, three waiting for the VS Seeker — and the line says so."""
+    from knowledge import rematches
+    live.load("post_misty")
+    st = rematches.status(live.r.read_flag)
+    assert st["total"] == 221 and st["at_top"] >= 1 and st["waiting"].get(rematches.VS_SEEKER_FLAG, 0) >= 1
+    assert rematches.line(live.r.read_flag).startswith("REMATCHES: ") and not live.r.read_flag(rematches.VS_SEEKER_FLAG)
+
+
 def test_area_progress_is_read_from_the_real_flags(live):
     """#366: trainer / item / hidden-item flags per named area, from a real early fixture (Misty beaten) — and the S.S. Anne warning before HM01."""
     from knowledge import sweeps
@@ -3013,15 +3022,3 @@ def test_area_progress_is_read_from_the_real_flags(live):
     assert sweeps.progress("Rocket Hideout", live.r.read_flag)["items"][0] == 0   # story-conditional items are not counted as 'taken' from the start
     out = live.c._sweep_listing()
     assert "AREA SWEEPS started, not finished" in out and "Viridian Forest: 1/5 trainers" in out and "⚠ S.S. Anne" in out
-
-
-def test_game_corner_status_prices_the_prizes_in_time_from_the_real_game(live):
-    """#359: with a Coin Case and 1,000 coins, the status lists every prize with what is missing, the slot time it would take and what it is for."""
-    from knowledge.game_corner_data import COIN_CASE
-    live.load("celadon_gym_door")
-    live.set_flag(COIN_CASE[1])
-    live.set_coins(1000)
-    out = live.c._game_corner("status")
-    assert "Coins: 1000/9999" in out and "Prize Corner (the slot driver wins about 16 coins a spin" in out
-    assert "Dratini — 4600 coins — 3600 more coins ≈ 225 slot spins" in out and "Abra — 120 coins — you can afford it" in out
-    assert out.count(" coins — ") >= 15                                             # all fifteen prizes

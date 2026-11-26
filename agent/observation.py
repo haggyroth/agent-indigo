@@ -184,6 +184,20 @@ def _post_game_line(t: Tick) -> list[str]:
     return [completion.post_game_text(ctx.owned, national, status, ctx)]
 
 
+def _rematch_line(t: Tick) -> list[str]:
+    """Rematch progress once the VS Seeker is owned (knowledge.rematches): shown when the counts change, silent otherwise and before the item exists."""
+    from knowledge import rematches
+    flag = t.reader.read_flag
+    if not flag(rematches.VS_SEEKER_FLAG):
+        return []
+    s = rematches.status(flag)
+    sig = (s["at_top"], s["ready"], tuple(sorted(s["waiting"].items())))
+    if sig == t.run.rematch_sig:
+        return []
+    t.run.rematch_sig = sig
+    return [rematches.line(flag)]
+
+
 def _next_beat_money(t: Tick, items) -> str:
     """The MONEY line when the next story beat wants more yen than we hold (knowledge.money): the gap and how to earn it."""
     from knowledge.money import money_line
@@ -262,6 +276,8 @@ def _readiness_and_bag(t: Tick) -> list[str]:
     aide = _safe("aide", lambda: _aide_line(t), "")
     if aide and d.get("badges_earned", 0) >= 1:
         out.append(aide)
+    if t.overworld and not opening:
+        out.extend(_rematch_line(t))
     if t.overworld and not opening and d.get("badges_earned", 0) >= 1:
         out.extend(_side_quest_line(t))
         out.extend(_post_game_line(t))
