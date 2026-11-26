@@ -91,7 +91,7 @@ class LeafGreenReader:
         self._last_badges: tuple[int, int] = (0, 0)
         self._last_pos:    tuple[int, int] = (0, 0)
         self._last_map:    tuple[int, int] = (0, 0)
-        self.map_epoch:    int = 0          # counts map changes seen by read_current_map: a floor that was left and entered again has been reloaded (its boulders reset)
+        self._epoch_extra: int = 0
         self._last_good_party: list | None = None
         # While the SaveBlock pointers are invalid (title screen, reset, a map transition frame) the SaveBlock readers return what they last read (self._cache,
         # #376) instead of a plausible-looking 0 / False / {} — "unreadable" must not look like "I have none".
@@ -106,6 +106,16 @@ class LeafGreenReader:
     def _cache(self) -> dict:
         """Last good value of every SaveBlock-dependent read (a property so a reader built without __init__, as several tests do, still works)."""
         return self.__dict__.setdefault("_cache_store", {})
+
+    @property
+    def map_epoch(self) -> int:
+        """How many times the game has (re)loaded a map: a floor that was left and entered again has been reloaded (its boulders reset). Taken from the emulator's own
+        count of warp-loads when it keeps one (independent of how often anyone polls the map, #391); otherwise from the map changes read_current_map has SEEN."""
+        return getattr(self, "_epoch_extra", 0) + getattr(self.client, "map_loads", 0)
+
+    @map_epoch.setter
+    def map_epoch(self, value: int) -> None:
+        self._epoch_extra = value - getattr(self.client, "map_loads", 0)
 
     def reset_caches(self) -> None:
         """Forget every last-good value. Call after anything that replaces RAM wholesale (load_state, a checkpoint resume, a reset): a cached value
@@ -766,8 +776,8 @@ class LeafGreenReader:
         if not self._valid_ewram_ptr(ptr):
             return self._last_map
         now = (self.client.read8(ptr + Addr.MAP_GROUP_OFFSET), self.client.read8(ptr + Addr.MAP_NUM_OFFSET))
-        if now != self._last_map:
-            self.map_epoch += 1
+        if now != self._last_map and not hasattr(self.client, "map_loads"):
+            self._epoch_extra = getattr(self, "_epoch_extra", 0) + 1              # no emulator-side count (a fake client): fall back to the map changes we have seen
         self._last_map = now
         return self._last_map
 
