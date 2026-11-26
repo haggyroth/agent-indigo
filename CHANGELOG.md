@@ -1353,6 +1353,10 @@ A run from the title screen took the parcel from the Viridian Mart clerk and the
 - feat: `use_move('Struggle')` / automatic Struggle when every move is out of PP or Disabled.
 
 ### Fixed
+- **LLM failures are told apart (#372).** A *context overflow* (HTTP 400, "context size exceeded") used to roll the history back and send the identical request 30 times until `error_budget`; it now shrinks and resends
+  (images → older turns → the observation cut to 2.5k chars) and remembers a prompt ceiling so the next request fits. New `CONTEXT_TOKENS` fits the history by *estimated tokens* (calibrated against the server's `prompt_tokens`),
+  not just message count. *Fatal* errors — a quota/billing 429 (previously "transient": ~2 h of backoff), 401/402/403, 404 unknown model — raise `LLMFatalError` and end the run at once with `reason="llm_error"`; `Retry-After` is honoured.
+  A failure on a later round of a step keeps the completed rounds' messages (their tool calls already moved the game) instead of deleting them.
 - fix(switch): the party-screen row for a switch target is now taken from the party as read AFTER
   the screen settles (the game physically reorders gPlayerParty to battle order) instead of applying
   gBattlePartyCurrentOrder on top — forced switches to the 2nd-slot mon failed every time. Cursor
