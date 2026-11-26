@@ -1,8 +1,8 @@
 """What every skill mixin may assume about the emulator — in ONE place.
 
-Skills used to ask `getattr(self.mgba, "wait_until_idle", None)` in 20 places because the legacy HTTP backend predates the
-native binding's idle detector. The capability check now lives here; the legacy client has a no-op `wait_until_idle` too, so a
-backend that lacks the method is a test fake, not a code path the skills must know about.
+Skills used to ask `getattr(self.mgba, "wait_until_idle", None)` in 20 places because the (removed) HTTP backend predated the
+native binding's idle detector. The capability check now lives here; an emulator that lacks the method is a test fake, not a
+code path the skills must know about.
 """
 import logging
 

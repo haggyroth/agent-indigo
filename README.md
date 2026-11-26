@@ -4,7 +4,7 @@
 
 An autonomous AI agent that plays **Pokemon LeafGreen** using a locally-running large language model. The agent reads live game state directly from emulator memory, reasons about what to do next, and sends button inputs — no ROM hacks, no scripted walkthroughs.
 
-By default it drives **libmgba in-process** (via a small cffi binding): no emulator GUI, no Lua, no HTTP — just Python controlling the core directly at many times real-time. A legacy HTTP backend (mGBA + mGBA-http) is still supported for spectating in the real mGBA window.
+By default it drives **libmgba in-process** (via a small cffi binding): no emulator GUI, no Lua, no HTTP — just Python controlling the core directly at many times real-time.
 
 ## How it works
 
@@ -61,7 +61,6 @@ The agent has a full gameplay skill set. The LLM calls these as tools:
 - A C compiler (Xcode Command Line Tools on macOS; `build-essential` on Linux) — cffi builds a small extension.
 - [LM Studio](https://lmstudio.ai/) with a **tool-capable** model, local server on port 1234
 - Pokemon LeafGreen ROM (`.gba`, US version, game code `AGB-BPGE`) — supply your own
-- *(legacy `http` backend only)* [mGBA](https://mgba.io/) + [mGBA-http 0.8.2](https://github.com/nikouu/mGBA-http)
 
 ## Setup
 
@@ -89,18 +88,13 @@ Point `ROM_PATH` in `.env` at your LeafGreen `.gba`, and set `MODEL_NAME` to mat
 
 That's it — `main.py` loads the ROM in-process. Set `SHOW_WINDOW=true` in `.env` to watch it play in a window.
 
-### Spectating via the legacy backend
-
-Set `MGBA_BACKEND=http` in `.env` to use the original transport instead: start mGBA, load `mGBASocketServer.lua` (Tools → Scripting), run the mGBA-http binary (port 5000), then `python main.py`. You get the real mGBA window at the cost of real-time speed and extra processes.
-
 ## Configuration
 
 All settings live in `.env` (copy from `.env.example`). Key options:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MGBA_BACKEND` | `native` | `native` (in-process libmgba) or `http` (legacy mGBA-http) |
-| `ROM_PATH` | `~/mgba-http/Pokemon_LeafGreen.gba` | Path to the LeafGreen `.gba` (native backend) |
+| `ROM_PATH` | `~/mgba-http/Pokemon_LeafGreen.gba` | Path to the LeafGreen `.gba` |
 | `LLM_BASE_URL` | `http://localhost:1234/v1` | OpenAI-compatible endpoint. Point at a cloud provider (OpenAI, OpenRouter, …) to use cloud models |
 | `LLM_API_KEY` | `lm-studio` | API key for the endpoint (placeholder for local; your provider key for cloud) |
 | `MODEL_NAME` | — | Model id: the LM Studio name locally, or the provider's id (e.g. `gpt-4o`) for cloud |
@@ -174,8 +168,7 @@ pathfinding/routing bug. It boots a real emulator, so it's opt-in:
 │   ├── history.py            Message trimming + control-token stripping
 ├── game/
 │   ├── _mgba_build.py        cffi builder for the in-process libmgba binding
-│   ├── mgba_core.py          NativeMGBAClient — drives libmgba in-process (default)
-│   ├── mgba_client.py        MGBAClient — legacy mGBA-http REST wrapper
+│   ├── mgba_core.py          NativeMGBAClient — drives libmgba in-process
 │   ├── viewer.py             Optional pygame window (SHOW_WINDOW)
 │   ├── memory_reader.py      Gen III XOR decryption + state machine
 │   ├── state.py              GameState, PokemonStatus, StateDiff dataclasses
@@ -191,7 +184,7 @@ pathfinding/routing bug. It boots a real emulator, so it's opt-in:
 
 ## Memory layout notes
 
-All memory reads use full GBA bus addresses, identical between the native binding and the HTTP API, so the decoder is backend-agnostic. Party data at `0x02024284` uses Gen III XOR encryption (PID ^ OT_ID key); HP, level, status, and PP are unencrypted and always reliable.
+All memory reads use full GBA bus addresses, as used by the native binding. Party data at `0x02024284` uses Gen III XOR encryption (PID ^ OT_ID key); HP, level, status, and PP are unencrypted and always reliable.
 
 **On writes:** the agent treats game RAM as read-only for observation — it does not touch save data, badges, stats, experience, RNG, or battle outcomes. The only sanctioned writes are **menu cursor positions** — the FIGHT move cursor, the battle action cursor (FIGHT/BAG/POKÉMON/RUN), and the bag/party list cursors — which the skills set to a target before pressing A. That's exactly equivalent to navigating a menu with the D-pad (it only chooses *which* legal option to select, deterministically, avoiding dropped-input flakiness); it never alters game logic or outcomes. This is why "no ROM hacks" above refers to the ROM and game rules, not a claim that no RAM byte is ever written.
 

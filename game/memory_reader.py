@@ -1,6 +1,6 @@
 import logging
 
-from game.mgba_client import MGBAClient
+from typing import TYPE_CHECKING
 from game.state import GameState, PokemonStatus, StateDiff, GameContext
 from game.constants import Addr, SPECIES_NAMES, MOVE_NAMES, GEN3_CHARSET
 
@@ -14,6 +14,10 @@ SUBSTRUCT_ORDER = [
     "EGAM", "EGMA", "EAGM", "EAMG", "EMGA", "EMAG",
     "MGAE", "MGEA", "MAGE", "MAEG", "MEGA", "MEAG",
 ]
+
+
+if TYPE_CHECKING:
+    from game.mgba_core import NativeMGBAClient
 
 
 def decrypt_substructs(raw_100: bytes) -> dict[str, bytes]:
@@ -64,7 +68,7 @@ def decode_status(word: int) -> str:
 # ── Main reader class ────────────────────────────────────────────────────────
 
 class LeafGreenReader:
-    def __init__(self, client: MGBAClient, decrypt: bool = True):
+    def __init__(self, client: "NativeMGBAClient", decrypt: bool = True):
         self.client  = client
         self.decrypt = decrypt
         # Last-known-good values for the pointer-deref reads. On a title screen,

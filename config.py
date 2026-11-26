@@ -49,11 +49,9 @@ def _env_float(name: str, default: float, *, minimum: float | None = None,
     return value
 
 
-# ── Emulator backend ──────────────────────────────────────────────────────────
-# "native": drive libmgba in-process (no GUI/Lua/mGBA-http). Requires the
-#           compiled binding (python -m game._mgba_build) and `brew install mgba`.
-# "http":   legacy mGBA-http transport (mGBA GUI + Lua socket + .NET server).
-MGBA_BACKEND      = os.getenv("MGBA_BACKEND",      "native")
+# ── Emulator ──────────────────────────────────────────────────────────────────
+# The agent drives libmgba in-process (the only backend). Requires the compiled
+# binding (python -m game._mgba_build) and `brew install mgba`.
 ROM_PATH          = os.path.expanduser(
                         os.getenv("ROM_PATH", "~/mgba-http/Pokemon_LeafGreen.gba"))
 
@@ -114,9 +112,6 @@ SHOW_WINDOW       = os.getenv("SHOW_WINDOW",  "false").lower() == "true"
 USE_RUNNING_SHOES = os.getenv("USE_RUNNING_SHOES", "true").lower() != "false"   # hold B while walking once the Running Shoes are owned (twice the speed); false = always walk
 VIEWER_SCALE      = _env_int("VIEWER_SCALE", 3, minimum=1)    # 240x160 -> 720x480
 VIEWER_FPS        = _env_int("VIEWER_FPS", 120, minimum=0)    # playback pace cap; 0 = uncapped
-
-# ── Network (http backend only) ───────────────────────────────────────────────
-MGBA_HTTP_BASE    = os.getenv("MGBA_HTTP_BASE",    "http://localhost:5000")
 
 # ── LLM endpoint ──────────────────────────────────────────────────────────────
 # The agent uses an OpenAI-compatible client, so it works with LM Studio locally
@@ -189,9 +184,6 @@ LLM_RETRIES       = _env_int("LLM_RETRIES", 8, minimum=0)
 # MAX_WALL_SECONDS: hard wall-clock cap on a whole run (checked each step). Belt-and-
 # suspenders alongside LLM_TIMEOUT so an unattended run can't burn hours. 0 = unlimited.
 MAX_WALL_SECONDS  = _env_float("MAX_WALL_SECONDS", 0.0, minimum=0.0)
-
-# ── Timing ────────────────────────────────────────────────────────────────────
-BUTTON_TAP_DELAY  = _env_float("BUTTON_TAP_DELAY", 0.10, minimum=0.0)
 
 
 # ── Paths ─────────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 > This file holds the deep reference material that was previously inline in
 > `CLAUDE.md`. `CLAUDE.md` is now a slim operational reference (build, run, don't
 > break); the sections below are useful when you're working on a specific subsystem
-> — the legacy HTTP backend, party-data decoding, the type chart, or game strategy.
+> — the retired HTTP backend, party-data decoding, the type chart, or game strategy.
 > They were moved verbatim so no detail is lost.
 >
 > **Version history** (what changed and why, per release) lives in
@@ -14,7 +14,7 @@
 
 ## mGBA-http 0.8.2 — Verified API Reference
 
-*(Applies only to the legacy `http` backend.)*
+*(RETIRED: the `http` backend and `game/mgba_client.py` were removed; kept as a reference for the memory-layout notes and the old API.)*
 
 **Base URL:** `http://localhost:5000`
 **All endpoints verified against swagger.json from the running server.**
