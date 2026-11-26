@@ -13,3 +13,8 @@ def test_the_chain_runs_one_island_ruby_sapphire_network_machine_with_the_decomp
 def test_the_post_game_ones_are_tiered_post_and_the_league_stays_the_end_of_the_road():
     assert sb.BY_KEY["sevii_ruby"].tier == "post" and sb.BY_KEY["network_machine"].tier == "post"
     assert sb.resolve("network_machine").key == "network_machine" and sb.resolve("ruby").key == "sevii_ruby"
+
+
+def test_the_legendaries_are_flag_checked_and_gated_behind_the_islands():
+    assert sb.BY_KEY["moltres"].done == (("flag", 0x2BD),) and sb.BY_KEY["moltres"].needs == ("sevii_one_island",)
+    assert sb.BY_KEY["mewtwo"].done == (("flag", 0x2BC),) and sb.BY_KEY["mewtwo"].needs == ("network_machine",) and sb.BY_KEY["mewtwo"].tier == "post"

@@ -189,6 +189,11 @@ BEATS: tuple[Beat, ...] = (
                 "A first detour then ends at Three Island's port (FLAG_SEVII_DETOUR_FINISHED). The Seagallop from Vermilion / Cinnabar then takes the Tri-Pass to One-Three Island.",
                 "Celio's real request waits for the National Pokédex (the National Dex beat): after the Hall of Fame, 60 species caught and this visit."),
          tip="Information only: the ferry scenes are not driven yet — go_to / fly_to work on the islands you have visited."),
+    Beat("moltres", "Moltres on Mt. Ember's summit (legendary, appears once)", "One Island -> Mt. Ember -> the Summit", needs=("sevii_one_island",), optional=True,
+         done=(("flag", 0x2BD),),                                                            # FLAG_FOUGHT_MOLTRES
+         steps=("A level 50 Fire / Flying static encounter at the top of Mt. Ember (Sevii). Talking to it starts the fight; it is gone for good once you win or catch it (FLAG_FOUGHT_MOLTRES), but if you run it stays.",
+                "Weaken it without fainting it (False Swipe, a status move), then throw Ultra / Master Balls; save_state first so a faint or a bad throw can be retried."),
+         tip="Needs the Sevii islands open (One Island) and the way up Mt. Ember; the Ruby Path (Celio's Ruby) is a different cave."),
     Beat("elite_four", "Pokémon League: the Elite Four and the Champion", "Indigo Plateau, north door of the Pokémon Center",
          needs=("victory_road",), driver="elite_four", done=(("flag", 0x82C),),                       # FLAG_SYS_GAME_CLEAR: set in the Hall of Fame
          steps=("Prep BEFORE the first door: heal, shop (Full Restores, Revives, Max Potions), save_state — the League's doors seal behind you, there is no healing or leaving until the Champion. Inside, heal() heals from the Bag only (Revives, Full Restores, Potions), and the quest tops the team up before each leader.",
@@ -214,6 +219,11 @@ BEATS: tuple[Beat, ...] = (
          done=(("flag", 0x844),),                                                            # FLAG_SYS_CAN_LINK_WITH_RS
          steps=("Give Celio the Sapphire. The Network Machine links with Hoenn: the Cerulean Cave guard leaves (Cerulean Cave opens), Lorelei's house is empty, the roaming beast starts roaming, and every trainer's later rematch teams open (the VS Seeker).",),
          tip="This is the gate for the post-game: Cerulean Cave (Mewtwo), the roamer, and the strongest rematch teams."),
+    Beat("mewtwo", "Mewtwo in Cerulean Cave (legendary, appears once)", "Cerulean City -> Cerulean Cave B1F", needs=("network_machine",), optional=True,
+         done=(("flag", 0x2BC),),                                                            # FLAG_FOUGHT_MEWTWO
+         steps=("The Network Machine (Celio, One Island) makes the Cerulean Cave guard leave: the cave north-west of Cerulean City opens. Mewtwo, level 70, waits on B1F; it is gone for good once you win or catch it (FLAG_FOUGHT_MEWTWO).",
+                "Bring a full team, plenty of Hyper Potions / Revives and the Master Ball (Silph Co.) or a stack of Ultra Balls; save_state before the fight."),
+         tip="The roaming beast the Network Machine starts is chosen by your starter: Raikou for Squirtle, Entei for Bulbasaur, Suicune for Charmander (level 50, roaming the Kanto routes); it runs, so Mean Look / a speed lead / a sleep move helps."),
 )
 # Gate flags beyond the badges/owned counts, with the reason shown while they are unmet (agent.story.side_ctx reads exactly these).
 FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}      # FLAG_WORLD_MAP_ONE_ISLAND
@@ -227,6 +237,8 @@ SIDE_INFO = {
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
     "exp_share": ("the Exp. Share", (("owned", 50),)),
     "vs_seeker": ("the VS Seeker: rematches with beaten trainers (experience, money; every top team is an achievement)", ()),
+    "moltres": ("Moltres, a legendary (appears once)", ()),
+    "mewtwo": ("Mewtwo, a legendary (appears once)", (("gameclear",), ("badges", 8))),
     "sevii_one_island": ("the Sevii Islands open (Tri-Pass, Celio, the island towns to fly to)", ()),
     "sevii_ruby": ("the Ruby and the Rainbow Pass (Four-Seven Island)", (("gameclear",),)),
     "sevii_sapphire": ("the Sapphire (completes the Network Machine's gems)", (("gameclear",),)),
