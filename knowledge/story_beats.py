@@ -119,6 +119,10 @@ BEATS: tuple[Beat, ...] = (
     Beat("hitmon", "Hitmonchan or Hitmonlee from the Fighting Dojo (optional)", "Saffron City, the Dojo", needs=("tea",), driver="hitmon", optional=True,
          done=(("flag", 0x278),),
          steps=("Beat Master Koichi (L37-38 Fighting types), then choose ONE ball: Hitmonlee (kicks) or Hitmonchan (punches) — the other is gone for good. The choice is yours: quest('hitmon lee') or quest('hitmon chan').",)),
+    Beat("eevee", "Eevee from Celadon Mansion's roof room (optional)", "Celadon City, the Mansion: 3F -> the roof -> the room (7,3)", needs=("tea",), driver="eevee", optional=True,
+         done=(("flag", 0x263),),                                                              # FLAG_GOT_EEVEE
+         steps=("The Poké Ball in the little room on top of Celadon Mansion is a free level 25 Eevee (the party, or the PC when it is full).",
+                "A Water / Thunder / Fire Stone evolves it (Vaporeon / Jolteon / Flareon): the choice, and the stone, are yours.")),
     Beat("copycat", "Mimic from Saffron's Copycat (optional)", "Celadon Dept. Store 2F (Poké Doll) → Saffron City, the Copycat's house", needs=("silph_co",), driver="copycat", optional=True,
          done=(("flag", 0x2CD),),
          steps=("A Rocket grunt stands at the Copycat house's door until Silph Co. is cleared (quest('silph_co')). The girl upstairs then teaches Mimic ONCE, for a Poké Doll (¥1000 at the Celadon Dept. Store 2F). quest('copycat') buys the doll and runs the lesson.",
@@ -238,7 +242,7 @@ FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}   
 SIDE_INFO = {
     "dig": ("TM28 Dig", ()), "magikarp": ("a Magikarp for ¥500 (a slow starter, a strong finish)", ()), "flash": ("HM05 Flash (lights the caves)", (("owned", 10),)),
     "fly": ("HM02 Fly (fast travel to any visited town)", ()), "coin_case": ("the Coin Case (Game Corner prizes)", ()), "hitmon": ("Hitmonlee or Hitmonchan — your choice", ()),
-    "copycat": ("the move Mimic", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
+    "copycat": ("the move Mimic", ()), "eevee": ("an Eevee (L25; stone evolutions for the Pokédex)", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
     "good_rod": ("the Good Rod (better fishing)", ()), "super_rod": ("the Super Rod (the best Kanto rod)", ()), "bike": ("the Bicycle (twice the speed; the Cycling Road)", ()),
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
     "exp_share": ("the Exp. Share", (("owned", 50),)),
