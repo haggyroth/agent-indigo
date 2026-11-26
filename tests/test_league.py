@@ -54,3 +54,27 @@ def test_a_run_started_after_the_game_is_cleared_does_not_end_at_step_zero():
     assert goal(None, fresh) is False
     fresh.data["milestones"].append("hall_of_fame")                       # recorded by _apply_progress / the quest
     assert goal(None, fresh) is True
+
+
+def test_a_cleared_league_points_at_the_network_machine_until_it_is_linked():
+    assert "Network Machine" in client(flags={league.FLAG_GAME_CLEAR})._get_elite_four()
+    assert not client(flags={league.FLAG_GAME_CLEAR})._league_rematch_open()
+    assert client(flags={league.FLAG_GAME_CLEAR, league.FLAG_NETWORK_MACHINE})._league_rematch_open()
+    assert not client(flags={league.FLAG_NETWORK_MACHINE})._league_rematch_open()                 # the game must be cleared as well
+
+
+def test_the_rematch_league_asks_for_much_higher_levels_and_still_names_quest_elite_four():
+    from knowledge.beat_readiness import EXTRA_NEEDS, NEEDS, REMATCH_KEY, readiness, recommendation
+    assert EXTRA_NEEDS[REMATCH_KEY].top > NEEDS["elite_four"].top and EXTRA_NEEDS[REMATCH_KEY].floor > NEEDS["elite_four"].floor
+    out = readiness(REMATCH_KEY, [NS(level=lv) for lv in (60, 58, 56, 55, 50, 45)])
+    assert "Not ready for quest('elite_four')" in out and "L72" in out
+    assert readiness(REMATCH_KEY, [NS(level=lv) for lv in (74, 70, 68, 66, 65, 64)]) == ""
+    assert "Champion L72-75" in recommendation(REMATCH_KEY)
+
+
+def test_the_rematch_levels_match_the_decomps_trainer_parties():
+    """Lorelei2 L63-66, Bruno2 L65-68, Agatha2 L65-70, Lance2 L66-72, the Champion's rematch L72-75 (src/data/trainer_parties.h) — the Need's text quotes them."""
+    from knowledge.beat_readiness import EXTRA_NEEDS, REMATCH_KEY
+    why = EXTRA_NEEDS[REMATCH_KEY].why
+    for text in ("L63-66", "L65-68", "L65-70", "L66-72", "L72-75"):
+        assert text in why

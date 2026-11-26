@@ -15,6 +15,7 @@ FLAG_VISITED_PLATEAU = 0x899      # FLAG_VISITED_INDIGO_PLATEAU — set on the f
 HALL_OF_FAME = (1, 80)
 FLAG_GAME_CLEAR = 0x82C
 FLAG_DEFEATED_CHAMP = 0x4BC
+FLAG_NETWORK_MACHINE = 0x844            # FLAG_SYS_CAN_LINK_WITH_RS: the Sevii chain's end — the League's rooms switch to the rematch trainers (TRAINER_ELITE_FOUR_*_2, TRAINER_CHAMPION_REMATCH_*)
 CENTER_DOOR = (4, 1)                    # the north door of the Plateau's Pokémon Center: into Lorelei's room
 PLATEAU_DOOR = (11, 6)                  # the Center's door on the Exterior
 # (map, defeated flag, tile in front of the leader, name, exit warp tile)
@@ -67,10 +68,16 @@ class LeagueMixin:
         events.emit("note", f"Elite Four prep: {', '.join(notes)}", log=False)
         return ", ".join(notes)
 
+    def _league_rematch_open(self) -> bool:
+        """The second League run: the game is cleared and the Network Machine linked. The Hall of Fame script already reset the rooms' defeated flags (EventScript_ResetEliteFour), so the
+        first-run walker below works unchanged; only the trainers (stronger) and the readiness bar differ."""
+        return bool(self.reader.read_flag(FLAG_GAME_CLEAR) and self.reader.read_flag(FLAG_NETWORK_MACHINE))
+
     def _get_elite_four(self, auto_trainers: bool = False) -> str:
         call = "quest('elite_four')"
-        if self.reader.read_flag(FLAG_GAME_CLEAR) and tuple(self.reader.read_current_map()) not in (*ROOM_BY_MAP, HALL_OF_FAME):
-            return "The Pokémon League is beaten — you are the Champion and the game is cleared. (Rematches are not scripted.)"
+        if self.reader.read_flag(FLAG_GAME_CLEAR) and tuple(self.reader.read_current_map()) not in (*ROOM_BY_MAP, HALL_OF_FAME) and not self._league_rematch_open():
+            return ("The Pokémon League is beaten — you are the Champion and the game is cleared. The Elite Four and the Champion field much stronger teams (L63-75) once the Sevii Islands' "
+                    "Network Machine is linked (quest('network_machine')); then quest('elite_four') runs the second League.")
         start = tuple(self.reader.read_current_map())
         if start in ROOM_BY_MAP:
             self._league_room = start                          # remembered even when the call only says "finish the battle": a whiteout from here is a loss
@@ -145,6 +152,10 @@ class LeagueMixin:
             self.mgba.tap("A")
             self.mgba.tick(60)
         cleared = bool(self.reader.read_flag(FLAG_GAME_CLEAR))
+        if cleared and self.reader.read_flag(FLAG_NETWORK_MACHINE):         # (the Network Machine needs the Hall of Fame first, so this is never the first run; the Hall of Fame script has reset the rooms' flags by now)
+            if self.ltm.add_milestone("league_rematch", "beat the rematch League (the stronger teams)"):
+                events.emit("milestone", "milestone: league_rematch — the Champion again, against the rematch teams")
+            return ("You beat the rematch League and are the Champion again — back in the Hall of Fame. The game reset the five rooms for another run (the Hall of Fame script does it every time).")
         if cleared:
             if self.ltm.add_milestone("hall_of_fame", "beat the Pokémon League"):
                 events.emit("milestone", "milestone: hall_of_fame — the Pokémon League is beaten, the game is cleared")
