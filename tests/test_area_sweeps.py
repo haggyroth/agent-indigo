@@ -71,7 +71,21 @@ def test_the_s_s_anne_warning_exists_until_the_captain_has_given_cut():
     assert "16 trainers and 7 items still open" in note and "sails once you have HM01" in note and "your call" in note
     assert sweeps.missable_note("S.S. Anne", p, lambda f: f == 0x237) == ""                  # FLAG_GOT_HM01: the ship is gone anyway
     assert sweeps.missable_note("S.S. Anne", sweeps.progress("S.S. Anne", lambda f: f != 0x237), lambda f: False) == ""     # nothing left to lose
-    assert sweeps.missable_note("Mt. Moon", sweeps.progress("Mt. Moon", lambda f: False), lambda f: False) == ""            # only areas that really close warn
+    assert sweeps.missable_note("Routes 24-25", sweeps.progress("Routes 24-25", lambda f: False), lambda f: False) == ""    # only areas that really close warn
+
+
+def test_trainers_that_vanish_at_a_story_event_are_warned_about_until_it_happens_or_they_are_beaten():
+    """Decomp: ViridianCity_Gym's DefeatedGiovanni sets FLAG_HIDE_MISC_KANTO_ROCKETS (Rocket Hideout x11, Mt. Moon B2F x4); the Five Island warehouse's DefeatedAdmin2 sets FLAG_HIDE_FIVE_ISLAND_ROCKETS."""
+    flags = AREAS["Rocket Hideout"]["vanish"]
+    assert [(n, name) for n, name, _t in flags] == [(173, "FLAG_HIDE_MISC_KANTO_ROCKETS")] and len(flags[0][2]) == 11
+    assert len(AREAS["Mt. Moon"]["vanish"][0][2]) == 4 and len(AREAS["Five Island region"]["vanish"][0][2]) == 8
+    note = sweeps.missable_note("Rocket Hideout", sweeps.progress("Rocket Hideout", lambda f: False), lambda f: False)
+    assert "11 of its 11 trainers vanish when you beat Giovanni in the Viridian Gym" in note and "your call" in note
+    beaten = set(flags[0][2][:6])
+    assert "5 of its 11" in sweeps.missable_note("Rocket Hideout", sweeps.progress("Rocket Hideout", lambda f: f in beaten), lambda f: f in beaten)
+    assert sweeps.missable_note("Rocket Hideout", sweeps.progress("Rocket Hideout", lambda f: f == 173), lambda f: f == 173) == ""      # the event already happened
+    assert sweeps.missable_note("Rocket Hideout", sweeps.progress("Rocket Hideout", lambda f: True), lambda f: f != 173) == ""        # everyone is beaten
+    assert "Rocket Admin" in sweeps.missable_note("Five Island region", sweeps.progress("Five Island region", lambda f: False), lambda f: False)
 
 
 # ── the generator's helpers (synthetic input) ────────────────────────────────────────────────────

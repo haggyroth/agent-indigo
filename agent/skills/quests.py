@@ -135,7 +135,7 @@ class QuestMixin:
             from knowledge import sweeps
             flag = self.reader.read_flag
             lines = [f"  {sweeps.line(a, p)}" for a, p in sweeps.started(flag)[:8]]
-            notes = [n for area in sweeps.MISSABLE if (n := sweeps.missable_note(area, sweeps.progress(area, flag), flag))]
+            notes = [n for area in sweeps.AREAS if (n := sweeps.missable_note(area, sweeps.progress(area, flag), flag))]
             out = ("\nAREA SWEEPS started, not finished (every trainer / item flag is read from the game):\n" + "\n".join(lines)) if lines else ""
             return out + ("\n" + "\n".join(notes) if notes else "")
         except Exception:

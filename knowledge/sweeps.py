@@ -9,6 +9,12 @@ MISSABLE = {
     "S.S. Anne": (0x237, "the ship sails once you have HM01 Cut from the Captain", "finish its trainers and items before you take Cut (quest('cut'))"),   # FLAG_GOT_HM01
 }
 
+# Trainers that VANISH when a script sets their hide flag (the generated `vanish` rows: the decomp's map JSON object flag + the script that sets it): flag name -> the event, in the player's terms.
+VANISH_WHEN = {
+    "FLAG_HIDE_MISC_KANTO_ROCKETS": "you beat Giovanni in the Viridian Gym (the last Gym) — the Rocket Grunts in the Rocket Hideout and on Mt. Moon's B2F go home",
+    "FLAG_HIDE_FIVE_ISLAND_ROCKETS": "you beat the Rocket Admin in Five Island's warehouse — the Rockets on Five Island and Outcast Island leave",
+}
+
 MAP_AREA = {m: area for area, d in AREAS.items() for m in d["maps"]}      # (bank, id) -> area name (a map belongs to at most one named area)
 
 
@@ -36,16 +42,24 @@ def line(area: str, prog: dict) -> str:
     return f"{area}: " + ", ".join(parts)
 
 
+def vanish_notes(area: str, flag_set) -> list[str]:
+    """Advice lines for trainers of `area` that will vanish at a story event and are still unbeaten: how many, and what the event is. [] when none (or the event has already happened)."""
+    out = []
+    for hide_flag, name, trainer_flags in AREAS[area].get("vanish", []):
+        left = [f for f in trainer_flags if not flag_set(f)]
+        if left and not flag_set(hide_flag) and name in VANISH_WHEN:
+            out.append(f"⚠ {area}: {len(left)} of its {len(trainer_flags)} trainers vanish when {VANISH_WHEN[name]}; fight them first if you want them (your call).")
+    return out
+
+
 def missable_note(area: str, prog: dict, flag_set) -> str:
     """The advice when this area would be lost by moving on and it is not finished ('' otherwise): what would be missed and what to do. Never a wall."""
+    parts = vanish_notes(area, flag_set)
     rule = MISSABLE.get(area)
-    if not rule or flag_set(rule[0]):
-        return ""
-    open_ = remaining(prog)
-    if not open_:
-        return ""
-    return (f"⚠ {area}: {prog['trainers'][1] - prog['trainers'][0]} trainers and {prog['items'][1] - prog['items'][0]} items still open — {rule[1]}; "
-            f"{rule[2]} if you want them (your call).")
+    if rule and not flag_set(rule[0]) and remaining(prog):
+        parts.insert(0, f"⚠ {area}: {prog['trainers'][1] - prog['trainers'][0]} trainers and {prog['items'][1] - prog['items'][0]} items still open — {rule[1]}; "
+                        f"{rule[2]} if you want them (your call).")
+    return "\n".join(parts)
 
 
 def started(flag_set) -> list[tuple[str, dict]]:
