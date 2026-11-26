@@ -127,10 +127,15 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                                      "content": self._strip_images(msg["content"])}
 
     def capture_screenshot(self) -> str | None:
-        """Take a screenshot via mGBA and return base64-encoded PNG, or None on error."""
+        """The current frame as base64 PNG, or None when it cannot be had (never a stale image). Encoded in memory when the emulator can; otherwise the emulator
+        writes it to SCREENSHOT_PATH and a failed write is a failure, not a cue to read back the previous frame."""
         try:
-            self.mgba.screenshot(SCREENSHOT_PATH)
-            time.sleep(0.05)
+            png = getattr(self.mgba, "framebuffer_png", None)
+            if png is not None:
+                return base64.b64encode(png()).decode()
+            if self.mgba.screenshot(SCREENSHOT_PATH) is False:
+                log_once("client.capture_screenshot", "client.capture_screenshot: the emulator could not write the frame (no screenshot this tick)")
+                return None
             with open(SCREENSHOT_PATH, "rb") as f:
                 return base64.b64encode(f.read()).decode()
         except Exception:

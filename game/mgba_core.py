@@ -6,6 +6,8 @@ frames, so button presses and `tick()` explicitly step it.
 
 Build the binding first if needed:  python -m game._mgba_build
 """
+import os
+import zlib
 from pathlib import Path
 from config import ROM_PATH, SAVE_DIR, SHOW_WINDOW
 
@@ -74,7 +76,25 @@ class NativeMGBAClient:
 
     def framebuffer(self) -> bytes:
         """Latest frame as RGBX bytes (width*height*4)."""
+        if self._h in (None, ffi.NULL):
+            raise RuntimeError("the emulator is closed")           # the frame buffer was freed with the core
         return bytes(ffi.buffer(self._video, self._video_bytes))
+
+    def framebuffer_png(self) -> bytes:
+        """The latest frame as a PNG, encoded in memory (RGB, no disk round-trip — nothing stale to read back if a write fails)."""
+        fb, w, h = self.framebuffer(), self._vw, self._vh
+        rows = bytearray()
+        row = bytearray(w * 3)
+        for y in range(h):
+            px = fb[y * w * 4:(y + 1) * w * 4]                         # [R, G, B, pad] per pixel
+            row[0::3], row[1::3], row[2::3] = px[0::4], px[1::4], px[2::4]
+            rows += b"\x00" + row                                     # filter type 0 (none)
+
+        def chunk(tag: bytes, data: bytes) -> bytes:
+            body = tag + data
+            return len(data).to_bytes(4, "big") + body + zlib.crc32(body).to_bytes(4, "big")
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", w.to_bytes(4, "big") + h.to_bytes(4, "big") + bytes([8, 2, 0, 0, 0]))
+                + chunk(b"IDAT", zlib.compress(bytes(rows), 1)) + chunk(b"IEND", b""))
 
     # ── Frame stepping ───────────────────────────────────────────────────────
 
@@ -122,7 +142,10 @@ class NativeMGBAClient:
             buf = ffi.buffer(self._video, self._video_bytes)
             if v is not None:
                 v.render(buf)
-            h = hash(tuple(buf[i] for i in range(0, self._video_bytes, 311)))  # sparse fingerprint, no full-frame copy
+            # Deliberately a SPARSE fingerprint (and not the whole frame): in battle the Pokémon sprites bob and the HP bars tick even while the game is waiting
+            # for input, so a whole-frame hash is never "idle" there. The sample ignores those small animations and sees the screen-wide changes (text printing,
+            # menu transitions). Tried the whole frame in #381: three live battle tests (Ether, the status-spam watchdog, Victory Road) regressed.
+            h = hash(tuple(buf[i] for i in range(0, self._video_bytes, 311)))
             streak = streak + 1 if h == last else 0
             last = h
             if streak >= stable:
@@ -146,8 +169,10 @@ class NativeMGBAClient:
 
     def _press(self, mask: int) -> None:
         lib.pycore_set_keys(self._h, mask)
-        self.run_frames(TAP_HOLD_FRAMES)
-        lib.pycore_set_keys(self._h, 0)
+        try:
+            self.run_frames(TAP_HOLD_FRAMES)
+        finally:
+            lib.pycore_set_keys(self._h, 0)         # a watchdog trip inside run_frames must not leave the key held
         self.run_frames(TAP_RELEASE_FRAMES)
 
     def tap(self, button: str) -> None:
@@ -156,14 +181,18 @@ class NativeMGBAClient:
     def run_step(self, button: str) -> None:
         """One step with the Running Shoes (B held with the direction): half the frames of tap()."""
         lib.pycore_set_keys(self._h, _mask([button, "B"]))
-        self.run_frames(RUN_HOLD_FRAMES)
-        lib.pycore_set_keys(self._h, 0)
+        try:
+            self.run_frames(RUN_HOLD_FRAMES)
+        finally:
+            lib.pycore_set_keys(self._h, 0)
         self.run_frames(RUN_RELEASE_FRAMES)
 
     def hold(self, button: str, duration_frames: int) -> None:
         lib.pycore_set_keys(self._h, _mask([button]))
-        self.run_frames(max(1, duration_frames))
-        lib.pycore_set_keys(self._h, 0)
+        try:
+            self.run_frames(max(1, duration_frames))
+        finally:
+            lib.pycore_set_keys(self._h, 0)
         self.run_frames(2)
 
     # ── Memory reads ─────────────────────────────────────────────────────────
@@ -177,7 +206,11 @@ class NativeMGBAClient:
     def read32(self, address: int) -> int:
         return int(lib.pycore_read32(self._h, address)) & 0xFFFFFFFF
 
+    MAX_READ = 1 << 20      # 1 MiB: far above anything the agent reads (a box blob is 33 KB); a bad length must not allocate / loop up to 4 GiB
+
     def read_range(self, address: int, length: int) -> bytes:
+        if not 0 <= length <= self.MAX_READ:
+            raise ValueError(f"read_range length {length} outside 0..{self.MAX_READ}")
         buf = ffi.new("uint8_t[]", length)
         lib.pycore_read_range(self._h, address, length, buf)
         return bytes(buf)
@@ -198,10 +231,22 @@ class NativeMGBAClient:
     def _slot_path(self, slot: int) -> str:
         return str(SAVE_DIR / f"slot_{slot}.ss1")
 
+    def _save_atomic(self, path: str) -> bool:
+        """Write the state beside its target and rename it into place: a failure (or a crash) mid-write leaves the previous file, never a truncated one."""
+        tmp = f"{path}.tmp"
+        try:
+            ok = bool(lib.pycore_save_state(self._h, tmp.encode()))
+            if ok:
+                os.replace(tmp, path)
+            return ok
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+
     def save_state(self, slot: int = 0) -> bool:
         """Save to a numbered slot. Returns True on success (False if the core
         rejected it), so callers don't silently believe a failed save."""
-        ok = bool(lib.pycore_save_state(self._h, self._slot_path(slot).encode()))
+        ok = self._save_atomic(self._slot_path(slot))
         if ok:
             self._save_seq += 1
             self._session_saves[int(slot)] = self._save_seq
@@ -219,7 +264,7 @@ class NativeMGBAClient:
         return bool(lib.pycore_load_state(self._h, self._slot_path(slot).encode()))
 
     def save_state_file(self, path: str) -> bool:
-        return bool(lib.pycore_save_state(self._h, str(path).encode()))
+        return self._save_atomic(str(path))
 
     def load_state_file(self, path: str) -> bool:
         return bool(lib.pycore_load_state(self._h, str(path).encode()))
@@ -236,8 +281,15 @@ class NativeMGBAClient:
         code = self.read_range(0x080000AC, 4).decode("ascii", "replace")
         return f"AGB-{code}"
 
-    def screenshot(self, path: str) -> None:
-        lib.pycore_screenshot(self._h, str(path).encode())
+    def screenshot(self, path: str) -> bool:
+        """Write the frame as a PNG at `path`. False when the core could not (the file is then NOT trusted: a caller must not read back a previous image)."""
+        ok = bool(lib.pycore_screenshot(self._h, str(path).encode()))
+        if not ok:
+            try:
+                os.unlink(str(path))                    # whatever partial / stale file is there
+            except OSError:
+                pass
+        return ok
 
     def log(self, message: str) -> None:
         print(f"[mgba] {message}")
@@ -248,7 +300,8 @@ class NativeMGBAClient:
         except Exception:
             return False
 
-    def __del__(self):
+    def close(self) -> None:
+        """Release the viewer and the core now (idempotent). The frame buffer is freed with the core, so framebuffer() raises afterwards instead of reading freed memory."""
         try:
             if getattr(self, "_viewer", None) is not None:
                 self._viewer.close()
@@ -258,6 +311,16 @@ class NativeMGBAClient:
         try:
             if getattr(self, "_h", None) not in (None, ffi.NULL):
                 lib.pycore_destroy(self._h)
-                self._h = None
         except Exception:
             pass
+        self._h = None
+        self._video = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def __del__(self):
+        self.close()
