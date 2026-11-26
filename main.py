@@ -213,6 +213,7 @@ def drive_into_gameplay(mgba, reader, attempts: int = 4) -> bool:
     """
     for _attempt in range(attempts):
         mgba.reset()
+        reader.reset_caches()                 # a power cycle: nothing read before it is still true
         mgba.run_frames(200)                  # boot logos
 
         for _ in range(80):                   # gate 1: title + Continue → game world
