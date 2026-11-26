@@ -12,6 +12,7 @@ NULL = core.ffi.NULL
 
 def _client(monkeypatch, **lib_funcs):
     """A NativeMGBAClient without a ROM: the C calls are the test's fakes."""
+    lib_funcs.setdefault("pycore_read32", lambda h, a: 0)           # (the per-frame map-load sampling reads gMain.callback2)
     lib = types.SimpleNamespace(**lib_funcs)
     monkeypatch.setattr(core, "lib", lib)
     c = core.NativeMGBAClient.__new__(core.NativeMGBAClient)

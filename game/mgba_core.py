@@ -106,6 +106,17 @@ class NativeMGBAClient:
     def set_watchdog(self, wd) -> None:
         self.watchdog = wd
 
+    # How many times the game has loaded a map (a warp: door, stairs, Fly, hole) since this core started — counted from the edges of gMain.callback2 into the
+    # map-load callback, sampled after EVERY emulated frame, so it does not depend on how often anyone asks which map we are on (#391).
+    map_loads = 0
+    _last_cb = 0
+
+    def _count_map_load(self) -> None:
+        cb = lib.pycore_read32(self._h, Addr.GMAIN_CALLBACK2)
+        if cb == Addr.CB2_MAP_LOAD and self._last_cb != Addr.CB2_MAP_LOAD:
+            self.map_loads += 1
+        self._last_cb = cb
+
     def run_frames(self, n: int) -> None:
         wd = self.watchdog
         if wd is not None:
@@ -114,9 +125,11 @@ class NativeMGBAClient:
         if v is None:
             for _ in range(n):
                 lib.pycore_run_frame(self._h)
+                self._count_map_load()
         else:
             for _ in range(n):
                 lib.pycore_run_frame(self._h)
+                self._count_map_load()
                 v.render(ffi.buffer(self._video, self._video_bytes))
 
     def tick(self, frames: int = IDLE_TICK_FRAMES) -> None:
@@ -141,6 +154,7 @@ class NativeMGBAClient:
             if wd is not None and i % 30 == 0:
                 wd.advance(30)
             lib.pycore_run_frame(self._h)
+            self._count_map_load()
             buf = ffi.buffer(self._video, self._video_bytes)
             if v is not None:
                 v.render(buf)
