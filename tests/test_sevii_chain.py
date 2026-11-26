@@ -18,3 +18,30 @@ def test_the_post_game_ones_are_tiered_post_and_the_league_stays_the_end_of_the_
 def test_the_legendaries_are_flag_checked_and_gated_behind_the_islands():
     assert sb.BY_KEY["moltres"].done == (("flag", 0x2BD),) and sb.BY_KEY["moltres"].needs == ("sevii_one_island",)
     assert sb.BY_KEY["mewtwo"].done == (("flag", 0x2BC),) and sb.BY_KEY["mewtwo"].needs == ("network_machine",) and sb.BY_KEY["mewtwo"].tier == "post"
+
+
+def test_the_trainer_tower_beat_is_done_when_all_four_prizes_are_in():
+    from types import SimpleNamespace
+
+    from agent.story import make_done_check
+    b = sb.BY_KEY["trainer_tower"]
+    assert b.done == (("tower", 4),) and b.needs == ("sevii_ruby",) and b.tier == "post"
+    won = lambda *p: make_done_check(SimpleNamespace(read_trainer_tower=lambda: [{"prize": x} for x in p]), None)          # noqa: E731
+    assert won(True, True, True, True)(("tower", 4)) and not won(True, True, False, True)(("tower", 4))
+
+
+def test_the_trainer_tower_reader_decodes_the_prize_bit_and_the_times():
+    from types import SimpleNamespace
+
+    from game.constants import Addr
+    from game.memory_reader import LeafGreenReader
+    sb1 = 0x02025000
+    raw = bytearray(Addr.TRAINER_TOWER_STRIDE * Addr.TRAINER_TOWER_TYPES)
+    raw[Addr.TRAINER_TOWER_STRIDE * 2 + 10] = 0b101                                  # Knockout: receivedPrize (bit 0) and spokeToOwner
+    raw[Addr.TRAINER_TOWER_STRIDE * 2 + 8] = 8
+    raw[Addr.TRAINER_TOWER_STRIDE * 2 + 4:Addr.TRAINER_TOWER_STRIDE * 2 + 8] = (12345).to_bytes(4, "little")
+    r = LeafGreenReader.__new__(LeafGreenReader)
+    r.client = SimpleNamespace(read32=lambda a: sb1, read_range=lambda a, n: bytes(raw) if a == sb1 + Addr.TRAINER_TOWER_OFFSET else bytes(n))
+    r._valid_ewram_ptr = lambda p: p == sb1
+    t = r.read_trainer_tower()
+    assert [x["prize"] for x in t] == [False, False, True, False] and t[2]["floors"] == 8 and t[2]["best"] == 12345

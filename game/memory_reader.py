@@ -736,6 +736,24 @@ class LeafGreenReader:
             out[i] = {n for n in range(6) if (word >> (2 + n)) & 1}
         return out
 
+    def read_trainer_tower(self) -> list[dict]:
+        """The four Trainer Tower challenge records (Single, Double, Knockout, Mixed) from gSaveBlock1.trainerTower: {'prize': the Owner's prize was received (the challenge is won),
+        'floors': floors cleared in the current/last attempt, 'best': best time in frames (215999 = none)}. All-empty on a read hiccup."""
+        empty = [{"prize": False, "floors": 0, "best": 215999} for _ in range(Addr.TRAINER_TOWER_TYPES)]
+        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
+        if not self._valid_ewram_ptr(sb1):
+            return empty
+        try:
+            raw = self.client.read_range(sb1 + Addr.TRAINER_TOWER_OFFSET, Addr.TRAINER_TOWER_STRIDE * Addr.TRAINER_TOWER_TYPES)
+        except Exception:
+            logger.warning("trainer tower read failed", exc_info=True)
+            return empty
+        out = []
+        for i in range(Addr.TRAINER_TOWER_TYPES):
+            r = raw[i * Addr.TRAINER_TOWER_STRIDE:(i + 1) * Addr.TRAINER_TOWER_STRIDE]
+            out.append({"prize": bool(r[10] & 1), "floors": r[8], "best": int.from_bytes(r[4:8], "little")})
+        return out
+
     def is_biking(self) -> bool:
         """gPlayerAvatar.flags bit1 (Mach Bike) or bit2 (Acro Bike): the player is on the Bicycle."""
         return bool(self.client.read8(Addr.PLAYER_AVATAR_FLAGS) & 0x06)

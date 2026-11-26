@@ -406,6 +406,10 @@ class Addr:
     # Fame Checker: gSaveBlock1.fameChecker[16] (u16 each; bits 0-1 pickState, bit 2+n = flavor text n of that person, 0-5), deref SAVEBLOCK1_PTR + 0x3A54.
     FAMECHECKER_OFFSET  = 0x3A54
     FAMECHECKER_PERSONS = 16
+    # Trainer Tower: gSaveBlock1.trainerTower[4] (struct 12 bytes: u32 timer, u32 bestTime, u8 floorsCleared, u8 unk, byte +0xA bit0 receivedPrize ...) at +0x3D38; type 0 Single, 1 Double, 2 Knockout, 3 Mixed.
+    TRAINER_TOWER_OFFSET = 0x3D38
+    TRAINER_TOWER_STRIDE = 12
+    TRAINER_TOWER_TYPES  = 4
     # HM obstacle objects (loaded object events' graphicsId) and the avatar flags byte.
     OBJ_GFX_CUT_TREE    = 95
     OBJ_GFX_ROCK_SMASH  = 96
