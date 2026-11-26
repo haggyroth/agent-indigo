@@ -50,3 +50,6 @@ Desktop.ini
 
 # per-run traces
 logs/runs/
+
+# per-save journals (memory/journals.py)
+logs/journals/

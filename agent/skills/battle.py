@@ -107,8 +107,8 @@ class BattleMixin:
                         f"use: {', '.join(usable)}.")
             return self._struggle()
         if not key or key not in names:   # `not key` guards an empty name matching an empty slot
-            return (f"'{name}' is not a known move for the active Pokémon right now (a move may have been replaced when it learned a new one). "
-                    f"Its moves: {self._moves_with_pp(move_names, pp)}.")
+            return (f"'{name}' is not a known move for {self._on_field_label(party)} right now (a move may have been replaced when it learned a new one). "
+                    f"Its moves: {self._moves_with_pp(move_names, pp)}.{self._who_knows(party, key)}")
         slot = names.index(key)
         move_label = move_names[slot]
         if slot == dslot:
@@ -404,6 +404,49 @@ class BattleMixin:
                 self.mgba.hold("A", 20)
             self.mgba.tick(6)
         return self._battle_bag_open()
+
+    def _lead_mon(self, party=None):
+        """(slot, mon) of the Pokémon on the field — gBattleMons[0]'s species, else the first one still standing (it is who a battle starts with). (None, None) if unknown."""
+        try:
+            party = party if party is not None else self.reader.read_party()
+            active = self.reader.read_active_battle_species()
+            hit = next((i for i, p in enumerate(party) if active and p.species_id == active), None)
+            if hit is None:
+                hit = next((i for i, p in enumerate(party) if p.current_hp > 0), None)
+            return (hit, party[hit]) if hit is not None else (None, None)
+        except Exception:
+            log_once("battle._lead_mon", "battle._lead_mon: tolerated failure (no lead named)")
+            return None, None
+
+    def _on_field_label(self, party=None) -> str:
+        """'the active Pokémon' or 'the active Pokémon (Mankey L25)': an unknown-move refusal must say WHO is out — a battle that began mid-trip (a trainer on the way to a Center) leaves the model
+        thinking the Pokémon it just fought with is still the one on the field."""
+        from knowledge.matchup import label
+        _i, me = self._lead_mon(party)
+        return f"the active Pokémon ({label(me)} L{me.level})" if me else "the active Pokémon"
+
+    def _who_knows(self, party, key: str) -> str:
+        """' <teammate> (slot N) knows <move> — switch_pokemon(...) first…' when a benched, healthy member has the move the model asked for, else ''."""
+        from knowledge.matchup import label
+        try:
+            me_i, _me = self._lead_mon(party)
+            owners = [(i, p) for i, p in enumerate(party) if i != me_i and p.current_hp > 0 and key in [m.lower() for m in p.move_names if m]]
+        except Exception:
+            return ""
+        if not owners:
+            return ""
+        i, p = owners[0]
+        return (f" {label(p)} (slot {i + 1}) knows {key.title()} but is on the bench — switch_pokemon('{p.nickname or p.species_name}') puts it in (that costs your turn), "
+                "or pick one of the moves above.")
+
+    def _lead_note(self) -> str:
+        """' Your lead: Mankey L25 60/60 — moves: …' for the message that hands a battle to the model mid-trip (go_to / heal / grind / quest hit an encounter), where no observation has
+        been shown yet. '' when it cannot be read."""
+        from knowledge.matchup import label
+        _i, me = self._lead_mon()
+        if me is None or not me.max_hp:
+            return ""
+        return f" Your lead: {label(me)} L{me.level} {me.current_hp}/{me.max_hp} — moves: {self._moves_with_pp(me.move_names, me.pp)}."
 
     def _shift_prompt_live(self) -> bool:
         """The trainer's 'Will you change POKéMON?' Yes/No box (Battle Style SHIFT) is up: the battle script sits on that `yesnobox`."""

@@ -166,6 +166,22 @@ def test_disabled_move_is_refused_without_pressing_anything(live):
     assert "DISABLED" in out or "refused" in out, out
 
 
+def test_unknown_move_refusal_names_who_is_out_and_who_has_the_move(live):
+    """Watched run (DeepSeek): a trainer battle began mid-heal() and the model used its last fighter's Vine Whip on the Pokémon that LEADS (15 refusals in one run). The refusal must say who is on
+    the field and which benched teammate knows the move; the hand-off message must name the lead and its moves."""
+    live.load("threemon")
+    c = live.c
+    party = live.r.read_party()
+    lead = party[0]
+    mate = next((p for p in party[1:] if p.current_hp > 0 and any(m and m not in lead.move_names for m in p.move_names)), None)
+    assert mate is not None
+    move = next(m for m in mate.move_names if m and m not in lead.move_names)
+    out = c._use_move(move)                                           # outdoors: the lead's moves are read from the party
+    assert "is not a known move for the active Pokémon" in out and "bench" in out and f"switch_pokemon('{mate.nickname or mate.species_name}')" in out, out
+    note = c._lead_note()
+    assert lead.species_name.lower() in note.lower() and "moves:" in note and f"L{lead.level}" in note, note
+
+
 def test_catching_with_a_full_party_reports_the_box(live):
     from game.constants import Addr
     live.load("threemon")

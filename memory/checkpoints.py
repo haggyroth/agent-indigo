@@ -16,8 +16,9 @@ from pathlib import Path
 
 
 class CheckpointManager:
-    def __init__(self, directory, save_fn, every_ticks: int = 20, keep: int = 5):
+    def __init__(self, directory, save_fn, every_ticks: int = 20, keep: int = 5, on_save=None, on_drop=None):
         self.dir = Path(directory)
+        self.on_save, self.on_drop = on_save, on_drop       # on_save(path): write what must travel with the state (the journal snapshot); on_drop(path): remove it with a pruned checkpoint
         self.save_fn, self.every, self.keep = save_fn, every_ticks, keep
         self._last_step = -10**9
         self._badges = None
@@ -41,10 +42,15 @@ class CheckpointManager:
             if not self.save_fn(str(path)):
                 return None
             self._last_step = step
+            if self.on_save:
+                self.on_save(path)
             if not permanent:
                 self._rolling.append(path)
                 while len(self._rolling) > self.keep:
-                    self._rolling.pop(0).unlink(missing_ok=True)
+                    old = self._rolling.pop(0)
+                    old.unlink(missing_ok=True)
+                    if self.on_drop:
+                        self.on_drop(old)
             (self.dir / "latest.json").write_text(json.dumps(
                 {"path": str(path), "step": step, "tag": tag, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
                  "meta": meta or {}}, indent=2, default=str))
