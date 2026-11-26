@@ -126,7 +126,7 @@ BEATS: tuple[Beat, ...] = (
     Beat("vs_seeker", "VS Seeker from the woman in Vermilion's Pokémon Center (optional)", "Vermilion City, Pokémon Center 1F", needs=("misty",), optional=True,
          done=(("flag", 0x292),),                                                            # FLAG_GOT_VS_SEEKER
          steps=("Talk to the woman in Vermilion City's Pokémon Center: she gives the VS Seeker, free.",
-                "Used outdoors (Bag > VS Seeker) after about 100 steps of charge, it makes the trainers you have beaten who are in range ready for a rematch; walk to each and fight.",
+                "Used outdoors (Bag > VS Seeker) after about 100 steps of charge, it makes the trainers you have beaten who are in range ready for a rematch; walk to each and fight (quest('rematch') drives the loop: it charges the battery, uses it, walks up to every flagged trainer and hands each battle to you).",
                 "Each trainer has a ladder of stronger parties that opens as the story advances (the Celadon / Fuchsia visits, the Hall of Fame, the Sevii Islands' Network Machine): the observation's REMATCHES line counts where every ladder stands."),
          tip="A long loop (charge, use, fight, repeat) — worth it for experience and money when the team needs levels, and for the 'top team of every rematchable trainer' completion goal."),
     Beat("running_shoes", "Running Shoes from Oak's Aide in Pewter City", "Pewter City (a forced scene after Brock)", needs=("brock",), optional=True,
