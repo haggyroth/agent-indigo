@@ -80,6 +80,10 @@ def build_party_mon(pid: int, ot_id: int, *, level: int, cur_hp: int, max_hp: in
         enc[i:i + 4] = word.to_bytes(4, "little")
     raw[32:80] = enc
 
+    # The integrity fields the game maintains: hasSpecies flag (+0x13 bit1) and the checksum (+0x1C) over the 24 decrypted words.
+    raw[0x13] = 0x02
+    raw[0x1C:0x1E] = (sum(int.from_bytes(plain[i:i + 2], "little") for i in range(0, 48, 2)) & 0xFFFF).to_bytes(2, "little")
+
     # Unencrypted Tier-1 fields.
     raw[0x50:0x54] = status_word.to_bytes(4, "little")
     raw[0x54] = level & 0xFF

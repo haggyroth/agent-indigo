@@ -32,6 +32,18 @@ def decrypt_substructs(raw_100: bytes) -> dict[str, bytes]:
     return {letter: bytes(enc[i * 12:(i + 1) * 12]) for i, letter in enumerate(order)}
 
 
+def checksum_ok(raw_100: bytes) -> bool:
+    """The game's own integrity check on a party/box struct: the u16 at +0x1C must equal the sum of the 24 little-endian u16 words of the DECRYPTED 48-byte
+    data block (pokefirered CalculateBoxMonChecksum). Written by the game on every change, so a mismatch means we read the struct mid-write (the
+    battle-load frame) — the game itself turns such a mon into a Bad Egg."""
+    if len(raw_100) < 80:
+        return False
+    sub = decrypt_substructs(bytes(raw_100) + bytes(max(0, 100 - len(raw_100))))
+    data = b"".join(sub[letter] for letter in "GAEM")        # order does not matter for a sum of words
+    total = sum(int.from_bytes(data[i:i + 2], "little") for i in range(0, 48, 2)) & 0xFFFF
+    return total == int.from_bytes(raw_100[0x1C:0x1E], "little")
+
+
 def parse_species(sub: dict) -> int:
     return int.from_bytes(sub["G"][0:2], "little")
 
@@ -158,9 +170,11 @@ class LeafGreenReader:
         move_names = [""] * 4
         pp         = [0] * 4
         ivs, evs, ability_slot, friendship, held_item = (), (), 0, 0, 0
+        valid, flags = True, raw[0x13]                  # BoxPokemon flags: bit0 isBadEgg · bit1 hasSpecies · bit2 isEgg
 
         if self.decrypt:
             try:
+                valid = checksum_ok(raw) and not (flags & 1)
                 sub = decrypt_substructs(raw)
                 species_id   = parse_species(sub)
                 species_name = SPECIES_NAMES.get(species_id, f"#{species_id}")
@@ -188,6 +202,7 @@ class LeafGreenReader:
             ot_id=int.from_bytes(raw[4:8], "little"),
             ivs=ivs, evs=evs, friendship=friendship, ability_slot=ability_slot, held_item=held_item,
             stats=tuple(int.from_bytes(raw[o:o + 2], "little") for o in (0x58, 0x5A, 0x5C, 0x5E, 0x60, 0x62)),
+            valid=valid, is_egg=bool(flags & 4),
         )
 
     # Gen III internal species indices run 1..411 (Bulbasaur..Chimecho-era slots);
@@ -220,17 +235,28 @@ class LeafGreenReader:
             party.append(self._decode_mon(raw, slot))
         return party
 
+    # A slot whose read fails the integrity check is served from its last good read for this many read_party() calls, then it is returned as it is (valid=False).
+    # (A whole-party freeze on one odd slot hid level-ups and HP changes in every other slot.)
+    STALE_READS = 3
+
     def _with_fallback(self, party: list[PokemonStatus]) -> list[PokemonStatus]:
-        # On the battle-load frame the encrypted substructs decrypt to nonsense
-        # (out-of-range species / move ids), which made use_move fail with "not a
-        # known move" and the agent flail for a step (#58). Reject an implausible read
-        # and reuse the last good party — the data settles within a frame or two.
-        if party and all(self._mon_plausible(m) for m in party):
-            self._last_good_party = party
-            return party
-        if party and self._last_good_party is not None:
-            return self._last_good_party
-        return party
+        # On the battle-load frame the encrypted substructs decrypt to nonsense, which made use_move fail with "not a known move" and the agent flail for a
+        # step (#58). A slot is accepted when the game's own checksum passes (and the species / move ids are in range); otherwise only THAT slot falls back.
+        from dataclasses import replace
+        self._reads = self.__dict__.get("_reads", 0) + 1
+        good = self.__dict__.setdefault("_slot_good", {})
+        out, all_ok = [], True
+        for mon in party:
+            if mon.valid and self._mon_plausible(mon):
+                good[mon.slot] = (mon, self._reads)
+                out.append(mon)
+                continue
+            all_ok = False
+            prev = good.get(mon.slot)
+            out.append(replace(prev[0], stale=True) if prev and self._reads - prev[1] <= self.STALE_READS else replace(mon, valid=False))
+        if all_ok:
+            self._last_good_party = out
+        return out
 
     def read_active_battle_moves(self) -> tuple[list[int], list[str], list[int]]:
         """The ACTIVE player battler's moves + PP from gBattleMons[0] — the exact set the
