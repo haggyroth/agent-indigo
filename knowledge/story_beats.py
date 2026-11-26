@@ -183,6 +183,12 @@ BEATS: tuple[Beat, ...] = (
                 "its trainers and wild Pokémon are L36-45.",
                 "Indigo Plateau: heal and save at the Pokémon Center, stock Full Restores / Revives, then talk to the Elite Four's door. Aim for L50+ across the team."),
          tip="After this there is only the Elite Four (Lorelei, Bruno, Agatha, Lance) and your rival as Champion."),
+    Beat("sevii_one_island", "One Island: Bill's forced sail, then Celio (the Sevii Islands)", "Cinnabar Island after Blaine -> One Island, Pokémon Center", needs=("blaine",), optional=True,
+         done=(("flag", 0x89B),),                                                            # FLAG_WORLD_MAP_ONE_ISLAND
+         steps=("Beating Blaine starts a forced scene: Bill is at Cinnabar and sails you to One Island (the Seagallop). Celio in One Island's Pokémon Center gives the Tri-Pass and a Town Map page.",
+                "A first detour then ends at Three Island's port (FLAG_SEVII_DETOUR_FINISHED). The Seagallop from Vermilion / Cinnabar then takes the Tri-Pass to One-Three Island.",
+                "Celio's real request waits for the National Pokédex (the National Dex beat): after the Hall of Fame, 60 species caught and this visit."),
+         tip="Information only: the ferry scenes are not driven yet — go_to / fly_to work on the islands you have visited."),
     Beat("elite_four", "Pokémon League: the Elite Four and the Champion", "Indigo Plateau, north door of the Pokémon Center",
          needs=("victory_road",), driver="elite_four", done=(("flag", 0x82C),),                       # FLAG_SYS_GAME_CLEAR: set in the Hall of Fame
          steps=("Prep BEFORE the first door: heal, shop (Full Restores, Revives, Max Potions), save_state — the League's doors seal behind you, there is no healing or leaving until the Champion. Inside, heal() heals from the Bag only (Revives, Full Restores, Potions), and the quest tops the team up before each leader.",
@@ -195,6 +201,19 @@ BEATS: tuple[Beat, ...] = (
                 "Then talk to Prof. Oak in his lab in Pallet Town: he asks a favour, your rival joins, and the Pokédex is extended beyond Kanto (EnableNationalPokedex).",
                 "It adds no new wild Pokémon by itself; it is progress for a completion run (Pokédex entries, the Sevii Islands)."),
          tip="Nothing here is scripted yet: reach One Island yourself (go_to / fly_to), then talk to Oak."),
+    Beat("sevii_ruby", "Celio's Ruby from Mt. Ember (Sevii)", "One Island: Celio -> Mt. Ember, Ruby Path", needs=("sevii_one_island", "national_dex"), optional=True,
+         done=(("flag", 0x2DD),),                                                            # FLAG_GOT_RUBY
+         steps=("Needs the National Pokédex: Celio then asks for a special gemstone (the Ruby) and sets Mt. Ember going.",
+                "Mt. Ember's Ruby Path (down to its lowest floor) holds the Ruby (FLAG_GOT_RUBY). Bring it back to Celio: he puts it in the Network Machine and trades your Tri-Pass for the Rainbow Pass (and a Town Map page for Four-Seven Island)."),
+         tip="Mt. Ember also has Moltres at its summit (legendaries issue); the Ruby Path is a separate cave."),
+    Beat("sevii_sapphire", "Celio's Sapphire from the Five Island warehouse (Sevii)", "Five Island: the Rocket Warehouse (Scientist Gideon)", needs=("sevii_ruby",), optional=True,
+         done=(("flag", 0x2DC),),                                                            # FLAG_RECOVERED_SAPPHIRE
+         steps=("With the Rainbow Pass the Seagallop reaches Four-Seven Island. The Sapphire is held by Team Rocket in Five Island's Rocket Warehouse: beat Scientist Gideon there (FLAG_RECOVERED_SAPPHIRE) and keep the Sapphire."),
+         tip="Gideon's fight is the one that matters; the grunts around him are optional experience."),
+    Beat("network_machine", "Network Machine linked (Sevii)", "One Island, Pokémon Center: Celio", needs=("sevii_sapphire",), optional=True,
+         done=(("flag", 0x844),),                                                            # FLAG_SYS_CAN_LINK_WITH_RS
+         steps=("Give Celio the Sapphire. The Network Machine links with Hoenn: the Cerulean Cave guard leaves (Cerulean Cave opens), Lorelei's house is empty, the roaming beast starts roaming, and every trainer's later rematch teams open (the VS Seeker).",),
+         tip="This is the gate for the post-game: Cerulean Cave (Mewtwo), the roamer, and the strongest rematch teams."),
 )
 # Gate flags beyond the badges/owned counts, with the reason shown while they are unmet (agent.story.side_ctx reads exactly these).
 FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}      # FLAG_WORLD_MAP_ONE_ISLAND
@@ -208,6 +227,10 @@ SIDE_INFO = {
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
     "exp_share": ("the Exp. Share", (("owned", 50),)),
     "vs_seeker": ("the VS Seeker: rematches with beaten trainers (experience, money; every top team is an achievement)", ()),
+    "sevii_one_island": ("the Sevii Islands open (Tri-Pass, Celio, the island towns to fly to)", ()),
+    "sevii_ruby": ("the Ruby and the Rainbow Pass (Four-Seven Island)", (("gameclear",),)),
+    "sevii_sapphire": ("the Sapphire (completes the Network Machine's gems)", (("gameclear",),)),
+    "network_machine": ("the Network Machine: Cerulean Cave, the roaming beast and the top rematch teams open", (("gameclear",),)),
     "national_dex": ("the National Pokédex (the Pokédex goes beyond Kanto)", (("gameclear",), ("owned", 60), ("flag", 0x89B))), "zapdos": ("Zapdos, a legendary (appears once)", ()), "articuno": ("Articuno, a legendary (appears once)", ()),
 }
 BEATS = tuple(replace(b, payoff=SIDE_INFO[b.key][0], gate=SIDE_INFO[b.key][1]) if b.key in SIDE_INFO else b for b in BEATS)
