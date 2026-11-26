@@ -720,6 +720,22 @@ class LeafGreenReader:
             out[o[Addr.OBJECT_LOCALID_OFFSET]] = (x - Addr.OBJECT_COORD_OFFSET, y - Addr.OBJECT_COORD_OFFSET)
         return out
 
+    def read_fame_checker(self) -> dict[int, set[int]]:
+        """{person index 0-15: {flavor text indexes 0-5 the player owns}} from gSaveBlock1.fameChecker (the Gossip Checker achievement wants all 96). Empty sets on a read hiccup."""
+        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
+        if not self._valid_ewram_ptr(sb1):
+            return {i: set() for i in range(Addr.FAMECHECKER_PERSONS)}
+        try:
+            raw = self.client.read_range(sb1 + Addr.FAMECHECKER_OFFSET, Addr.FAMECHECKER_PERSONS * 2)
+        except Exception:
+            logger.warning("fame checker read failed", exc_info=True)
+            return {i: set() for i in range(Addr.FAMECHECKER_PERSONS)}
+        out = {}
+        for i in range(Addr.FAMECHECKER_PERSONS):
+            word = raw[2 * i] | (raw[2 * i + 1] << 8)
+            out[i] = {n for n in range(6) if (word >> (2 + n)) & 1}
+        return out
+
     def is_biking(self) -> bool:
         """gPlayerAvatar.flags bit1 (Mach Bike) or bit2 (Acro Bike): the player is on the Bicycle."""
         return bool(self.client.read8(Addr.PLAYER_AVATAR_FLAGS) & 0x06)
