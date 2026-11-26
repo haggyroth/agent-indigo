@@ -3001,3 +3001,12 @@ def test_map_epoch_counts_warps_even_when_nobody_polls_the_map(live):
         m.tap("Up")                                          # ... and back in
         m.tick(40)
     assert r.map_epoch == before + 2
+
+
+def test_rematch_progress_is_read_from_the_real_flags(live):
+    """#367: ladder progress from a real fixture (Misty beaten): two trainers already at their only party, three waiting for the VS Seeker — and the line says so."""
+    from knowledge import rematches
+    live.load("post_misty")
+    st = rematches.status(live.r.read_flag)
+    assert st["total"] == 221 and st["at_top"] >= 1 and st["waiting"].get(rematches.VS_SEEKER_FLAG, 0) >= 1
+    assert rematches.line(live.r.read_flag).startswith("REMATCHES: ") and not live.r.read_flag(rematches.VS_SEEKER_FLAG)
