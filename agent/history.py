@@ -15,6 +15,29 @@ def strip_control_tokens(text: str) -> str:
     return _CONTROL_TOKEN_RE.sub("", text or "")
 
 
+_THINK_BLOCK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL | re.IGNORECASE)
+_THINK_OPEN_RE = re.compile(r"<think>(.*)\Z", re.DOTALL | re.IGNORECASE)
+
+
+def split_think(text: str) -> tuple[str, str]:
+    """(thinking, answer) of a model reply: every closed <think>…</think> block, a trailing UNCLOSED <think>… (the reply was cut off by
+    MAX_TOKENS inside its reasoning), and a bare leading `reasoning</think>answer` (templates that open the block for the model) are moved
+    out of the answer. The answer is what may be stored in history and replayed to the API; the thinking never is (#374)."""
+    text = text or ""
+    thoughts: list[str] = []
+
+    def take(m):
+        thoughts.append(m.group(1).strip())
+        return ""
+    text = _THINK_BLOCK_RE.sub(take, text)
+    if "</think>" in text.lower() and "<think>" not in text.lower():           # implicit opening tag
+        i = text.lower().index("</think>")
+        thoughts.append(text[:i].strip())
+        text = text[i + len("</think>"):]
+    text = _THINK_OPEN_RE.sub(take, text)
+    return "\n".join(t for t in thoughts if t), text.strip()
+
+
 def trim_messages(messages: list[dict], max_history: int) -> list[dict]:
     """Trim history to ~max_history messages after the system prompt.
 

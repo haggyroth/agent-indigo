@@ -6,6 +6,9 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Fixed
+- **Reasoning is never replayed into history (#374).** `<think>` blocks were only stripped when `ENABLE_THINKING=true` (default false) and an unclosed block (a reply cut off by `MAX_TOKENS` mid-thought) never was, so a Qwen3-style
+  model re-sent its thoughts every turn — context pressure and the 400 the code comments warn about. `agent.history.split_think` now removes closed, unclosed and implicit-open blocks regardless of the flag, `reasoning_content` /
+  `reasoning` fields are read too, and `ENABLE_THINKING` only decides whether the thinking is shown / logged. A reply that ends on `finish_reason="length"` is reported and leaves a well-formed turn.
 - **Long-term memory no longer forgets four of its own keys on reload (#371).** `gym_losses` (a loss inside a gym blocks `challenge_leader` until the team grows), `hidden_taken`, `pc_visited` and
   `shop_broke_at` were written to `progress.json` but dropped by `LongTermMemory._load` because they were missing from `DEFAULTS`. They are declared now, and `_load` keeps any undeclared key
   (only `RETIRED_KEYS` are dropped). A test scans the source for every `ltm.data` key and fails if one is not in `DEFAULTS`.
