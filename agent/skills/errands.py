@@ -28,6 +28,8 @@ FLAG_COPYCAT_MIMIC, POKE_DOLL, FLAG_HIDE_SAFFRON_ROCKETS = 0x2CD, 80, 0x03E     
 FLAG_BEAT_KOICHI = 0x500 + 317                                          # TRAINER_BLACK_BELT_KOICHI's trainer flag
 TM28_ITEM = 316                                                         # TM01 = 289
 MAGIKARP_PRICE = 500
+PEWTER_MUSEUM_1F, FLAG_GOT_OLD_AMBER = (6, 0), 0x25E                       # the scientist at (21,3) behind the ticket counter
+OLD_AMBER_SPOTS = (((21, 4), "Up"), ((20, 3), "Right"))
 CELADON_ROOF_ROOM, FLAG_GOT_EEVEE = (10, 11), 0x263                         # the room above Celadon Mansion's roof; FLAG_GOT_EEVEE
 EEVEE_SPOTS = (((7, 4), "Up"), ((6, 3), "Right"), ((8, 3), "Left"))        # the Poké Ball object at (7,3)
 GRUNT_SPOTS = (((33, 7), "Up"), ((32, 6), "Right"), ((34, 6), "Left"))              # the grunt stands at (33,6)
@@ -233,6 +235,31 @@ class ErrandsMixin:
         where = "it went to the PC box (your party is full): pc('swap')" if full else "it joined your party"
         return (f"Took the Eevee from the roof room ({where}). It is L25; a Water / Thunder / Fire Stone evolves it into Vaporeon / Jolteon / Flareon "
                 "(use_item on it; the Celadon Dept. Store sells none — the stones are rewards and finds), a choice of the model's.")
+
+    def _get_old_amber(self, auto_trainers: bool = False) -> str:
+        """quest('old_amber'): the scientist in the Pewter Museum's far room gives the Old Amber free (FLAG_GOT_OLD_AMBER 0x25E, key item 'Old Amber'); the museum's second door (Pewter City (25,4)) leads straight to him — no ticket (the ¥50 counter guards only the left half)."""
+        call = "quest('old_amber')"
+        if self.reader.read_flag(FLAG_GOT_OLD_AMBER):
+            return "You already took the Old Amber — the Cinnabar Pokémon Lab revives it into an Aerodactyl (L5) once you own the Secret Key chain (quest('pokemon_mansion'))."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        # The scientist stands in the museum's RIGHT half, reached by the building's second door (Pewter City (25,4) -> warp 3); the left door (17,6) only leads to the ticket counter and the fossils.
+        if tuple(self.reader.read_current_map()) == PEWTER_MUSEUM_1F and self.reader.read_player_pos()[0] < 17:
+            self._walk_to(14, 9)                                   # out through the left door
+            self._advance_to_control(tries=20)
+        if tuple(self.reader.read_current_map()) != PEWTER_MUSEUM_1F:
+            if (msg := self._go_to_map_tuple((3, 2), "map:3,2", call)):
+                return msg
+            if not self._party_knows(15):                           # HM01 Cut: a tree stands in front of that door
+                return "The Pewter Museum's second door (the one that leads to the Old Amber scientist) is behind a Cut tree: quest('cut') first, then call quest('old_amber')."
+            self._walk_to(25, 4)                                   # the second museum door (walk_to cuts the tree on the way)
+            self._advance_to_control(tries=20)
+            if tuple(self.reader.read_current_map()) != PEWTER_MUSEUM_1F:
+                return f"Couldn't get through the Pewter Museum's second door (Pewter City (25,4)) — call {call} again."
+        if (msg := self._gift_errand(call, "map:6,0", PEWTER_MUSEUM_1F, OLD_AMBER_SPOTS, FLAG_GOT_OLD_AMBER, "the Old Amber scientist", auto_trainers, ("yes",))):
+            return msg
+        return ("Took the Old Amber from the Pewter Museum. The Cinnabar Pokémon Lab revives it into an Aerodactyl (L5) — the Lab's fossil machine needs the Secret Key "
+                "(quest('pokemon_mansion')); a Helix or Dome Fossil from Mt. Moon is the either-or alternative.")
 
     def _get_magikarp(self, auto_trainers: bool = False) -> str:
         call = "quest('magikarp')"

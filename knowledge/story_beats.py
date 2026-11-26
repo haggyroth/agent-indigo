@@ -123,6 +123,10 @@ BEATS: tuple[Beat, ...] = (
          done=(("flag", 0x263),),                                                              # FLAG_GOT_EEVEE
          steps=("The Poké Ball in the little room on top of Celadon Mansion is a free level 25 Eevee (the party, or the PC when it is full).",
                 "A Water / Thunder / Fire Stone evolves it (Vaporeon / Jolteon / Flareon): the choice, and the stone, are yours.")),
+    Beat("old_amber", "Old Amber from the Pewter Museum scientist (optional)", "Pewter City, the Museum's second (right-hand) door -> the scientist at (21,3)", needs=("cut",), driver="old_amber", optional=True,
+         done=(("flag", 0x25E),),                                                              # FLAG_GOT_OLD_AMBER
+         steps=("Use the Pewter Museum's second door (the right-hand one, Pewter City (25,4)) — no ticket needed on that side, but a Cut tree stands in front of it (quest('cut')) — and talk to the scientist at (21,3): he gives the Old Amber free.",
+                "The Cinnabar Pokémon Lab revives it into an Aerodactyl (L5; Rock / Flying) — the revival machine sits behind the Secret Key (Pokémon Mansion). It is a dex entry and a fast, hard-hitting attacker; Mt. Moon's Helix / Dome Fossil is the either-or alternative.")),
     Beat("copycat", "Mimic from Saffron's Copycat (optional)", "Celadon Dept. Store 2F (Poké Doll) → Saffron City, the Copycat's house", needs=("silph_co",), driver="copycat", optional=True,
          done=(("flag", 0x2CD),),
          steps=("A Rocket grunt stands at the Copycat house's door until Silph Co. is cleared (quest('silph_co')). The girl upstairs then teaches Mimic ONCE, for a Poké Doll (¥1000 at the Celadon Dept. Store 2F). quest('copycat') buys the doll and runs the lesson.",
@@ -242,7 +246,7 @@ FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}   
 SIDE_INFO = {
     "dig": ("TM28 Dig", ()), "magikarp": ("a Magikarp for ¥500 (a slow starter, a strong finish)", ()), "flash": ("HM05 Flash (lights the caves)", (("owned", 10),)),
     "fly": ("HM02 Fly (fast travel to any visited town)", ()), "coin_case": ("the Coin Case (Game Corner prizes)", ()), "hitmon": ("Hitmonlee or Hitmonchan — your choice", ()),
-    "copycat": ("the move Mimic", ()), "eevee": ("an Eevee (L25; stone evolutions for the Pokédex)", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
+    "copycat": ("the move Mimic", ()), "eevee": ("an Eevee (L25; stone evolutions for the Pokédex)", ()), "old_amber": ("the Old Amber (an Aerodactyl once revived at Cinnabar)", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
     "good_rod": ("the Good Rod (better fishing)", ()), "super_rod": ("the Super Rod (the best Kanto rod)", ()), "bike": ("the Bicycle (twice the speed; the Cycling Road)", ()),
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
     "exp_share": ("the Exp. Share", (("owned", 50),)),
