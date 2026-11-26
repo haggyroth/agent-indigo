@@ -28,6 +28,8 @@ FLAG_COPYCAT_MIMIC, POKE_DOLL, FLAG_HIDE_SAFFRON_ROCKETS = 0x2CD, 80, 0x03E     
 FLAG_BEAT_KOICHI = 0x500 + 317                                          # TRAINER_BLACK_BELT_KOICHI's trainer flag
 TM28_ITEM = 316                                                         # TM01 = 289
 MAGIKARP_PRICE = 500
+MT_MOON_B2F, FLAG_GOT_MT_MOON_FOSSIL = (1, 3), 0x232                         # FLAG_GOT_FOSSIL_FROM_MT_MOON: set once ONE of the two is taken
+MT_MOON_FOSSIL_SPOTS = {"dome": (((13, 8), "Up"),), "helix": (((14, 8), "Up"),)}       # the Dome Fossil at (13,7), the Helix Fossil at (14,7)
 PEWTER_MUSEUM_1F, FLAG_GOT_OLD_AMBER = (6, 0), 0x25E                       # the scientist at (21,3) behind the ticket counter
 OLD_AMBER_SPOTS = (((21, 4), "Up"), ((20, 3), "Right"))
 CELADON_ROOF_ROOM, FLAG_GOT_EEVEE = (10, 11), 0x263                         # the room above Celadon Mansion's roof; FLAG_GOT_EEVEE
@@ -260,6 +262,31 @@ class ErrandsMixin:
             return msg
         return ("Took the Old Amber from the Pewter Museum. The Cinnabar Pokémon Lab revives it into an Aerodactyl (L5) — the Lab's fossil machine needs the Secret Key "
                 "(quest('pokemon_mansion')); a Helix or Dome Fossil from Mt. Moon is the either-or alternative.")
+
+    def _mt_moon_choice(self) -> str:
+        """'dome' / 'helix' from the quest words ('' when none was given): a one-time either-or, so the MODEL decides."""
+        words = {str(w).strip().lower() for w in self._quest_opts}
+        if words & {"dome", "kabuto", "kabutops"}:
+            return "dome"
+        if words & {"helix", "omanyte", "omastar"}:
+            return "helix"
+        return ""
+
+    def _get_mt_moon_fossil(self, auto_trainers: bool = False) -> str:
+        """quest('mt_moon_fossil helix|dome'): Mt. Moon B2F's two fossils (13,7) Dome / (14,7) Helix — take ONE (FLAG_GOT_FOSSIL_FROM_MT_MOON 0x232); the Super Nerd takes the other."""
+        call = "quest('mt_moon_fossil')"
+        if self.reader.read_flag(FLAG_GOT_MT_MOON_FOSSIL):
+            return "You already took a fossil from Mt. Moon (the Super Nerd took the other: a one-time choice) — revive it at the Cinnabar Lab: quest('fossil')."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        pick = self._mt_moon_choice()
+        if not pick:
+            return ("Mt. Moon B2F holds two fossils and you may keep ONE (the Super Nerd there takes the other, for good): the Dome Fossil (Kabuto → Kabutops: Rock / Water, hits hard) or the "
+                    "Helix Fossil (Omanyte → Omastar: Rock / Water, bulky, special). The Old Amber (Aerodactyl) is a separate gift. Choose: quest('mt_moon_fossil dome') or quest('mt_moon_fossil helix').")
+        name = {"dome": "Dome Fossil", "helix": "Helix Fossil"}[pick]
+        if (msg := self._gift_errand(call, "map:1,3", MT_MOON_B2F, MT_MOON_FOSSIL_SPOTS[pick], FLAG_GOT_MT_MOON_FOSSIL, f"the {name}", auto_trainers, ("yes",))):
+            return msg
+        return f"Took the {name} from Mt. Moon (the other one went to the Super Nerd). The Cinnabar Pokémon Lab revives it (quest('fossil')) — it needs the Secret Key chain to get in."
 
     def _get_magikarp(self, auto_trainers: bool = False) -> str:
         call = "quest('magikarp')"

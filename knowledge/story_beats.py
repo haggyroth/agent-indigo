@@ -123,6 +123,11 @@ BEATS: tuple[Beat, ...] = (
          done=(("flag", 0x263),),                                                              # FLAG_GOT_EEVEE
          steps=("The Poké Ball in the little room on top of Celadon Mansion is a free level 25 Eevee (the party, or the PC when it is full).",
                 "A Water / Thunder / Fire Stone evolves it (Vaporeon / Jolteon / Flareon): the choice, and the stone, are yours.")),
+    Beat("mt_moon_fossil", "A fossil from Mt. Moon B2F: Helix or Dome (optional)", "Mt. Moon B2F, the two fossils at (13,7) and (14,7)", needs=("brock",), driver="mt_moon_fossil", optional=True,
+         done=(("flag", 0x232),),                                                              # FLAG_GOT_FOSSIL_FROM_MT_MOON
+         steps=("On Mt. Moon's lowest floor two fossils sit side by side behind a Super Nerd (a trainer battle): you may take ONE — the Dome Fossil (Kabuto, Kabutops: Rock / Water, strong attacker) or the Helix Fossil (Omanyte, Omastar: Rock / Water, bulky). He takes the other for good.",
+                "The choice is yours: quest('mt_moon_fossil dome') or quest('mt_moon_fossil helix'). The Cinnabar Pokémon Lab revives it later (quest('fossil'))."),
+         tip="Dex-wise only one of the two lines is reachable this way; the other needs a trade partner."),
     Beat("old_amber", "Old Amber from the Pewter Museum scientist (optional)", "Pewter City, the Museum's second (right-hand) door -> the scientist at (21,3)", needs=("cut",), driver="old_amber", optional=True,
          done=(("flag", 0x25E),),                                                              # FLAG_GOT_OLD_AMBER
          steps=("Use the Pewter Museum's second door (the right-hand one, Pewter City (25,4)) — no ticket needed on that side, but a Cut tree stands in front of it (quest('cut')) — and talk to the scientist at (21,3): he gives the Old Amber free.",
@@ -246,7 +251,7 @@ FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}   
 SIDE_INFO = {
     "dig": ("TM28 Dig", ()), "magikarp": ("a Magikarp for ¥500 (a slow starter, a strong finish)", ()), "flash": ("HM05 Flash (lights the caves)", (("owned", 10),)),
     "fly": ("HM02 Fly (fast travel to any visited town)", ()), "coin_case": ("the Coin Case (Game Corner prizes)", ()), "hitmon": ("Hitmonlee or Hitmonchan — your choice", ()),
-    "copycat": ("the move Mimic", ()), "eevee": ("an Eevee (L25; stone evolutions for the Pokédex)", ()), "old_amber": ("the Old Amber (an Aerodactyl once revived at Cinnabar)", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
+    "copycat": ("the move Mimic", ()), "eevee": ("an Eevee (L25; stone evolutions for the Pokédex)", ()), "mt_moon_fossil": ("a Helix or Dome Fossil (Omanyte or Kabuto once revived; one of the two)", ()), "old_amber": ("the Old Amber (an Aerodactyl once revived at Cinnabar)", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
     "good_rod": ("the Good Rod (better fishing)", ()), "super_rod": ("the Super Rod (the best Kanto rod)", ()), "bike": ("the Bicycle (twice the speed; the Cycling Road)", ()),
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
     "exp_share": ("the Exp. Share", (("owned", 50),)),
