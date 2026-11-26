@@ -133,6 +133,26 @@ def _story_status_for(t: Tick) -> dict:
     return story_status(r, t.ltm, overrides)
 
 
+def _sweep_line(t: Tick) -> list[str]:
+    """Area progress for the named area (Mt. Moon, the S.S. Anne ...) the player is in — read from the game's own flags (knowledge.sweeps) — plus the warning when leaving would
+    lose something (the S.S. Anne sails once HM01 is taken). Shown when it CHANGES (entering the area, a trainer beaten, an item taken), never every tick; silent in unnamed maps."""
+    from knowledge import sweeps
+    area = sweeps.area_of_map(t.here)
+    if area is None:
+        t.run.sweep_sig = None
+        return []
+    flag = t.reader.read_flag
+    prog = sweeps.progress(area, flag)
+    note = sweeps.missable_note(area, prog, flag)
+    sig = (area, tuple(prog.values()), bool(note))
+    if sig == t.run.sweep_sig:
+        return []
+    t.run.sweep_sig = sig
+    if sweeps.complete(prog) and not note:
+        return [f"AREA COMPLETE: {sweeps.line(area, prog)}"]
+    return [f"AREA PROGRESS: {sweeps.line(area, prog)}" + (f"\n{note}" if note else "")]
+
+
 def _next_beat_money(t: Tick, items) -> str:
     """The MONEY line when the next story beat wants more yen than we hold (knowledge.money): the gap and how to earn it."""
     from knowledge.money import money_line
@@ -211,6 +231,8 @@ def _readiness_and_bag(t: Tick) -> list[str]:
     aide = _safe("aide", lambda: _aide_line(t), "")
     if aide and d.get("badges_earned", 0) >= 1:
         out.append(aide)
+    if t.overworld and not opening:
+        out.extend(_sweep_line(t))
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
         sig = (tuple(tms), tuple((i, q) for i, q in items if i in BAG_SIG_ITEMS),
                tuple(tuple(p.move_names) for p in party), tuple(p.held_item for p in party))

@@ -5,6 +5,9 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 
 ## [Unreleased]
 
+### Added
+- **Area completion, read from the game's own flags (#366).** `tools/gen_area_sweeps.py` reads the pret/pokefirered decomp (every trainer's `trainerbattle_*` → defeat flag, every item ball's `FLAG_HIDE_*`, every non-renewable hidden item) and writes `knowledge/area_sweeps.py`: 26 named areas (Viridian Forest, Mt. Moon, Rock Tunnel, the S.S. Anne, Rocket Hideout, Pokémon Tower, Silph Co., the Mansion, the Power Plant, Seafoam, the Safari Zone, Victory Road, the gyms, the route groups). `knowledge/sweeps.py` counts progress per area (story-conditional item balls and respawning mushrooms are left out), and the observation shows `AREA PROGRESS: Mt. Moon: 4/11 trainers, 1/10 items, …` when it changes; `quest()` lists the started-but-unfinished areas. The one area that is lost by moving on, the S.S. Anne (it sails once you have HM01 Cut), says what would be missed — advice, never a wall. A `sweep(area)` driver is a separate step.
+
 ### Fixed
 - **LLM failures are told apart (#372).** A *context overflow* (HTTP 400, "context size exceeded") used to roll the history back and send the identical request 30 times until `error_budget`; it now shrinks and resends
   (images → older turns → the observation cut to 2.5k chars) and remembers a prompt ceiling so the next request fits. New `CONTEXT_TOKENS` fits the history by *estimated tokens* (calibrated against the server's `prompt_tokens`),
