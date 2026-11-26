@@ -351,6 +351,10 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
             f"{', '.join(_sync['dropped'])} to match the cartridge "
             f"(badges now {ltm.data['badges_earned']}/8). "
             f"Use `python -m tools.reset_journal` for a full reset.[/]")
+    from agent.story import make_done_check
+    _contradicted = ltm.reconcile_model_milestones(make_done_check(reader, ltm))
+    if _contradicted:
+        say(f"[yellow]Dropped milestones recorded by hand that this save does not confirm: {', '.join(_contradicted)}[/]")
     if _sync["adopted"]:
         say(f"[yellow]Adopted from the save into LTM: {', '.join(_sync['adopted'])}[/]")
 
