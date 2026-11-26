@@ -151,6 +151,8 @@ class LeafGreenReader:
         cb2 = self.client.read32(Addr.GMAIN_CALLBACK2)
         if cb2 == Addr.CB2_BATTLE:
             return GameContext.IN_BATTLE
+        if cb2 in Addr.CB2_MAP_LOAD_SET:
+            return GameContext.TRANSITIONING             # a map is loading (a warp or an edge crossing): not a menu, even with a stale MENU_OPEN byte (#402)
 
         # MENU_OPEN (0x03002415) alone is NOT a reliable menu gate: after a
         # full-screen menu (Pokédex/Bag/…) closes it STAYS 1 even back on the
@@ -167,6 +169,8 @@ class LeafGreenReader:
             # On the field callback: overlay menu (Start/Save), a warp fade, a
             # script dialog, real free-roam, or a stale MENU_OPEN after a menu.
             if menu_flag and fade:
+                if self._warp_in_progress():
+                    return GameContext.TRANSITIONING # the warp's own fade / arrival, with the menu byte left over from an earlier menu (#402)
                 return GameContext.IN_MENU          # overlay menu genuinely open
             if fade:
                 return GameContext.TRANSITIONING     # warp/map-load fade (no menu)
@@ -181,6 +185,12 @@ class LeafGreenReader:
         if menu_flag:
             return GameContext.IN_MENU
         return GameContext.TRANSITIONING
+
+    def _warp_in_progress(self) -> bool:
+        """A warp's own tasks are running and the Start menu's is not (gTasks). Tells a warp fade / arrival from an overlay menu when the stale MENU_OPEN byte and SCREEN_FADE read the same."""
+        raw = self.client.read_range(Addr.TASKS_BASE, Addr.TASK_COUNT * Addr.TASK_STRIDE)
+        funcs = {int.from_bytes(raw[i * Addr.TASK_STRIDE:i * Addr.TASK_STRIDE + 4], "little") for i in range(Addr.TASK_COUNT) if raw[i * Addr.TASK_STRIDE + 4]}
+        return Addr.START_MENU_TASK not in funcs and bool(funcs & set(Addr.WARP_TASKS))
 
     def _decode_mon(self, raw: bytes, slot: int) -> PokemonStatus:
         """Decode one 100-byte Gen III party struct into a PokemonStatus.
