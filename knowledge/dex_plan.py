@@ -19,7 +19,7 @@ SPECIAL: dict[int, tuple[str, str]] = {
     106: ("Saffron Dojo: after Master Koichi, choose ONE of Hitmonlee / Hitmonchan", "hitmon"), 107: ("Saffron Dojo: after Master Koichi, choose ONE of Hitmonlee / Hitmonchan", "hitmon"),
     129: ("Route 4 Pokémon Center salesman for ¥500 (or fishing)", "magikarp"),
     131: ("Silph Co. 7F: the worker gives a Lapras once the Rockets are gone", "silph_co"),
-    133: ("gift: the Pokéball on Celadon Mansion's roof", ""),
+    133: ("gift: the Pokéball in Celadon Mansion's roof room", "eevee"),
     138: ("fossil: Helix Fossil (Mt. Moon B2F) revived at the Cinnabar Pokémon Lab", ""),
     140: ("fossil: Dome Fossil (Mt. Moon B2F) revived at the Cinnabar Pokémon Lab", ""),
     142: ("fossil: Old Amber (Pewter Museum) revived at the Cinnabar Pokémon Lab", ""),

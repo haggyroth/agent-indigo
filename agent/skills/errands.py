@@ -28,6 +28,8 @@ FLAG_COPYCAT_MIMIC, POKE_DOLL, FLAG_HIDE_SAFFRON_ROCKETS = 0x2CD, 80, 0x03E     
 FLAG_BEAT_KOICHI = 0x500 + 317                                          # TRAINER_BLACK_BELT_KOICHI's trainer flag
 TM28_ITEM = 316                                                         # TM01 = 289
 MAGIKARP_PRICE = 500
+CELADON_ROOF_ROOM, FLAG_GOT_EEVEE = (10, 11), 0x263                         # the room above Celadon Mansion's roof; FLAG_GOT_EEVEE
+EEVEE_SPOTS = (((7, 4), "Up"), ((6, 3), "Right"), ((8, 3), "Left"))        # the Poké Ball object at (7,3)
 GRUNT_SPOTS = (((33, 7), "Up"), ((32, 6), "Right"), ((34, 6), "Left"))              # the grunt stands at (33,6)
 KOICHI_SPOTS = (((6, 6), "Up"), ((5, 5), "Right"), ((7, 5), "Left"))                # Master Koichi at (6,5)
 HITMON_SPOTS = {"chan": (((7, 4), "Up"),), "lee": (((5, 4), "Up"),)}                     # the balls at (7,3) Hitmonchan / (5,3) Hitmonlee
@@ -217,6 +219,20 @@ class ErrandsMixin:
         if (msg := self._gift_errand(call, "Saffron Dojo", SAFFRON_DOJO, HITMON_SPOTS[pick], FLAG_GOT_HITMON, f"the {name} ball", auto_trainers, ("yes", "no"))):
             return msg
         return f"Took {name} from the Dojo ({where}; the other one is gone: a one-time choice). It is L25."
+
+    def _get_eevee(self, auto_trainers: bool = False) -> str:
+        """quest('eevee'): the Poké Ball in Celadon Mansion's roof room (7,3) is an Eevee, L25, free (FLAG_GOT_EEVEE 0x263; a full party sends it to the PC by the game's own script)."""
+        call = "quest('eevee')"
+        if self.reader.read_flag(FLAG_GOT_EEVEE):
+            return "You already have the Eevee — it is in your party or the PC (a Water / Thunder / Fire Stone evolves it into Vaporeon / Jolteon / Flareon)."
+        if self.reader.detect_context() == GameContext.IN_BATTLE:
+            return "You're in a battle — finish it first."
+        full = len(self.reader.read_party()) >= 6
+        if (msg := self._gift_errand(call, "map:10,11", CELADON_ROOF_ROOM, EEVEE_SPOTS, FLAG_GOT_EEVEE, "the Eevee ball", auto_trainers, ("no",))):
+            return msg
+        where = "it went to the PC box (your party is full): pc('swap')" if full else "it joined your party"
+        return (f"Took the Eevee from the roof room ({where}). It is L25; a Water / Thunder / Fire Stone evolves it into Vaporeon / Jolteon / Flareon "
+                "(use_item on it; the Celadon Dept. Store sells none — the stones are rewards and finds), a choice of the model's.")
 
     def _get_magikarp(self, auto_trainers: bool = False) -> str:
         call = "quest('magikarp')"
