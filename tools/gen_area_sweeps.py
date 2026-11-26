@@ -17,7 +17,7 @@ import sys
 
 PF_DEFAULT = os.path.expanduser("~/Projects/pokefirered")
 
-# area name -> folder names (exact) or regexes (r"..." prefix means a regex over the folder name). Sevii Islands arrive with #360.
+# area name -> folder names (exact) or regexes (r"..." prefix means a regex over the folder name). The Sevii Islands are in (#360).
 AREAS = {
     "Viridian Forest": ["ViridianForest"],
     "Mt. Moon": [r"re:^MtMoon_"],
@@ -45,6 +45,15 @@ AREAS = {
     "Routes 11-15, Fuchsia": ["Route11", "Route12", "Route13", "Route14", "Route15", "FuchsiaCity"],
     "Routes 16-18, Celadon (Cycling Road)": ["Route16", "Route17", "Route18", "CeladonCity"],
     "Routes 19-21": ["Route19", "Route20", "Route21_North", "Route21_South"],
+    # The Sevii Islands (#360), grouped the way the issue's checklist names them: Kindle Road / Mt. Ember · Two-Three Island with Cape Brink, Bond Bridge and Berry Forest · Four Island / Icefall Cave ·
+    # the Five / Six / Seven Island regions · Cerulean Cave. (The Trainer Tower's floors build their trainers at run time: they are not object events and are not counted.)
+    "Kindle Road / Mt. Ember": [r"re:^OneIsland", r"re:^MtEmber_"],
+    "Two-Three Island (Cape Brink, Bond Bridge, Berry Forest)": [r"re:^TwoIsland", r"re:^ThreeIsland"],
+    "Four Island / Icefall Cave": [r"re:^FourIsland"],
+    "Five Island region": [r"re:^FiveIsland"],
+    "Six Island region": [r"re:^SixIsland"],
+    "Seven Island region": [r"re:^SevenIsland(?!_TrainerTower)"],
+    "Cerulean Cave": [r"re:^CeruleanCave_"],
 }
 
 

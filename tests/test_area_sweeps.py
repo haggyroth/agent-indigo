@@ -14,6 +14,9 @@ COUNTS = {
     "Cerulean Gym": (2, 0, 0), "Vermilion Gym": (3, 0, 0), "Celadon Gym": (7, 0, 0), "Fuchsia Gym": (6, 0, 0), "Saffron Gym": (7, 0, 0), "Cinnabar Gym": (7, 0, 0),
     "Viridian Gym": (8, 0, 1), "Routes 2-4, Viridian, Pewter, Cerulean": (9, 4, 6), "Routes 24-25": (15, 2, 5), "Routes 9-10": (15, 2, 8),
     "Routes 6-8, Saffron, Vermilion": (18, 0, 7), "Routes 11-15, Fuchsia": (50, 6, 8), "Routes 16-18, Celadon (Cycling Road)": (20, 1, 7), "Routes 19-21": (30, 0, 0),
+    # the Sevii Islands (#360); the Icefall Cave grunts and the Trainer Tower's trainers are scripted / built at run time, not object events, so they are not counted
+    "Kindle Road / Mt. Ember": (16, 6, 2), "Two-Three Island (Cape Brink, Bond Bridge, Berry Forest)": (6, 5, 5), "Four Island / Icefall Cave": (0, 6, 0),
+    "Five Island region": (22, 12, 5), "Six Island region": (29, 6, 4), "Seven Island region": (16, 4, 2), "Cerulean Cave": (0, 8, 1),
 }
 
 
