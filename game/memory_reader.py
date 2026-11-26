@@ -200,7 +200,15 @@ class LeafGreenReader:
         return (1 <= mon.species_id <= cls._MAX_SPECIES
                 and all(0 <= m <= cls._MAX_MOVE_ID for m in mon.move_ids))
 
+    def read_party_fresh(self) -> list[PokemonStatus]:
+        """The party exactly as memory holds it right now: no plausibility fallback to a previous read, no caching. For decisions that must not act on stale data."""
+        return self._read_party_slots()
+
     def read_party(self) -> list[PokemonStatus]:
+        party = self._read_party_slots()
+        return self._with_fallback(party)
+
+    def _read_party_slots(self) -> list[PokemonStatus]:
         party = []
         for slot in range(6):
             raw = self.client.read_range(Addr.PARTY_DATA + slot * 100, 100)
@@ -210,6 +218,9 @@ class LeafGreenReader:
             if raw[0x54] == 0:
                 continue
             party.append(self._decode_mon(raw, slot))
+        return party
+
+    def _with_fallback(self, party: list[PokemonStatus]) -> list[PokemonStatus]:
         # On the battle-load frame the encrypted substructs decrypt to nonsense
         # (out-of-range species / move ids), which made use_move fail with "not a
         # known move" and the agent flail for a step (#58). Reject an implausible read
