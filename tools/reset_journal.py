@@ -13,24 +13,37 @@ the save you're testing with.
 Usage:
     python -m tools.reset_journal            # keep starter/parcel (default)
     python -m tools.reset_journal --bare     # wipe everything (as if brand new)
+    python -m tools.reset_journal --source saves/foo.sav    # reset that save's own journal (logs/journals/…), not the global one
 """
 import argparse
 import copy
 import json
 from datetime import datetime
 
-from config import JOURNAL_PATH, PROGRESS_PATH
+from config import JOURNAL_PATH as GLOBAL_JOURNAL
+from config import PROGRESS_PATH as GLOBAL_PROGRESS
 from memory.long_term import DEFAULTS
 
 KEEP_MILESTONES = ("starter_chosen", "delivered_oaks_parcel")
 KEEP_TOWNS = ("Pallet Town", "Viridian City")
 
 
+def _paths(source: str):
+    if not source:
+        return GLOBAL_PROGRESS, GLOBAL_JOURNAL
+    from memory.journals import profile_paths
+    ltm, bat = profile_paths(source)
+    ltm.parent.mkdir(parents=True, exist_ok=True)
+    return ltm, bat
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Reset the agent journal to the battery save's state.")
     ap.add_argument("--bare", action="store_true",
                     help="wipe everything (don't preserve starter/parcel milestones)")
+    ap.add_argument("--source", default="", help="a save/state file: reset ITS journal (logs/journals/<save>/) instead of the global one")
     args = ap.parse_args()
+    PROGRESS_PATH, JOURNAL_PATH = _paths(args.source)
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     for p in (PROGRESS_PATH, JOURNAL_PATH):

@@ -682,7 +682,7 @@ class NavMixin:
                     f"use safari('ball' | 'bait' | 'rock' | 'run') (the observation says whether it is worth a ball), then call "
                     f"{again} to continue. Steps and Safari Balls are limited.")
         if trainer:
-            return (f"A TRAINER battle started at {here} on the way to {target_name} (you can't flee it). Win it with "
+            return (f"A TRAINER battle started at {here} on the way to {target_name} (you can't flee it).{self._lead_note()} Win it with "
                     f"use_move / switch_pokemon / use_item, then call {again} to continue.")
         what, verdict = "Pokémon", ""
         try:
@@ -708,7 +708,7 @@ class NavMixin:
                         + f" ({balls} Poké Balls.)"
         except Exception:
             pass
-        return (f"A wild {what} appeared at {here} on the way to {target_name}.{verdict} Fight it (use_move), "
+        return (f"A wild {what} appeared at {here} on the way to {target_name}.{verdict}{self._lead_note()} Fight it (use_move), "
                 f"catch(), switch_pokemon or flee_battle(); then call {again} to continue.")
 
     def _handle_travel_battle(self, target_name: str, mode: str = "yield",

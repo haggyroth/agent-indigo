@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — one journal per save / state
+Loading a save used to pick up the ONE global journal (`logs/progress.json` + `logs/battles.jsonl`): a badge-1 fixture arrived with Misty, Surge, Cut, Celadon and 678 battles from the newest
+run, and "past losses" lessons leaked between playthroughs.
+- `memory/journals.py`: `START_FROM_SAVE` / `START_FROM_STATE` select `logs/journals/<save>-<hash>/{progress.json,battles.jsonl}`; a run's checkpoints share `run-<timestamp>`. `PER_SAVE_JOURNALS=false`
+  restores the single global journal; a new game and explicit `ltm_path`/`journal_path` (the eval harness) are unchanged.
+- A journal that does not exist yet is DERIVED from the cartridge (the starter and Oak's parcel once a badge is earned, every Fly-flagged town, the badge milestones from the startup reconciliation) instead of copied from another run.
+- Every checkpoint writes the journal beside its state (`<ckpt>.ss1.ltm.json` / `.battles.jsonl`, removed with a pruned checkpoint); `RESUME` restores exactly what was true when that state was saved.
+- `python -m tools.reset_journal --source <save>` resets one save's journal.
+
+### Fixed — harness advice that sent the model into refusals (DeepSeek watched runs)
+- A trapped Pokémon (Wrap/Bind/Mean Look) was told "Better matchup: switch…" and "Options: switch_pokemon…" in the same observation as "you CANNOT switch" — six failed switches in one run. Switch/flee
+  advice is now withheld while trapped (`low_hp_advice(trapped=…)`, `better_matchup`, the backup-teammates hint).
+- A battle that began mid-trip (a trainer on the way to a Pokémon Center, an encounter while grinding) handed the model a message without saying who leads, so it used the last fighter's moves on the
+  lead (15 "'Vine Whip' is not a known move" refusals in one run). The hand-off now names the lead and its moves, and the refusal says who is on the field and which benched teammate knows the move.
+
 ### Changed — quality over a full party of six
 The prompt said "Aim for a full party of 6 with different types", and the catch policy took any near-level line that "adds a new type", so watched teams filled slots with filler (Wigglytuff, Raichu, a
 Pidgeot…) whose XP was then split six ways.

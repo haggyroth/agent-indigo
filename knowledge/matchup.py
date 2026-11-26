@@ -211,10 +211,10 @@ def better_matchup(party, active_species: int, foe_name: str = "", foe_level: in
             f"{', and it outspeeds the foe' if fast else ''} ({'; '.join(why)}).")
 
 
-def low_hp_advice(party, active_species: int, foe: Foe, heals=(), wild: bool = False) -> str:
+def low_hp_advice(party, active_species: int, foe: Foe, heals=(), wild: bool = False, trapped: bool = False) -> str:
     """'' unless the active mon is nearly dead or the foe's best hit would KO it; then the ways out: finish a nearly-dead
     foe, switch to a healthy teammate (the only thing that saves a mon the foe will KO), heal (only if it survives the
-    hit), flee (wild). `heals` = [(item name, HP restored)] the bag actually holds."""
+    hit), flee (wild). `heals` = [(item name, HP restored)] the bag actually holds. `trapped` (Wrap/Bind/Mean Look…): no switch, no flee — the game refuses both."""
     me = next((p for p in party if p.species_id == active_species and p.current_hp > 0), None)
     if me is None or not me.max_hp:
         return ""
@@ -232,7 +232,7 @@ def low_hp_advice(party, active_species: int, foe: Foe, heals=(), wild: bool = F
     if foe.max_hp and foe.hp_frac <= FINISH_FRAC and move and mult > 0 and (fast or not ko):
         ways.append(f"the foe is nearly down ({foe.hp}/{foe.max_hp}): use_move('{move}') may finish it first")
     cands = []
-    for p in party:
+    for p in ([] if trapped else party):
         if p.species_id == active_species or p.current_hp <= 0 or not p.max_hp or p.current_hp / p.max_hp < SWITCH_HP_FLOOR:
             continue
         hit = foe_hit(foe, p)
@@ -247,6 +247,6 @@ def low_hp_advice(party, active_species: int, foe: Foe, heals=(), wild: bool = F
         ways.append(f"use_item('{n}') (+{a if a < 999 else 'full'} HP" + (", survives the hit" if ko else "") + ")")
     elif heals and ko:
         ways.append("healing items would not survive that hit")
-    if wild:
+    if wild and not trapped:
         ways.append("flee_battle()")
     return head + ". " + ("Options: " + "; ".join(ways) + "." if ways else "No safe option — attack.")

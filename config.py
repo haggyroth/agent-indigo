@@ -198,6 +198,9 @@ BUTTON_TAP_DELAY  = _env_float("BUTTON_TAP_DELAY", 0.10, minimum=0.0)
 SAVE_DIR          = PROJECT_ROOT / "saves"
 JOURNAL_PATH      = PROJECT_ROOT / "logs" / "battles.jsonl"
 PROGRESS_PATH     = PROJECT_ROOT / "logs" / "progress.json"
+# PER_SAVE_JOURNALS: loading a save (START_FROM_SAVE) or a state (START_FROM_STATE / RESUME) selects the journal that belongs to it (logs/journals/<save>/) instead of the one
+#   global logs/progress.json + logs/battles.jsonl, so an old fixture never inherits the milestones of a newer run. "false" = the old single global journal.
+PER_SAVE_JOURNALS = os.getenv("PER_SAVE_JOURNALS", "true").strip().lower() not in ("0", "false", "no", "off")
 # Screenshot frame path. Default to a PER-PROCESS temp dir, not a fixed name in the
 # shared temp dir: a predictable /tmp path lets another user pre-plant a symlink the
 # native writer would follow/truncate (CWE-379), and two concurrent runs would clobber

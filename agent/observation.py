@@ -343,7 +343,9 @@ def _battle(t: Tick) -> list[str]:
     enemy = r.read_enemy_lead()
     backups = [f"{p.species_name} (slot {i + 1})" for i, p in enumerate(party)
                if p.species_id != active and healthy_enough(p, 0.3) and can_attack(p)]
-    hint = ("Teammates that can still attack: " + ", ".join(backups) + " — switch_pokemon to one.") if backups else ""
+    vol = _safe("volatiles", lambda: r.read_battle_volatiles(0), {})
+    trapped = bool(vol.get("wrapped") or vol.get("escape_prevention"))      # the game refuses switch AND run: advice to do either only makes the model try (a watched run failed 6 switches)
+    hint = ("Teammates that can still attack: " + ", ".join(backups) + " — switch_pokemon to one.") if backups and not trapped else ""
     out.append(battle_summary(move_names, run.current_enemy, me.hp_percent, pp_view, attacker_types=lead_types,
                               opponent_status=enemy.status if enemy else "", disabled_slot=d_slot, disabled_turns=d_turns,
                               backup_hint=hint, wild=not run.battle_is_trainer, user_level=me.level, user_hp_frac=me.hp_percent,
@@ -353,8 +355,8 @@ def _battle(t: Tick) -> list[str]:
     if enemy and enemy.max_hp:           # who is down, who is up, and who matches up well against THIS foe
         foe = _foe_info(t, enemy)
         heals = _safe("heals", lambda: [HEAL_HP[i] for i, q in r.read_items_pocket() if q and i in HEAL_HP], [])
-        for line in (roster(party, active, foe=foe), better_matchup(party, active, foe=foe),
-                     low_hp_advice(party, active, foe, heals, wild=not run.battle_is_trainer)):
+        for line in (roster(party, active, foe=foe), "" if trapped else better_matchup(party, active, foe=foe),
+                     low_hp_advice(party, active, foe, heals, wild=not run.battle_is_trainer, trapped=trapped)):
             if line:
                 out.append(line)
     cure = _safe("status_cure", lambda: cure_hint(me.nickname or me.species_name or "Your lead", me.status, dict(r.read_items_pocket()), me.hp_percent), "")
@@ -370,7 +372,7 @@ def _battle(t: Tick) -> list[str]:
     xp = _safe("xp_share", lambda: xp_share_hint(party, active, enemy.level if enemy and enemy.max_hp else 0), "")
     if xp:
         out.append(xp)
-    out.extend(_volatiles(_safe("volatiles", lambda: r.read_battle_volatiles(0), {})))
+    out.extend(_volatiles(vol))
     foe_types = POKEMON_TYPES.get((enemy.species_name or "").upper().strip(), ()) if enemy else ()
     nudge = battle_idle_nudge(stm.action_history, AgentClient._best_damaging_move(
         move_names, pp_view, lead_types, foe_types,

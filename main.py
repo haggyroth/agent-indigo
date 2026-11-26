@@ -1,6 +1,6 @@
 from agent.skills.base import log_once
 from datetime import datetime
-from config import (START_NEW_GAME, RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
+from config import (PER_SAVE_JOURNALS, START_NEW_GAME, RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, BATTLE_STYLE, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
                     LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
 from game.memory_reader import LeafGreenReader
@@ -303,6 +303,13 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
             say(f"[red]Could not load save: {start_save}[/]")
 
     tilemap = TilemapReader(mgba)
+    # The journal belongs to the save/state we just loaded (memory.journals): an old fixture must not inherit the milestones of the newest run. Explicit paths (the eval
+    # harness, tests) and a new game keep what they were given / the global journal.
+    journal_origin, journal_src = "", (start_state or start_save) if (backend == "native" and not new_game) else ""
+    if PER_SAVE_JOURNALS and journal_src and ltm_path is None and journal_path is None:
+        from memory import journals
+        ltm_path, journal_path, journal_origin = journals.select(journal_src)
+        say(f"[cyan]Journal for {Path(journal_src).name}: {journal_origin} ({ltm_path.parent.name})[/]")
     ltm     = LongTermMemory(path=ltm_path)
     if new_game and backend == "native":
         backup = ltm.start_fresh()                  # stale milestones would make quest('new_game') say "already done" at the title
@@ -311,6 +318,11 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
     stm     = ShortTermMemory()
     journal = BattleJournal(path=journal_path)
 
+    if journal_origin == "new":
+        from memory import journals
+        added = journals.derive_from_cartridge(ltm, reader)
+        if added:
+            say(f"[yellow]New journal derived from the cartridge: {', '.join(added)}[/]")
     if fresh_session:
         ltm.new_session()
     say(f"Session #{ltm.data['session_count']} | Badges: {ltm.data['badges_earned']}/8 | "
@@ -534,7 +546,9 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
     ckpt = None
     if getattr(rlog, "dir", None) and CHECKPOINT_EVERY > 0 and hasattr(mgba, "save_state_file"):
         from memory.checkpoints import CheckpointManager
-        ckpt = CheckpointManager(rlog.dir / "checkpoints", mgba.save_state_file, CHECKPOINT_EVERY)
+        from memory import journals as _journals
+        ckpt = CheckpointManager(rlog.dir / "checkpoints", mgba.save_state_file, CHECKPOINT_EVERY,
+                                 on_save=lambda p: (ltm.save(), _journals.snapshot(p, ltm.path, journal.path)), on_drop=_journals.drop_snapshot)
     _s0 = reader.read_state()
     rlog.event("start", map=[_s0.map_bank, _s0.map_id], pos=[_s0.player_x, _s0.player_y],
                badges=_s0.badges, party=_party_brief(_s0), goal=goal_desc)

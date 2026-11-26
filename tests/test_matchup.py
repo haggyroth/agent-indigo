@@ -127,3 +127,13 @@ def test_low_hp_advice_prefers_finishing_a_nearly_dead_foe_when_faster():
     me = stat_mon("PIDGEY", 16, 3, 22, ["Gust"], (22, 10, 10, 30, 8, 8))
     tip = low_hp_advice([me, KAK], 16, foe)
     assert "use_move('Gust') may finish it first" in tip
+
+
+def test_low_hp_advice_while_trapped_offers_no_switch_and_no_flee():
+    """A trapping move (Wrap/Mean Look…) makes the game refuse a switch and a run; a watched run was told to switch six times while trapped and failed each one."""
+    foe = Foe(name="RATICATE", level=20, hp=40, max_hp=40, attack=40, sp_attack=30, speed=40, moves=("Tackle",))
+    weak = stat_mon("KAKUNA", 14, 6, 25, ["Poison Sting"], (25, 8, 12, 5, 6, 6), nick="Sir Wiggle")
+    ok = stat_mon("PIDGEY", 16, 22, 22, ["Gust"], (22, 10, 30, 20, 8, 25), nick="Sky High")
+    tip = low_hp_advice([weak, ok], 14, foe, heals=[("Super Potion", 50)], wild=True, trapped=True)
+    assert "switch_pokemon" not in tip and "flee_battle" not in tip and "use_item('Super Potion')" in tip
+    assert "switch_pokemon('Sky High')" in low_hp_advice([weak, ok], 14, foe, heals=[("Super Potion", 50)], wild=True)
