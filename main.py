@@ -406,6 +406,7 @@ class _RunState:
     battle_is_trainer: bool = False
     prev_key_items: Optional[int] = None
     prev_dex_owned: Optional[int] = None
+    sweep_sig: Optional[tuple] = None      # the area-progress line as last shown (agent.observation._sweep_line)
     bag_sig: Optional[tuple] = None
     sidequest_sig: Optional[tuple] = None  # (open side quests, locked count) as last shown: the digest line only reappears when it changes
     area_shown: Optional[tuple] = None    # the map whose area guide was last shown (see agent.observation._area)
