@@ -98,6 +98,11 @@ LEAGUE_LOSS_BUMP  = _env_int("LEAGUE_LOSS_BUMP", 2, minimum=0)
 #   "debug" (+ observations/reasoning). STATUS_EVERY: a one-line status (party, money, balls, tokens) every N ticks.
 LOG_LEVEL         = os.getenv("LOG_LEVEL", "events").strip().lower()
 STATUS_EVERY      = _env_int("STATUS_EVERY", 25, minimum=0)
+# RUN_GOAL: when a run is DONE. "hall_of_fame" (default) = the Hall of Fame is recorded (bounded runs, the evals); "completion" = keep playing past it until the completion target
+#   (the Kanto Pokédex and every side quest, knowledge/completion.py) is reached — or a budget (MAX_STEPS, TOKEN_BUDGET, MAX_WALL_SECONDS …) ends the run.
+RUN_GOAL          = os.getenv("RUN_GOAL", "hall_of_fame").strip().lower()
+if RUN_GOAL not in ("hall_of_fame", "completion"):
+    raise SystemExit(f"Invalid RUN_GOAL {RUN_GOAL!r}: use 'hall_of_fame' or 'completion'")
 # IV_PEEK_BEFORE_CATCH: show a WILD Pokémon's IV quality in the battle observation before the catch. Off by default — a human
 #   player has no IV readout in Gen III, so the model judges a specimen after catching it (inspect_pokemon / the catch
 #   report). Turn on for selective-catching experiments; runs with it on are not comparable to runs with it off.

@@ -46,5 +46,7 @@ def side_ctx(reader):
             return fn()
         except Exception:
             return default
+    gate_flags = sorted({arg[0] for b in story_beats.BEATS for kind, *arg in b.gate if kind == "flag"})
     return story_beats.SideCtx(badges=safe(lambda: int(reader.read_badges()[0]), 0), owned=safe(lambda: int(reader.read_pokedex()[0]), 0),
-                               game_clear=safe(lambda: bool(reader.read_flag(0x82C)), False))      # FLAG_SYS_GAME_CLEAR
+                               game_clear=safe(lambda: bool(reader.read_flag(0x82C)), False),      # FLAG_SYS_GAME_CLEAR
+                               flags=tuple(f for f in gate_flags if safe(lambda f=f: bool(reader.read_flag(f)), False)))

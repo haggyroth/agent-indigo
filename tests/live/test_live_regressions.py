@@ -2970,6 +2970,19 @@ def test_the_side_quest_log_opens_at_the_right_point_and_closes_when_done(live):
     assert "old_rod" not in sb.digest(live.c._story(), side_ctx(live.r))
 
 
+def test_the_post_game_briefing_from_the_post_hof_fixture(live):
+    """#357: after the Hall of Fame the log names what is left — the dex count, open side quests and what the National Pokédex needs — from the real game state."""
+    from agent.story import side_ctx
+    from knowledge import completion
+    live.load("post_hof")
+    ctx = side_ctx(live.r)
+    assert ctx.game_clear and ctx.owned == live.r.read_pokedex()[0] and 0x89B not in ctx.flags          # the credits are done; the Sevii Islands are not reached
+    text = completion.post_game_text(ctx.owned, bool(live.r.read_flag(completion.NATIONAL_DEX_FLAG)), live.c._story(), ctx)
+    assert text.startswith("POST-GAME") and f"Pokédex {ctx.owned}/151" in text and "Sevii Islands (One Island)" in text
+    listing = live.c._quest_tool("")
+    assert "POST-GAME" in listing and "national_dex" in listing and f"needs 60 species caught (you have {ctx.owned})" in listing
+
+
 def test_map_epoch_counts_warps_even_when_nobody_polls_the_map(live):
     """#391: leave a building and walk back in with NO read_current_map call in between — the epoch still advances by two; plain steps add nothing."""
     live.load("fullparty")                                   # inside a Pokémon Center, facing the door

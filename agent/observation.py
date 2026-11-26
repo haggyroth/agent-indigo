@@ -148,6 +148,22 @@ def _side_quest_line(t: Tick) -> list[str]:
     return [line] if line else []
 
 
+def _post_game_line(t: Tick) -> list[str]:
+    """After the Hall of Fame: what is left (knowledge.completion.post_game_text) — information only, shown when it changes and every 60 ticks, silent before the game is cleared."""
+    from agent.story import side_ctx
+    from knowledge import completion
+    ctx = side_ctx(t.reader)
+    if not ctx.game_clear:
+        return []
+    status = _story_status_for(t)
+    national = bool(t.reader.read_flag(completion.NATIONAL_DEX_FLAG))
+    sig = (ctx.owned, national, ctx.flags, tuple(completion.open_side_quests(status, ctx)))
+    if sig == t.run.postgame_sig and t.run.step_count % 60 != 0:
+        return []
+    t.run.postgame_sig = sig
+    return [completion.post_game_text(ctx.owned, national, status, ctx)]
+
+
 def _next_beat_money(t: Tick, items) -> str:
     """The MONEY line when the next story beat wants more yen than we hold (knowledge.money): the gap and how to earn it."""
     from knowledge.money import money_line
@@ -228,6 +244,7 @@ def _readiness_and_bag(t: Tick) -> list[str]:
         out.append(aide)
     if t.overworld and not opening and d.get("badges_earned", 0) >= 1:
         out.extend(_side_quest_line(t))
+        out.extend(_post_game_line(t))
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
         sig = (tuple(tms), tuple((i, q) for i, q in items if i in BAG_SIG_ITEMS),
                tuple(tuple(p.move_names) for p in party), tuple(p.held_item for p in party))

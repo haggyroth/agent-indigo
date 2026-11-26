@@ -18,12 +18,13 @@ def test_every_optional_beat_has_a_payoff_and_the_tiers_are_right():
     optional = {b.key for b in sb.BEATS if b.optional}
     assert optional == set(sb.SIDE_INFO)                                  # a new optional beat must say what it is worth
     for b in sb.BEATS:
-        assert (b.tier == "side") == b.optional and (b.payoff != "") == b.optional, b.key
+        assert (b.tier in ("side", "post")) == b.optional and (b.payoff != "") == b.optional, b.key
+        assert (b.tier == "post") == (("gameclear",) in b.gate), b.key
     assert all(b.tier == "main" for b in sb.BEATS if not b.optional)
 
 
 def test_the_gates_match_the_oak_aide_counts_in_the_decomp_data():
-    gates = {b.key: dict(b.gate).get("owned") for b in sb.BEATS if b.gate}
+    gates = {b.key: dict(b.gate).get("owned") for b in sb.BEATS if b.gate and b.tier == "side"}
     assert gates == {key: need for key, need, _flag, _label in AIDES}
 
 
@@ -66,7 +67,8 @@ def test_the_listing_groups_main_side_now_and_side_locked_and_keeps_the_marks():
     main_part = text.split("SIDE QUESTS")[0]
     import re
     assert not re.search(r"^[✔▶…] (old_rod|dig|bike|itemfinder):", main_part, re.M)                              # side quests are not in the main chain
-    assert "POST-GAME" not in text                                                                                # nothing post-game yet
+    assert "POST-GAME" in text and "… national_dex" in text and "after the Hall of Fame" in text                    # the post-game section, locked until the League is beaten
+    assert not re.search(r"^[✔▶…] national_dex:", text.split("POST-GAME")[0], re.M)                             # and not mixed into the side quests
 
 
 def test_league_advice_counts_what_is_open_and_never_blocks():

@@ -14,7 +14,7 @@ def test_the_chain_ends_with_the_league_after_victory_road():
     b = sb.BY_KEY["elite_four"]
     assert b.needs == ("victory_road",) and b.driver == "elite_four" and ("flag", 0x82C) in b.done
     assert sb.resolve("champion") is b and sb.resolve("elite4") is b
-    assert sb.CHAIN_KEYS[-1] == "elite_four"
+    assert [k for k in sb.CHAIN_KEYS if sb.BY_KEY[k].tier != "post"][-1] == "elite_four"          # (post-game beats come after the League)
 
 
 def test_the_rooms_are_in_battle_order_with_distinct_maps_and_flags():
