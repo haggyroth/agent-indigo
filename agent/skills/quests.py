@@ -203,7 +203,7 @@ class QuestMixin:
                 "pokemon_mansion": self._get_secret_key, "silph_co": self._get_silph_co,
                 "victory_road": self._get_victory_road, "elite_four": self._get_elite_four,
                 "flash": self._get_flash, "fly": self._get_fly, "dig": self._get_dig, "hitmon": self._get_hitmon, "copycat": self._get_copycat,
-                "magikarp": self._get_magikarp, "eevee": self._get_eevee, "old_amber": self._get_old_amber, "itemfinder": self._get_itemfinder, "exp_share": self._get_exp_share,
+                "magikarp": self._get_magikarp, "eevee": self._get_eevee, "old_amber": self._get_old_amber, "mt_moon_fossil": self._get_mt_moon_fossil, "itemfinder": self._get_itemfinder, "exp_share": self._get_exp_share,
                 "old_rod": lambda a: self._get_rod("old", a), "good_rod": lambda a: self._get_rod("good", a),
                 "super_rod": lambda a: self._get_rod("super", a), "bike": self._get_bike, "new_game": self._get_new_game, "zapdos": self._get_zapdos, "articuno": self._get_articuno,
                 **{g: (lambda a, g=g: self._get_gym(g, a)) for g in ("brock", "misty", "surge", "erika", "koga", "sabrina", "blaine", "giovanni")}}[beat.driver](auto_trainers)
