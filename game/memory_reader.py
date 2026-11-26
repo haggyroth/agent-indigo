@@ -81,12 +81,27 @@ class LeafGreenReader:
         self._last_map:    tuple[int, int] = (0, 0)
         self.map_epoch:    int = 0          # counts map changes seen by read_current_map: a floor that was left and entered again has been reloaded (its boulders reset)
         self._last_good_party: list | None = None
+        # While the SaveBlock pointers are invalid (title screen, reset, a map transition frame) the SaveBlock readers return what they last read (self._cache,
+        # #376) instead of a plausible-looking 0 / False / {} — "unreadable" must not look like "I have none".
 
     @staticmethod
     def _valid_ewram_ptr(ptr: int) -> bool:
         """True if `ptr` points into EWRAM, where SaveBlock1 / the DMA map block
         live. The pointer at 0x03005008 reads 0 or garbage on non-gameplay frames."""
         return 0x02000000 <= ptr < 0x02040000
+
+    @property
+    def _cache(self) -> dict:
+        """Last good value of every SaveBlock-dependent read (a property so a reader built without __init__, as several tests do, still works)."""
+        return self.__dict__.setdefault("_cache_store", {})
+
+    def reset_caches(self) -> None:
+        """Forget every last-good value. Call after anything that replaces RAM wholesale (load_state, a checkpoint resume, a reset): a cached value
+        from the OLD timeline must never answer for the new one. Also counts as a map change (a loaded state is a reloaded floor)."""
+        self._last_badges, self._last_pos, self._last_map = (0, 0), (0, 0), (0, 0)
+        self._last_good_party = None
+        self.__dict__.pop("_cache_store", None)
+        self.map_epoch += 1
 
     def read_badges(self) -> tuple[int, int]:
         """Returns (badge_count, raw_bitmask).
@@ -397,10 +412,11 @@ class LeafGreenReader:
         this increases. Item IDs are cleartext; empty slots read id 0."""
         sb = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb):
-            return 0
+            return self._cache.get("key_item_count", 0)
         raw = self.client.read_range(sb + Addr.KEY_ITEMS_OFFSET, Addr.KEY_ITEMS_SLOTS * 4)
-        return sum(1 for i in range(0, len(raw), 4)
-                   if (raw[i] | (raw[i + 1] << 8)) != 0)
+        n = sum(1 for i in range(0, len(raw), 4) if (raw[i] | (raw[i + 1] << 8)) != 0)
+        self._cache["key_item_count"] = n
+        return n
 
     def _encryption_key(self) -> int:
         """gSaveBlock2->encryptionKey (u32) — XORs money and item quantities."""
@@ -414,17 +430,23 @@ class LeafGreenReader:
         pointers aren't live (title/transition)."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return 0
+            return self._cache.get("money", 0)
         val = self.client.read32(sb1 + Addr.MONEY_OFFSET) ^ self._encryption_key()
-        return val if 0 <= val <= 999_999 else 0
+        if 0 <= val <= 999_999:
+            self._cache["money"] = val
+            return val
+        return self._cache.get("money", 0)               # a failed decrypt (wrong key mid-transition) is not "no money"
 
     def read_coins(self) -> int:
         """Game Corner coins (the Coin Case). A u16 at SaveBlock1 + 0x294, XOR'd with the low half of the encryption key."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return 0
+            return self._cache.get("coins", 0)
         val = self.client.read16(sb1 + Addr.COINS_OFFSET) ^ (self._encryption_key() & 0xFFFF)
-        return val if 0 <= val <= 9999 else 0
+        if 0 <= val <= 9999:
+            self._cache["coins"] = val
+            return val
+        return self._cache.get("coins", 0)
 
     def read_bag(self) -> dict[int, int]:
         """Return {item_id: quantity} across the Items and Poké Balls pockets.
@@ -433,7 +455,7 @@ class LeafGreenReader:
         separately (read_key_item_count) — they have no meaningful quantity."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return {}
+            return dict(self._cache.get("bag", {}))
         k16 = self._encryption_key() & 0xFFFF
         bag: dict[int, int] = {}
         for off, slots in ((Addr.ITEMS_OFFSET, Addr.ITEMS_SLOTS),
@@ -450,6 +472,7 @@ class LeafGreenReader:
                 qty = (raw[i + 2] | (raw[i + 3] << 8)) ^ k16
                 if 0 < qty <= 999:          # guard against a stale/garbage decrypt
                     bag[iid] = qty
+        self._cache["bag"] = dict(bag)
         return bag
 
     def count_item(self, item_id: int) -> int:
@@ -464,7 +487,7 @@ class LeafGreenReader:
         XOR'd with the low 16 bits of the encryption key, like read_bag."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return []
+            return list(self._cache.get("items_pocket", []))
         k16 = self._encryption_key() & 0xFFFF
         out: list[tuple[int, int]] = []
         try:
@@ -479,6 +502,7 @@ class LeafGreenReader:
             qty = (raw[i + 2] | (raw[i + 3] << 8)) ^ k16
             if 0 < qty <= 999:
                 out.append((iid, qty))
+        self._cache["items_pocket"] = list(out)
         return out
 
     def read_item_ball_tiles(self) -> list[tuple[int, int]]:
@@ -508,7 +532,7 @@ class LeafGreenReader:
     def _read_pocket(self, offset: int, slots: int) -> list[tuple[int, int]]:
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return []
+            return list(self._cache.get(("pocket", offset), []))
         k16 = self._encryption_key() & 0xFFFF
         out: list[tuple[int, int]] = []
         try:
@@ -523,14 +547,17 @@ class LeafGreenReader:
             qty = (raw[i + 2] | (raw[i + 3] << 8)) ^ k16
             if 0 < qty <= 999:
                 out.append((iid, qty))
+        self._cache[("pocket", offset)] = list(out)
         return out
 
     def read_var(self, n: int) -> int:
         """Script variable `n` (0x4000+: VAR_TEMP_0 = 0x4000, ...). 0 when SaveBlock1 isn't readable."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return 0
-        return self.client.read16(sb1 + Addr.VARS_OFFSET + (n - 0x4000) * 2)
+            return self._cache.get(("var", n), 0)
+        v = self.client.read16(sb1 + Addr.VARS_OFFSET + (n - 0x4000) * 2)
+        self._cache[("var", n)] = v
+        return v
 
     BOX_COUNT, BOX_SLOTS, BOXMON_SIZE = 14, 30, 80
 
@@ -599,21 +626,25 @@ class LeafGreenReader:
         """(owned, seen) counts for the 151 Kanto species (national dex numbers 1-151 = bits 0-150), or (0, 0)."""
         sb2 = self.client.read32(Addr.SAVEBLOCK2_PTR)
         if not self._valid_ewram_ptr(sb2):
-            return 0, 0
+            return self._cache.get("dex_counts", (0, 0))
 
         def count(off):
             raw = self.client.read_range(sb2 + off, 19)         # 152 bits cover Kanto
             bits = sum(bin(b).count("1") for b in raw[:18]) + bin(raw[18] & 0x7F).count("1")
             return min(bits, self.KANTO_DEX)
-        return count(Addr.DEX_OWNED_OFFSET), count(Addr.DEX_SEEN_OFFSET)
+        counts = (count(Addr.DEX_OWNED_OFFSET), count(Addr.DEX_SEEN_OFFSET))
+        self._cache["dex_counts"] = counts
+        return counts
 
     def read_dex_owned_ids(self) -> set:
         """The set of Kanto species ids (1-151) registered as CAUGHT."""
         sb2 = self.client.read32(Addr.SAVEBLOCK2_PTR)
         if not self._valid_ewram_ptr(sb2):
-            return set()
+            return set(self._cache.get("dex_owned_ids", set()))
         raw = self.client.read_range(sb2 + Addr.DEX_OWNED_OFFSET, 19)
-        return {n + 1 for n in range(self.KANTO_DEX) if raw[n >> 3] >> (n & 7) & 1}
+        owned = {n + 1 for n in range(self.KANTO_DEX) if raw[n >> 3] >> (n & 7) & 1}
+        self._cache["dex_owned_ids"] = set(owned)
+        return owned
 
     def read_dex_owned(self, species_id: int) -> bool | None:
         """Is this species already registered as CAUGHT in the Pokédex? (Kanto species: internal id == national
@@ -630,8 +661,10 @@ class LeafGreenReader:
         """A gSaveBlock1 event/system flag (relocation-safe)."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return False
-        return bool(self.client.read8(sb1 + Addr.FLAGS_OFFSET + (n >> 3)) >> (n & 7) & 1)
+            return self._cache.get(("flag", n), False)
+        v = bool(self.client.read8(sb1 + Addr.FLAGS_OFFSET + (n >> 3)) >> (n & 7) & 1)
+        self._cache[("flag", n)] = v
+        return v
 
     def read_tmhm_pocket(self) -> list[tuple[int, int]]:
         """TMs/HMs the player owns as ordered [(item_id, qty)] — the TM Case list order."""
@@ -641,10 +674,12 @@ class LeafGreenReader:
         """Key item ids in bag-list order (compacted)."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
         if not self._valid_ewram_ptr(sb1):
-            return []
+            return list(self._cache.get("key_items", []))
         raw = self.client.read_range(sb1 + Addr.KEY_ITEMS_OFFSET, Addr.KEY_ITEMS_SLOTS * 4)
         ids = [raw[i] | (raw[i + 1] << 8) for i in range(0, len(raw) - 3, 4)]
-        return [i for i in ids if i]
+        out = [i for i in ids if i]
+        self._cache["key_items"] = list(out)
+        return out
 
     def read_objects_by_gfx(self, gfx_ids) -> list[tuple[int, int]]:
         """Grid coords of loaded, active object events whose graphicsId is in gfx_ids

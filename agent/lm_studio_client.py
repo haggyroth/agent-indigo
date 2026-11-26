@@ -638,6 +638,8 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                     return (f"Slot {slot} has no state saved THIS session — loading a leftover file from an older run would reset "
                             "the game. save_state(slot) first (before a gym leader or a risky fight); after a loss you can load it.")
                 ok = self.mgba.load_state(slot)
+                if ok and getattr(self, "reader", None) is not None:
+                    self.reader.reset_caches()            # RAM was replaced wholesale: no last-good value from the old timeline may answer for the new one
                 return f"State loaded from slot {slot}." if ok else \
                        f"Load from slot {slot} FAILED — no saved state in that slot yet."
             case "wait_frames":
