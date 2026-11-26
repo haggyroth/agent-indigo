@@ -5,7 +5,7 @@ from knowledge import story_beats
 
 
 def make_done_check(reader, ltm):
-    """done_check(spec) -> bool for one done-spec of a Beat: ("flag", n) / ("item", id) / ("badge", bit) / ("milestone", name) / ("party", min size)."""
+    """done_check(spec) -> bool for one done-spec of a Beat: ("flag", n) / ("item", id) / ("badge", bit) / ("milestone", name) / ("party", min size) / ("tower", n challenges won)."""
     items = None
     badges = None
 
@@ -23,6 +23,8 @@ def make_done_check(reader, ltm):
                 if badges is None:
                     badges = int(reader.read_badges()[1])
                 return bool(badges >> value & 1)
+            if kind == "tower":                          # the first `value` Trainer Tower challenges are won (the Owner's prize was received)
+                return all(t["prize"] for t in reader.read_trainer_tower()[:value])
             if kind == "party":
                 return len(reader.read_party()) >= value
             if kind == "milestone":

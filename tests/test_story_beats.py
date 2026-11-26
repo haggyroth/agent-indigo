@@ -7,7 +7,7 @@ def checker(flags=(), items=(), badges=(), milestones=()):
 
     def check(spec):
         kind, v = spec
-        return {"flag": v in flags, "item": v in items, "badge": v in badges, "milestone": v in milestones}[kind]
+        return {"flag": v in flags, "item": v in items, "badge": v in badges, "milestone": v in milestones, "tower": False}[kind]
     return check
 
 
@@ -19,7 +19,7 @@ def test_the_chain_is_consistent_and_topologically_ordered():
         for n in b.needs:
             assert n in keys[:i], f"{b.key} needs {n}, which must come EARLIER in the chain"
         for kind, _v in b.done:
-            assert kind in ("flag", "item", "badge", "milestone")
+            assert kind in ("flag", "item", "badge", "milestone", "tower")
 
 
 def test_every_story_beat_before_the_elite_four_the_goal_names_is_present():

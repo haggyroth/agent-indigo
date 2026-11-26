@@ -18,3 +18,9 @@ def test_fame_go_reads_a_sign_and_the_entry_arrives(live):
     out = live.c._quest_tool("fame go")
     assert 0 in live.r.read_fame_checker()[0], out
     assert "New entries: Oak #1" in out
+
+
+def test_the_trainer_tower_records_read_from_the_save_without_a_prize_yet(live):
+    live.load("post_hof")
+    t = live.r.read_trainer_tower()
+    assert len(t) == 4 and not any(x["prize"] for x in t)                      # nobody has been to Seven Island in the fixture
