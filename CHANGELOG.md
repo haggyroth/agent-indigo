@@ -5,6 +5,11 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 
 ## [Unreleased]
 
+### Fixed
+- **Long-term memory no longer forgets four of its own keys on reload (#371).** `gym_losses` (a loss inside a gym blocks `challenge_leader` until the team grows), `hidden_taken`, `pc_visited` and
+  `shop_broke_at` were written to `progress.json` but dropped by `LongTermMemory._load` because they were missing from `DEFAULTS`. They are declared now, and `_load` keeps any undeclared key
+  (only `RETIRED_KEYS` are dropped). A test scans the source for every `ltm.data` key and fails if one is not in `DEFAULTS`.
+
 ### Changed — the model makes the choices code used to make
 - **Names.** `quest('new_game')` with nothing chosen (and no `STARTER` / `PLAYER_NAME` / `RIVAL_NAME` in `.env`) presses no button and asks the model to pick its starter, its name and its rival's name; with
   the choices it plays the intro. The starter's and the Silph Co. Lapras's "Give a nickname?" boxes are handed back to the model (`answer_prompt('yes')` then `enter_name(...)`, or `'no'`) instead of
@@ -1353,10 +1358,6 @@ A run from the title screen took the parcel from the Viridian Mart clerk and the
 - feat: `use_move('Struggle')` / automatic Struggle when every move is out of PP or Disabled.
 
 ### Fixed
-- **LLM failures are told apart (#372).** A *context overflow* (HTTP 400, "context size exceeded") used to roll the history back and send the identical request 30 times until `error_budget`; it now shrinks and resends
-  (images → older turns → the observation cut to 2.5k chars) and remembers a prompt ceiling so the next request fits. New `CONTEXT_TOKENS` fits the history by *estimated tokens* (calibrated against the server's `prompt_tokens`),
-  not just message count. *Fatal* errors — a quota/billing 429 (previously "transient": ~2 h of backoff), 401/402/403, 404 unknown model — raise `LLMFatalError` and end the run at once with `reason="llm_error"`; `Retry-After` is honoured.
-  A failure on a later round of a step keeps the completed rounds' messages (their tool calls already moved the game) instead of deleting them.
 - fix(switch): the party-screen row for a switch target is now taken from the party as read AFTER
   the screen settles (the game physically reorders gPlayerParty to battle order) instead of applying
   gBattlePartyCurrentOrder on top — forced switches to the 2nd-slot mon failed every time. Cursor
