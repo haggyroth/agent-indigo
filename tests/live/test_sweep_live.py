@@ -34,14 +34,19 @@ def test_sweeping_mt_moon_collects_its_item_balls_across_three_floors(live):
     total = len(AREAS["Mt. Moon"]["items"])
     assert total == 10 and sweeps.progress("Mt. Moon", flag)["items"][0] < total
     out = ""
-    for _ in range(25):
+    for _ in range(90):
         out = live.c._quest_tool("sweep Mt. Moon")
         if live.r.detect_context() == GameContext.IN_BATTLE:
             live.c._flee_battle()
             continue
-        if "left (hidden items need the Itemfinder)" in out and "Skipped" in out and not out.startswith("A TRAINER"):
-            break                                                # everything reachable is done; what is left was skipped with a note, never looped on
+        if "open field" in out:                                  # a dialogue / menu is up: the model would advance_dialog / close_menus
+            print("STUCK", live.r.detect_context().name, live.r.read_current_map(), live.r.read_player_pos())
+            live.c._advance_to_control(tries=20)
+            continue
+        if sweeps.progress("Mt. Moon", flag)["items"][0] >= total:
+            break
     got, _t = sweeps.progress("Mt. Moon", flag)["items"]
-    print("MTMOON_SWEEP", got, total, out[-260:])
-    assert got >= 6, out                                         # measured 7 of 10 (two balls sit on tiles the walker cannot reach and are skipped with a note): across floors, read from the game's own flags
+    left = [(m, x, y) for f, m, x, y in AREAS["Mt. Moon"]["item_pos"] if not flag(f)]
+    print("MTMOON_SWEEP", got, total, "LEFT", left, out[-200:])
+    assert got >= 6, out                                         # WIP (#428): 7 of 10 so far; the goal is all ten, including B2F's sealed corner rooms (entered by their ladder from B1F)
     assert "Mt. Moon:" in out

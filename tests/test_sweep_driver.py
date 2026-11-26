@@ -37,6 +37,7 @@ def _client(g: Game, battle_on_trainer=True):
         g.flags.add(flag_at[(x, y)])
         return "an item", ""
     c._pick_ball = pick_ball
+    c._enter_pocket = lambda x, y, call: False               # no sealed rooms in the forest
     c._approach_adjacent = lambda x, y: (g.log.append(("approach", x, y)), True)[1]
     c._facing_dir = lambda *a: "Up"
 
@@ -98,6 +99,29 @@ def test_what_it_cannot_reach_is_skipped_with_a_note_and_never_looped_on():
     c._pick_ball = lambda x, y: ("", f"couldn't reach the item at ({x},{y})")
     out = c._sweep("Viridian Forest")
     assert out.count("couldn't reach the item") == 4 and "4 left" in out
+
+
+def test_an_item_in_a_sealed_pocket_is_tried_again_after_entering_it_once_and_never_more_than_once():
+    """Mt. Moon B2F's corner rooms are reached only by a ladder from the floor above: when a ball cannot be reached the driver enters the pocket once, then looks again."""
+    g = Game(beaten=FOREST["trainers"])
+    c = _client(g)
+    real = c._pick_ball
+    entered = []
+
+    def pick(x, y):
+        if (x, y) not in entered:
+            return "", f"couldn't reach the item at ({x},{y})"       # sealed until we are inside
+        return real(x, y)
+    c._pick_ball = pick
+    c._enter_pocket = lambda x, y, call: (entered.append((x, y)), True)[1]
+    out = c._sweep("Viridian Forest")
+    assert len(entered) == 4 and "couldn't reach" not in out and "every trainer and item ball is done" in out
+    c2 = _client(Game(beaten=FOREST["trainers"]))
+    calls = []
+    c2._pick_ball = lambda x, y: ("", f"couldn't reach the item at ({x},{y})")
+    c2._enter_pocket = lambda x, y, call: (calls.append((x, y)), False)[1]
+    out2 = c2._sweep("Viridian Forest")
+    assert len(calls) == 4 and out2.count("couldn't reach the item") == 4                    # tried once per ball, then skipped with the note
 
 
 def test_a_trainer_who_does_not_fight_is_skipped_with_a_note():

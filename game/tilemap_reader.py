@@ -328,6 +328,24 @@ class TilemapReader:
             logger.warning("warp read failed", exc_info=True)
             return []
 
+    def read_warp_dests(self) -> list[tuple[int, int, int, tuple[int, int]]]:
+        """[(x, y, destination warp id, (dest bank, dest map))] for the warps of the current map, in the decomp's order (the same one `knowledge.map_graph.MAP_WARPS` lists): the
+        WarpEvent's warpId / mapNum / mapGroup bytes. Stepping onto the destination map's warp with that id lands on THIS warp — how a pocket reached only by a ladder is entered."""
+        try:
+            events = self.client.read32(Addr.MAP_HEADER + 0x04)
+            if not (0x02000000 <= events < 0x03100000 or 0x08000000 <= events < 0x0A000000):
+                return []
+            count = self.client.read8(events + 0x01)
+            warps_ptr = self.client.read32(events + 0x08)
+            out = []
+            for i in range(min(count, 32)):
+                base = warps_ptr + i * 8
+                out.append((self.client.read16(base), self.client.read16(base + 2), self.client.read8(base + 5), (self.client.read8(base + 7), self.client.read8(base + 6))))
+            return out
+        except Exception:
+            logger.warning("warp dest read failed", exc_info=True)
+            return []
+
     def passable_grid(self, surf: bool = False):
         """Snapshot the whole map's passability in one bulk read.
 
