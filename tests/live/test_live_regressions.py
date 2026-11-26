@@ -1476,7 +1476,7 @@ def test_flash_and_fly_quests_collect_the_hms(live):
 
 def test_early_gift_quests_dig_hitmon_and_magikarp(live):
     """quest('dig') / quest('hitmon') / quest('magikarp') on the real ROM (#278): the Cerulean thief gives TM28 back after a battle, the Fighting Dojo's master
-    is beaten and Hitmonchan taken (a one-time choice; the party is full so it goes to the PC box, the 'nickname?' box is declined), and the Route 4 salesman
+    is beaten and the Pokémon the MODEL chose (here Hitmonchan) taken (a one-time choice; the party is full so it goes to the PC box, the 'nickname?' box is declined), and the Route 4 salesman
     sells a Magikarp for ¥500 (reached from Pewter: from Cerulean's side of Route 4 go_to stalls at the east end)."""
     import pytest
     live.load("celadon_gym_door")
@@ -1507,7 +1507,9 @@ def test_early_gift_quests_dig_hitmon_and_magikarp(live):
     live.fly_to("saffron city", badges=0xFF, flags=(0x2A6, 0x23C, 0x250))
     live.strong_lead(level=60)
     live.patch_mon(0, moves=[75, 15, 33, 22], pps=[25, 30, 35, 25])
-    out = run("hitmon", 0x278, 10)
+    assert "Choose: quest('hitmon lee') or quest('hitmon chan')" in c._execute("quest", json.dumps({"name": "hitmon"}))      # the code never picks for the model
+    assert not live.r.read_flag(0x278)
+    out = run("hitmon chan", 0x278, 10)
     assert live.r.read_flag(0x278) and "Hitmonchan" in out, out
     c._execute("go_to", json.dumps({"destination": "Saffron City", "force": True}))        # out of the Dojo: Fly works outdoors only
     live.fly_to("pewter city", badges=0xFF)
