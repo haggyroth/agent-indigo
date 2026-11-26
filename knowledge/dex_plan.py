@@ -99,3 +99,46 @@ def dex_line(owned, limit: int = 4) -> str:
     nxt = next_targets(owned, limit)
     tail = "; ".join(f"{name(s)} — {text}" + (f" [quest('{q}')]" if q else "") for s, text, q in nxt)
     return f"DEX: {len(owned)}/{KANTO} caught. Easiest next: {tail}." if nxt else f"DEX: {len(owned)}/{KANTO} caught."
+
+
+# ── the dex view (#362) ──────────────────────────────────────────────────────────────────────────
+
+REACH_NOW, REACH_AFTER, REACH_TRADE, REACH_EVENT = "reachable now", "after another catch", "needs a trade partner", "event only"
+EVENT_ONLY = {151}                      # Mew
+
+
+def reach(sid: int, owned) -> tuple[str, str, str]:
+    """(reachability, best source text, quest key) of a MISSING species. A trade evolution (Kadabra -> Alakazam) and a version exclusive need a trade partner; Mew is an event."""
+    if sid in EVENT_ONLY:
+        return REACH_EVENT, "event only (Mew)", ""
+    src = sources(sid, owned)
+    prio, text, quest = src[0]
+    trade_evo = sid in EVOLVES_FROM and "trade" in EVOLVES_FROM[sid][1] and not any(p in (0, 3) for p, _t, _q in src)
+    if prio == 6 or trade_evo:
+        return REACH_TRADE, ("evolve " + name(EVOLVES_FROM[sid][0]) + " by trade" if trade_evo else text), quest
+    return (REACH_NOW if prio <= 3 else REACH_AFTER), text, quest
+
+
+def dex_view(owned, seen: int = 0, per_group: int = 12) -> str:
+    """The Kanto Pokédex as a view: caught / seen / missing, and every missing species grouped by whether it can be had here, after another catch, only with a trade partner,
+    or only as an event — each with its best source. Information for the model, which decides what to chase."""
+    left = missing(owned)
+    if not left:
+        return f"POKÉDEX: all {KANTO} Kanto species caught."
+    groups: dict[str, list] = {REACH_NOW: [], REACH_AFTER: [], REACH_TRADE: [], REACH_EVENT: []}
+    for sid in left:
+        how, text, quest = reach(sid, owned)
+        groups[how].append((sid, text, quest))
+    reachable = len(groups[REACH_NOW]) + len(groups[REACH_AFTER])
+    out = [f"POKÉDEX (Kanto): {len(owned)}/{KANTO} caught, {seen} seen, {len(left)} missing — {reachable} can be had in this game without a partner "
+           f"({len(groups[REACH_NOW])} now, {len(groups[REACH_AFTER])} after another catch), {len(groups[REACH_TRADE])} need a trade partner, {len(groups[REACH_EVENT])} event-only."]
+    for how in (REACH_NOW, REACH_AFTER, REACH_TRADE, REACH_EVENT):
+        rows = groups[how]
+        if not rows:
+            continue
+        out.append(f"{how.upper()} ({len(rows)}):")
+        for sid, text, quest in rows[:per_group]:
+            out.append(f"  {name(sid)} — {text}" + (f" [quest('{quest}')]" if quest else ""))
+        if len(rows) > per_group:
+            out.append(f"  … and {len(rows) - per_group} more")
+    return "\n".join(out)

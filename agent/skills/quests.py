@@ -81,6 +81,15 @@ class QuestMixin:
             log_once("quests._tm_shop_note", "quests._tm_shop_note: tolerated failure (no TM shop line)")
             return ""
 
+    def _dex_view(self) -> str:
+        """quest('dex'): the Kanto Pokédex by reachability (knowledge.dex_plan.dex_view)."""
+        from knowledge.dex_plan import dex_view
+        try:
+            return dex_view(self.reader.read_dex_owned_ids(), self.reader.read_pokedex()[1])
+        except Exception:
+            log_once("quests._dex_view", "quests._dex_view: tolerated failure")
+            return "The Pokédex could not be read right now (try again once the game is on the field)."
+
     def _dex_note(self) -> str:
         """The DEX line for team_report (knowledge.dex_plan): the count and the easiest next catches ('' when unreadable)."""
         from knowledge.dex_plan import dex_line
@@ -137,11 +146,13 @@ class QuestMixin:
         ✔ done / ▶ next / … blocked; a name runs its script when it has one (ss_ticket, cut, coin_case, rocket_hideout, tea, surf,
         strength, the eight gyms…) or prints the state-aware plan (only the game start, `parcel`, is guide-only now)."""
         from knowledge import story_beats as sb
+        if str(name or "").strip().lower() in ("dex", "pokedex", "pokédex"):
+            return self._dex_view()
         status = self._story()
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
         if not str(name or "").strip():
-            return sb.listing(status, ctx) + self._sweep_listing()
+            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had."
         head, *self._quest_opts = str(name).split()                 # 'new_game squirtle name=KYLE': the words after the name are the driver's options
         name = head
         beat = sb.resolve(name)
