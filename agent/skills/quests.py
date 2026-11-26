@@ -148,6 +148,8 @@ class QuestMixin:
         from knowledge import story_beats as sb
         if str(name or "").strip().lower() in ("dex", "pokedex", "pokédex"):
             return self._dex_view()
+        if str(name or "").strip().lower().startswith("sweep"):
+            return self._sweep(str(name).strip()[5:].strip())
         status = self._story()
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
