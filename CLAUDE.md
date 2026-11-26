@@ -42,6 +42,8 @@ python -m game._mgba_build            # compiles game/_mgba_native*.so
 The binding reads/writes memory with **absolute GBA bus addresses** (`game/constants.py`,
 `memory_reader.py`).
 
+**State loads keep a loaded cartridge save.** `load_state` / `load_state_file` restore RAM but not a battery save you loaded with `load_save` (libmgba `SAVESTATE_SAVEDATA` is left out of `LOAD_FLAGS` on purpose; verified live, #380): a retry or resume never rewinds the real in-game save, and a power cycle still "Continues" from the `.sav`. With no `.sav` loaded, the state supplies the cartridge save.
+
 **Booting from a save.** `NativeMGBAClient.load_save(path)` loads a battery `.sav`
 into cartridge memory; call it before `reset()` so the title screen offers
 "Continue":  `m.load_save("game.sav"); m.reset()`. (This is the cartridge save, not

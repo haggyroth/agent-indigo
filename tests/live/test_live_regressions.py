@@ -2939,3 +2939,16 @@ def test_shop_before_the_league_flies_to_a_mart_that_sells_hyper_potions(live):
     bag = dict(live.r.read_bag())
     assert bag.get(21, 0) > before.get(21, 0) and bag.get(24, 0) > before.get(24, 0), (out, bag)         # Hyper Potions and Revives
     assert bag.get(20, 0) == before.get(20, 0) and bag.get(19, 0) == before.get(19, 0), out               # no Max Potions / Full Restores
+
+
+def test_load_state_does_not_rewind_a_loaded_battery_save(live):
+    """#380: with a battery save loaded, a state from a LATER point (7 badges) rewinds RAM only — after a power cycle 'Continue' still loads the .sav's own save."""
+    import main
+    from live.conftest import LIVE_DIR
+    assert live.m.load_save(str(LIVE_DIR / "work.sav"))
+    main.drive_into_gameplay(live.m, live.r)
+    before = (live.r.read_badges()[0], live.r.read_current_map())
+    live.load("blaine_won")
+    assert live.r.read_badges()[0] == 7                              # RAM really is the later state
+    main.drive_into_gameplay(live.m, live.r)
+    assert (live.r.read_badges()[0], live.r.read_current_map()) == before
