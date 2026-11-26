@@ -2952,3 +2952,19 @@ def test_load_state_does_not_rewind_a_loaded_battery_save(live):
     assert live.r.read_badges()[0] == 7                              # RAM really is the later state
     main.drive_into_gameplay(live.m, live.r)
     assert (live.r.read_badges()[0], live.r.read_current_map()) == before
+
+
+def test_the_side_quest_log_opens_at_the_right_point_and_closes_when_done(live):
+    """#356 from a real early fixture (Misty beaten): the Old Rod is on offer; collecting it (flag 0x240) moves it to 'done' and out of the digest."""
+    from agent.story import side_ctx
+    from knowledge import story_beats as sb
+    live.load("post_misty")
+    listing = live.c._quest_tool("")
+    assert "SIDE QUESTS — available now" in listing and "▶ old_rod:" in listing and "▶ dig:" in listing
+    status = live.c._story()
+    line = sb.digest(status, side_ctx(live.r))
+    assert line.startswith("SIDE QUESTS you can do now") and "old_rod" in line
+    live.set_flag(0x240)                                                                  # FLAG_GOT_OLD_ROD
+    done_line = next(ln for ln in live.c._quest_tool("").splitlines() if ln.startswith("SIDE QUESTS — done:"))
+    assert "old_rod" in done_line
+    assert "old_rod" not in sb.digest(live.c._story(), side_ctx(live.r))

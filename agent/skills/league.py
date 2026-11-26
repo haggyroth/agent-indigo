@@ -7,6 +7,7 @@ Fame by script (Oak's speech, FLAG_SYS_GAME_CLEAR 0x82C) and then the credits. S
 room: wait for the forced walk to end → walk to the tile in front of the leader → face + A → (the battle goes to the model, like the other quests) →
 walk to the exit. The call resumes from whatever room it finds itself in."""
 from agent import events
+from agent.skills.base import log_once
 from game.state import GameContext
 
 CENTER_1F, EXTERIOR = (13, 0), (3, 9)
@@ -53,6 +54,14 @@ class LeagueMixin:
             notes.append(", ".join(bought) if bought else "supplies already stocked (or no money)")
         except Exception:
             notes.append("shop skipped")
+        try:
+            from agent.story import side_ctx
+            from knowledge import story_beats as sb
+            advice = sb.league_advice(self._story(), side_ctx(self.reader))          # optional work still open: advice, never a wall
+            if advice:
+                notes.append(advice)
+        except Exception:
+            log_once("league.side_quests", "league: side-quest advice skipped")
         ok = self.mgba.save_state(SAVE_SLOT)
         notes.append(f"state saved to slot {SAVE_SLOT}" if ok else "state save FAILED")
         events.emit("note", f"Elite Four prep: {', '.join(notes)}", log=False)

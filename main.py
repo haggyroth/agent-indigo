@@ -405,6 +405,7 @@ class _RunState:
     prev_key_items: Optional[int] = None
     prev_dex_owned: Optional[int] = None
     bag_sig: Optional[tuple] = None
+    sidequest_sig: Optional[tuple] = None  # (open side quests, locked count) as last shown: the digest line only reappears when it changes
     area_shown: Optional[tuple] = None    # the map whose area guide was last shown (see agent.observation._area)
     prev_map_key: Optional[tuple[int, int]] = None
     transitioning_steps: int = 0

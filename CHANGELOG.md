@@ -5,6 +5,10 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 
 ## [Unreleased]
 
+### Added
+- **A side-quest log (#356).** `quest()` now lists MAIN (the road to the Elite Four), SIDE QUESTS available now — each with what it is worth (TM28 Dig, the Old Rod, a legendary …) — and those not open yet with why (the Oak's Aide counts, a missing story step), plus what is done. When the set of open side quests changes the
+  observation says so once (`SIDE QUESTS you can do now …`), and `quest('elite_four')`'s prep notes how many are still open before the Hall of Fame: advice, never a wall, and the either/or choices (Hitmonlee / Hitmonchan) stay the model's. `Beat` gains `tier`, `gate` and `payoff`; a unit test pins the gates to the Aide thresholds, a live test runs it from the Misty fixture.
+
 ### Fixed
 - **LLM failures are told apart (#372).** A *context overflow* (HTTP 400, "context size exceeded") used to roll the history back and send the identical request 30 times until `error_budget`; it now shrinks and resends
   (images → older turns → the observation cut to 2.5k chars) and remembers a prompt ceiling so the next request fits. New `CONTEXT_TOKENS` fits the history by *estimated tokens* (calibrated against the server's `prompt_tokens`),
