@@ -406,6 +406,7 @@ class _RunState:
     battle_is_trainer: bool = False
     prev_key_items: Optional[int] = None
     prev_dex_owned: Optional[int] = None
+    rematch_sig: Optional[tuple] = None    # the VS Seeker rematch line as last shown (agent.observation._rematch_line)
     sweep_sig: Optional[tuple] = None      # the area-progress line as last shown (agent.observation._sweep_line)
     bag_sig: Optional[tuple] = None
     sidequest_sig: Optional[tuple] = None  # (open side quests, locked count) as last shown: the digest line only reappears when it changes

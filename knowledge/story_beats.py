@@ -123,6 +123,12 @@ BEATS: tuple[Beat, ...] = (
          done=(("flag", 0x2CD),),
          steps=("A Rocket grunt stands at the Copycat house's door until Silph Co. is cleared (quest('silph_co')). The girl upstairs then teaches Mimic ONCE, for a Poké Doll (¥1000 at the Celadon Dept. Store 2F). quest('copycat') buys the doll and runs the lesson.",
                 "Mimic copies the foe's last move — rarely worth a slot; this is mostly for completeness.")),
+    Beat("vs_seeker", "VS Seeker from the woman in Vermilion's Pokémon Center (optional)", "Vermilion City, Pokémon Center 1F", needs=("misty",), optional=True,
+         done=(("flag", 0x292),),                                                            # FLAG_GOT_VS_SEEKER
+         steps=("Talk to the woman in Vermilion City's Pokémon Center: she gives the VS Seeker, free.",
+                "Used outdoors (Bag > VS Seeker) after about 100 steps of charge, it makes the trainers you have beaten who are in range ready for a rematch; walk to each and fight.",
+                "Each trainer has a ladder of stronger parties that opens as the story advances (the Celadon / Fuchsia visits, the Hall of Fame, the Sevii Islands' Network Machine): the observation's REMATCHES line counts where every ladder stands."),
+         tip="A long loop (charge, use, fight, repeat) — worth it for experience and money when the team needs levels, and for the 'top team of every rematchable trainer' completion goal."),
     Beat("running_shoes", "Running Shoes from Oak's Aide in Pewter City", "Pewter City (a forced scene after Brock)", needs=("brock",), optional=True,
          done=(("flag", 0x82F),),
          steps=("Oak's Aide meets you in Pewter City after the Gym (a forced scene, nothing to drive) and the Running Shoes arrive: FLAG_SYS_B_DASH. Holding B then runs at about twice walking speed.",)),
@@ -201,6 +207,7 @@ SIDE_INFO = {
     "good_rod": ("the Good Rod (better fishing)", ()), "super_rod": ("the Super Rod (the best Kanto rod)", ()), "bike": ("the Bicycle (twice the speed; the Cycling Road)", ()),
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
     "exp_share": ("the Exp. Share", (("owned", 50),)),
+    "vs_seeker": ("the VS Seeker: rematches with beaten trainers (experience, money; every top team is an achievement)", ()),
     "national_dex": ("the National Pokédex (the Pokédex goes beyond Kanto)", (("gameclear",), ("owned", 60), ("flag", 0x89B))), "zapdos": ("Zapdos, a legendary (appears once)", ()), "articuno": ("Articuno, a legendary (appears once)", ()),
 }
 BEATS = tuple(replace(b, payoff=SIDE_INFO[b.key][0], gate=SIDE_INFO[b.key][1]) if b.key in SIDE_INFO else b for b in BEATS)
