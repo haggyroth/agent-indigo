@@ -150,11 +150,14 @@ class QuestMixin:
             return self._dex_view()
         if str(name or "").strip().lower().startswith("sweep"):
             return self._sweep(str(name).strip()[5:].strip())
+        words = str(name or "").strip().lower().split()
+        if words and words[0] in ("rematch", "rematches"):
+            return self._rematch(" ".join(words[1:]))
         status = self._story()
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
         if not str(name or "").strip():
-            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had."
+            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had; quest('rematch') runs the VS Seeker loop (charge, use, fight the trainers it flags)."
         head, *self._quest_opts = str(name).split()                 # 'new_game squirtle name=KYLE': the words after the name are the driver's options
         name = head
         beat = sb.resolve(name)

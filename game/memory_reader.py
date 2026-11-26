@@ -676,6 +676,40 @@ class LeafGreenReader:
             return []
         return out
 
+    def read_vs_seeker(self) -> dict:
+        """The VS Seeker's state from gSaveBlock1: {'bag_steps': 0-100 (100 = charged, usable), 'charge_steps': 0-100 (steps since a use that found rematches; at 100 they are withdrawn),
+        'ready': {localId: rung}} — the NPCs (by localId on the current map) who now want a rematch and the ladder rung each will fight. Empty/zero on a read hiccup."""
+        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
+        if not self._valid_ewram_ptr(sb1):
+            return {"bag_steps": 0, "charge_steps": 0, "ready": {}}
+        try:
+            steps = self.client.read16(sb1 + Addr.VSSEEKER_STEPS_OFFSET)
+            raw = self.client.read_range(sb1 + Addr.VSSEEKER_TABLE_OFFSET, Addr.VSSEEKER_TABLE_SLOTS)
+        except Exception:
+            logger.warning("vs seeker read failed", exc_info=True)
+            return {"bag_steps": 0, "charge_steps": 0, "ready": {}}
+        return {"bag_steps": steps & 0xFF, "charge_steps": steps >> 8, "ready": {i: v for i, v in enumerate(raw) if v}}
+
+    def read_objects_by_local(self) -> dict[int, tuple[int, int]]:
+        """{localId: (x, y)} of the loaded, active NPC object events (grid coords); the player (localId 0xFF) is left out."""
+        out: dict[int, tuple[int, int]] = {}
+        stride = Addr.OBJECT_EVENT_STRIDE
+        try:
+            raw = self.client.read_range(Addr.OBJECT_EVENTS, Addr.OBJECT_EVENT_COUNT * stride)
+        except Exception:
+            logger.warning("object read failed", exc_info=True)
+            return out
+        for i in range(Addr.OBJECT_EVENT_COUNT):
+            o = raw[i * stride:(i + 1) * stride]
+            if len(o) < stride or not (o[0] & 1) or (o[2] & 1):                 # not active / the player
+                continue
+            x = o[0x10] | (o[0x11] << 8)
+            y = o[0x12] | (o[0x13] << 8)
+            x = x - 65536 if x >= 32768 else x
+            y = y - 65536 if y >= 32768 else y
+            out[o[Addr.OBJECT_LOCALID_OFFSET]] = (x - Addr.OBJECT_COORD_OFFSET, y - Addr.OBJECT_COORD_OFFSET)
+        return out
+
     def is_biking(self) -> bool:
         """gPlayerAvatar.flags bit1 (Mach Bike) or bit2 (Acro Bike): the player is on the Bicycle."""
         return bool(self.client.read8(Addr.PLAYER_AVATAR_FLAGS) & 0x06)

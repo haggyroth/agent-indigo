@@ -389,6 +389,12 @@ class Addr:
     # id lists exactly the UNcollected balls currently on screen (pick_up_items).
     OBJECT_GFX_OFFSET   = 0x05
     OBJ_GFX_ITEM_BALL   = 92
+    OBJECT_LOCALID_OFFSET = 0x08      # u8 localId (the NPC's number on its map: what the VS Seeker's rematch table is indexed by)
+    # VS Seeker state, in gSaveBlock1 (deref SAVEBLOCK1_PTR): u16 trainerRematchStepCounter (low byte = steps carried in the bag, 100 = ready to use; high byte = steps since a
+    # use that found rematches, at 100 every rematch is withdrawn) then u8 trainerRematches[100] indexed by localId (0 = none, else the ladder rung that trainer will fight).
+    VSSEEKER_STEPS_OFFSET   = 0x638
+    VSSEEKER_TABLE_OFFSET   = 0x63A
+    VSSEEKER_TABLE_SLOTS    = 100
     # HM obstacle objects (loaded object events' graphicsId) and the avatar flags byte.
     OBJ_GFX_CUT_TREE    = 95
     OBJ_GFX_ROCK_SMASH  = 96
