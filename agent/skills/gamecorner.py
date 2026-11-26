@@ -102,7 +102,18 @@ class GameCornerMixin:
             return ("No Coin Case yet: a man in the Celadon Restaurant gives it to you for free. Without it the slot machines and the "
                     "coin and prize clerks refuse you.")
         return (f"Coins: {coins}/{MAX_COINS}, money ¥{yen}. Coins cost ¥{COIN_LOTS[0][1]} per {COIN_LOTS[0][0]} (¥20 each). "
-                "game_corner('slots') plays the machines; shop(item='TM24') (or 'Abra', 'Smoke Ball'…) spends coins at the Prize Corner.")
+                "game_corner('slots') plays the machines; shop(item='TM24') (or 'Abra', 'Smoke Ball'…) spends coins at the Prize Corner."
+                + (("\n" + table) if (table := self._prize_table(coins)) else ""))
+
+    def _prize_table(self, coins: int) -> str:
+        """The prizes with their price in coins, in slot time and what they are for — information; buying is always the model's call."""
+        try:
+            from knowledge.game_corner import prize_lines, SPIN_NET_COINS, SPIN_FRAMES
+            party = [(p.species_id, p.nickname or p.species_name) for p in self.reader.read_party()]
+            lines = prize_lines(coins, self.reader.read_dex_owned, party)
+            return (f"Prize Corner (the slot driver wins about {SPIN_NET_COINS} coins a spin, ~{SPIN_FRAMES} frames each; buying coins is ¥20 apiece):\n" + "\n".join(lines))
+        except Exception:
+            return ""
 
     def _buy_coins(self, coins: int, call: str = "game_corner('buy_coins')") -> str:
         if not self._has_coin_case():
