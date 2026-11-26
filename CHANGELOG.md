@@ -6,9 +6,6 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Fixed
-- **The "RAM writes are menu cursors only" rule is enforced (#375).** `NativeMGBAClient.write8/16/32` check `game/write_guard.py`'s allow-list — `gMoveSelectionCursor`, `gActionSelectionCursor`, the `sShopData.itemList` scratch pointer and the SaveBlock2
-  battle-style option (through the live pointer) — and raise `WriteNotAllowed` for anything else (party, bag, RNG, saves…). `tests/live` opts out with `client.unrestricted_writes = True`; a test scans the source so a new write site must be
-  registered.
 - **Long-term memory no longer forgets four of its own keys on reload (#371).** `gym_losses` (a loss inside a gym blocks `challenge_leader` until the team grows), `hidden_taken`, `pc_visited` and
   `shop_broke_at` were written to `progress.json` but dropped by `LongTermMemory._load` because they were missing from `DEFAULTS`. They are declared now, and `_load` keeps any undeclared key
   (only `RETIRED_KEYS` are dropped). A test scans the source for every `ltm.data` key and fails if one is not in `DEFAULTS`.
