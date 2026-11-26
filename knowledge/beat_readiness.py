@@ -33,6 +33,18 @@ NEEDS: dict[str, Need] = {
 }
 
 
+# The second League run (the Network Machine linked, #369): the same five rooms, the rematch teams from the decomp's trainer parties — Lorelei L63-66, Bruno L65-68, Agatha L65-70,
+# Lance L66-72, the Champion L72-75 (against L51-63 the first time). Not a beat of its own: quest('elite_four') asks for it after the Hall of Fame; a loss costs time only (the game is already cleared).
+REMATCH_KEY = "elite_four_rematch"
+EXTRA_NEEDS: dict[str, Need] = {
+    REMATCH_KEY: Need(72, 63, 5, "the rematch League: Lorelei L63-66, Bruno L65-68, Agatha L65-70, Lance L66-72 and the Champion L72-75, five fights with no healing between them", 14, 5),
+}
+
+
+def _need(key: str):
+    return NEEDS.get(key) or EXTRA_NEEDS.get(key)
+
+
 def effective_heals(bag, top: int) -> float:
     """HP-restoring items in `bag` ({item id: count}) as full-strength heals for a team whose best Pokémon is L`top`: each grade counts min(1, HP restored / (HP_PER_LEVEL × top))
     — below GRADE_FROM_TOP every grade counts as one (the early beats' Potions are fine)."""
@@ -43,7 +55,7 @@ def effective_heals(bag, top: int) -> float:
 def supplies_short(key: str, bag) -> list:
     """['N HP items (M recommended)', 'K Revives (J recommended)'] that fall short for beat `key`, [] when stocked or `bag` is None. `bag` is {item id: count}.
     For the late beats the HP items are counted by strength (see effective_heals) and the message says which grade to buy."""
-    need = NEEDS.get(key)
+    need = _need(key)
     if need is None or bag is None:
         return []
     have_p = effective_heals(bag, need.top)
@@ -103,7 +115,7 @@ HARD_LEVELS = frozenset({"elite_four"})      # beats whose LEVEL shortfall is a 
 
 def level_shortfall(key: str, party) -> list[str]:
     """['your best Pokémon is L52 (L54 recommended)', 'only 3 of your team are L46+ (5 recommended)'] — the level gaps for beat `key`, [] when there are none."""
-    need = NEEDS.get(key)
+    need = _need(key)
     return _shortfall(need, party) if need is not None else []
 
 
@@ -124,7 +136,7 @@ def hard_wall(key: str, party, losses: int = 0, bump: int = 0, rule: str = "advi
 def readiness(key: str, party, bag=None) -> str:
     """'' when the party (and, with `bag`, its healing supplies) is ready for beat `key` (or the beat has no requirement); else why not and what to do.
     A fainted Pokémon counts as present (a heal fixes it) — only its LEVEL matters here."""
-    need = NEEDS.get(key)
+    need = _need(key)
     if need is None or not party:
         return ""
     short = level_shortfall(key, party)
@@ -136,12 +148,13 @@ def readiness(key: str, party, bag=None) -> str:
         parts.append(f"{'; '.join(short)} — it means {need.why}. grind() with no level lifts the weaker members (grind({need.top}) the ace)")
     if stock:
         parts.append(f"only {'; '.join(stock)} — shop() for Potions and Revives — Hyper Potions (¥1,200, +200 HP) and Revives are the best value; Hyper Potions are sold only in Saffron and Cinnabar, not at the Plateau (its clerk has Max Potions ¥2,500 and Full Restores ¥3,000), so shop() flies you to Saffron for them from the Plateau when you have the money (shop(sell=true) turns spare treasure into money)")
-    return f"Not ready for quest('{key}'): " + "; and ".join(parts) + f". Call quest('{key}') again to go anyway."
+    quest = "elite_four" if key == REMATCH_KEY else key
+    return f"Not ready for quest('{quest}'): " + "; and ".join(parts) + f". Call quest('{quest}') again to go anyway."
 
 
 def recommendation(key: str) -> str:
     """One plan line for quest(<key>)'s plan, or ''."""
-    need = NEEDS.get(key)
+    need = _need(key)
     if not need:
         return ""
     sup = f", and carry {need.potions}+ Potions{f' and {need.revives}+ Revives' if need.revives else ''}" if need.potions else ""

@@ -165,7 +165,8 @@ class QuestMixin:
         beat = sb.resolve(name)
         if beat is None:
             return f"No quest called {name!r}. " + sb.listing(status, ctx)
-        if status.get(beat.key) == "done" and not (beat.key == "victory_road" and not self._plateau_side()):
+        rematch = beat.key == "elite_four" and self._league_rematch_open()           # the League after the Hall of Fame, with the Network Machine linked: the game reset it, the stronger teams wait
+        if status.get(beat.key) == "done" and not (beat.key == "victory_road" and not self._plateau_side()) and not rematch:
             return f"{beat.title}: already done."              # Victory Road is "done" once the Plateau was visited, but from inside the cave / south of it the quest is still the way through (the boulders reset)
         if not beat.driver:
             return "No script for this one yet — here is the plan:\n" + sb.plan(beat, status)
@@ -180,8 +181,8 @@ class QuestMixin:
             return f"Not yet — Fly first. {_FLY_HINT}"              # a gate, not a warning: the cave has no way home without it
         from config import LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE
         from knowledge.beat_readiness import hard_wall, loss_advice, readiness
-        losses = int(self.ltm.data.get("league_losses", 0)) if beat.key == "elite_four" else 0
-        if (wall := hard_wall(beat.key, self.reader.read_party(), losses, LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE)):
+        losses = int(self.ltm.data.get("league_losses", 0)) if beat.key == "elite_four" and not rematch else 0
+        if (wall := "" if rematch else hard_wall(beat.key, self.reader.read_party(), losses, LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE)):
             return wall                                          # the League's level wall: every call, no "go anyway" (a run threw itself at it eleven times)
         if beat.key == "elite_four" and (advice := loss_advice(self.reader.read_party(), losses, LEAGUE_LOSS_BUMP, LEAGUE_LOSS_RULE)):
             if LEAGUE_LOSS_RULE == "wall":
@@ -189,8 +190,9 @@ class QuestMixin:
             if f"elite_four:loss{losses}" not in self._ready_warned:
                 self._ready_warned.add(f"elite_four:loss{losses}")      # once per loss count: encouraged, never forced — the next call goes ahead
                 return advice
-        if beat.key not in self._ready_warned and (warn := readiness(beat.key, self.reader.read_party(), self._bag_or_none())):
-            self._ready_warned.add(beat.key)            # once per beat: a second call (or a resumed one) goes ahead
+        rkey = "elite_four_rematch" if rematch else beat.key
+        if rkey not in self._ready_warned and (warn := readiness(rkey, self.reader.read_party(), self._bag_or_none())):
+            self._ready_warned.add(rkey)                # once per beat: a second call (or a resumed one) goes ahead
             return warn
         return {"ss_ticket": self._get_ss_ticket, "cut": self._get_cut, "surf": self._get_surf,
                 "strength": self._get_strength, "coin_case": self._get_coin_case,
