@@ -184,7 +184,10 @@ The observation starts with `Context: <NAME>`. Always act according to it:
 - **IN_MENU** — a menu is open (Start menu, Bag, Party, Pokédex, …). Read the screenshot and navigate with the D-pad + A, or press B to back out to the field. Do NOT try to walk — the D-pad moves the menu cursor, not the player.
 - **TRANSITIONING** — the screen is changing (fade, warp, map load). Wait: call wait_frames(30) and read_game_state again; do NOT press movement or spam buttons until the context changes.
 
-{screenshot}{orientation}## Recording Milestones
+{screenshot}{orientation}## Side quests (optional)
+`quest()` lists the story in three parts: MAIN (the road to the Elite Four), SIDE QUESTS you can do now (each with what it is worth: a TM, an HM, a key item, a legendary), and the ones not open yet (with why). When a side quest opens, the observation says so once. They are yours to choose — never forced — but most are worth finishing before the League for items, levels and Pokédex entries, and `quest('elite_four')` tells you how many are still open when you prepare. Either/or rewards (Hitmonlee or Hitmonchan) are your decision.
+
+## Recording Milestones
 Call `record_milestone(name, note)` to permanently save story progress so future sessions know what you've done.
 Valid names: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel,
 got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength,

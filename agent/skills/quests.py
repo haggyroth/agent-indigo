@@ -138,13 +138,15 @@ class QuestMixin:
         strength, the eight gyms…) or prints the state-aware plan (only the game start, `parcel`, is guide-only now)."""
         from knowledge import story_beats as sb
         status = self._story()
+        from agent.story import side_ctx
+        ctx = side_ctx(self.reader)
         if not str(name or "").strip():
-            return sb.listing(status) + self._sweep_listing()
+            return sb.listing(status, ctx) + self._sweep_listing()
         head, *self._quest_opts = str(name).split()                 # 'new_game squirtle name=KYLE': the words after the name are the driver's options
         name = head
         beat = sb.resolve(name)
         if beat is None:
-            return f"No quest called {name!r}. " + sb.listing(status)
+            return f"No quest called {name!r}. " + sb.listing(status, ctx)
         if status.get(beat.key) == "done" and not (beat.key == "victory_road" and not self._plateau_side()):
             return f"{beat.title}: already done."              # Victory Road is "done" once the Plateau was visited, but from inside the cave / south of it the quest is still the way through (the boulders reset)
         if not beat.driver:

@@ -153,6 +153,21 @@ def _sweep_line(t: Tick) -> list[str]:
     return [f"AREA PROGRESS: {sweeps.line(area, prog)}" + (f"\n{note}" if note else "")]
 
 
+def _side_quest_line(t: Tick) -> list[str]:
+    """The side-quest digest (knowledge.story_beats.digest): shown when the SET of open side quests changes — never repeated every tick; quest() always lists them."""
+    from agent.story import side_ctx
+    from knowledge import story_beats as sb
+    status = _story_status_for(t)
+    ctx = side_ctx(t.reader)
+    sq = sb.side_quests(status, ctx)
+    sig = (tuple(b.key for b in sq["now"]), len(sq["locked"]))
+    if sig == t.run.sidequest_sig:
+        return []
+    t.run.sidequest_sig = sig
+    line = sb.digest(status, ctx)
+    return [line] if line else []
+
+
 def _next_beat_money(t: Tick, items) -> str:
     """The MONEY line when the next story beat wants more yen than we hold (knowledge.money): the gap and how to earn it."""
     from knowledge.money import money_line
@@ -231,6 +246,8 @@ def _readiness_and_bag(t: Tick) -> list[str]:
     aide = _safe("aide", lambda: _aide_line(t), "")
     if aide and d.get("badges_earned", 0) >= 1:
         out.append(aide)
+    if t.overworld and not opening and d.get("badges_earned", 0) >= 1:
+        out.extend(_side_quest_line(t))
     if t.overworld and not opening:
         out.extend(_sweep_line(t))
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago

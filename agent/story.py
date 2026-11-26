@@ -37,3 +37,14 @@ def story_status(reader, ltm, overrides=None) -> dict:
     """{beat key: 'done' | 'next' | 'blocked'} for the whole chain, from the live game. `overrides` = {key: bool} for beats whose driver
     has a stricter notion of done (Cut taught, Surf taught)."""
     return story_beats.evaluate(make_done_check(reader, ltm), overrides)
+
+
+def side_ctx(reader):
+    """What the side-quest gates read from the live game: badges, species caught, the Hall of Fame flag (any unreadable value counts as 'not yet')."""
+    def safe(fn, default):
+        try:
+            return fn()
+        except Exception:
+            return default
+    return story_beats.SideCtx(badges=safe(lambda: int(reader.read_badges()[0]), 0), owned=safe(lambda: int(reader.read_pokedex()[0]), 0),
+                               game_clear=safe(lambda: bool(reader.read_flag(0x82C)), False))      # FLAG_SYS_GAME_CLEAR

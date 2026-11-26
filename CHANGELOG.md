@@ -6,6 +6,8 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Added
+- **A side-quest log (#356).** `quest()` now lists MAIN (the road to the Elite Four), SIDE QUESTS available now — each with what it is worth (TM28 Dig, the Old Rod, a legendary …) — and those not open yet with why (the Oak's Aide counts, a missing story step), plus what is done. When the set of open side quests changes the
+  observation says so once (`SIDE QUESTS you can do now …`), and `quest('elite_four')`'s prep notes how many are still open before the Hall of Fame: advice, never a wall, and the either/or choices (Hitmonlee / Hitmonchan) stay the model's. `Beat` gains `tier`, `gate` and `payoff`; a unit test pins the gates to the Aide thresholds, a live test runs it from the Misty fixture.
 - **Area completion, read from the game's own flags (#366).** `tools/gen_area_sweeps.py` reads the pret/pokefirered decomp (every trainer's `trainerbattle_*` → defeat flag, every item ball's `FLAG_HIDE_*`, every non-renewable hidden item) and writes `knowledge/area_sweeps.py`: 26 named areas (Viridian Forest, Mt. Moon, Rock Tunnel, the S.S. Anne, Rocket Hideout, Pokémon Tower, Silph Co., the Mansion, the Power Plant, Seafoam, the Safari Zone, Victory Road, the gyms, the route groups). `knowledge/sweeps.py` counts progress per area (story-conditional item balls and respawning mushrooms are left out), and the observation shows `AREA PROGRESS: Mt. Moon: 4/11 trainers, 1/10 items, …` when it changes; `quest()` lists the started-but-unfinished areas. The one area that is lost by moving on, the S.S. Anne (it sails once you have HM01 Cut), says what would be missed — advice, never a wall. A `sweep(area)` driver is a separate step.
 
 ### Fixed

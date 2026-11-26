@@ -8,7 +8,8 @@ first, how to tell it is DONE (flags / key items / badges read from the game, ve
 
 Flags and item ids below are the decomp's (constants/flags.h, constants/items.h); gym badges are bits of the badge byte
 (Boulder 0, Cascade 1, Thunder 2, Rainbow 3, Soul 4, Marsh 5, Volcano 6, Earth 7)."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import NamedTuple
 
 # done-spec kinds: ("flag", id) · ("item", key-item id) · ("badge", bit) · ("milestone", name) — a beat is done if ANY holds
 TEA, POKE_FLUTE, SECRET_KEY, CARD_KEY, LIFT_KEY, SILPH_SCOPE, SS_TICKET, COIN_CASE_ITEM = 369, 350, 351, 355, 356, 359, 265, 260
@@ -26,6 +27,13 @@ class Beat:
     driver: str = ""           # quest() key when a script exists (quest('key') does it), else "" = guide only
     optional: bool = False     # not required to reach the Elite Four (but useful)
     tip: str = ""
+    gate: tuple = ()           # availability conditions BESIDES `needs` (side quests): ("owned", n) species caught · ("badges", n) · ("gameclear",) the Hall of Fame
+    payoff: str = ""           # one line: what finishing it is worth (side quests)
+
+    @property
+    def tier(self) -> str:
+        """main = on the road to the Elite Four · side = optional, doable before the Hall of Fame · post = only after it."""
+        return "post" if ("gameclear",) in self.gate else ("side" if self.optional else "main")
 
 
 BEATS: tuple[Beat, ...] = (
@@ -176,6 +184,16 @@ BEATS: tuple[Beat, ...] = (
                 "Every room: walk up to the leader and talk; each win opens the next door. After the Champion: the Hall of Fame, Oak's speech and the credits."),
          tip="A loss resets the whole League (the decomp's EventScript_ResetEliteFourEnd clears every defeated flag), heals the party, costs some money and respawns you in the Plateau's Center: quest('elite_four') starts again from the first door. You keep every level the losing fights gave you — train first if the shortfall is large; don't load_state (it discards that Exp)."),
 )
+# What each optional beat is worth, and any gate beyond its `needs` (the Oak's Aide counts are knowledge/aides.py). Information for the model, never a wall.
+SIDE_INFO = {
+    "dig": ("TM28 Dig", ()), "magikarp": ("a Magikarp for ¥500 (a slow starter, a strong finish)", ()), "flash": ("HM05 Flash (lights the caves)", (("owned", 10),)),
+    "fly": ("HM02 Fly (fast travel to any visited town)", ()), "coin_case": ("the Coin Case (Game Corner prizes)", ()), "hitmon": ("Hitmonlee or Hitmonchan — your choice", ()),
+    "copycat": ("the move Mimic", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
+    "good_rod": ("the Good Rod (better fishing)", ()), "super_rod": ("the Super Rod (the best Kanto rod)", ()), "bike": ("the Bicycle (twice the speed; the Cycling Road)", ()),
+    "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
+    "exp_share": ("the Exp. Share", (("owned", 50),)), "zapdos": ("Zapdos, a legendary (appears once)", ()), "articuno": ("Articuno, a legendary (appears once)", ()),
+}
+BEATS = tuple(replace(b, payoff=SIDE_INFO[b.key][0], gate=SIDE_INFO[b.key][1]) if b.key in SIDE_INFO else b for b in BEATS)
 BY_KEY = {b.key: b for b in BEATS}
 CHAIN_KEYS = tuple(b.key for b in BEATS)
 # extra aliases accepted by quest('…')
@@ -246,22 +264,90 @@ def story_line(status: dict) -> str:
     return f"STORY NEXT: {b.title} — {b.where}. {how}{more}"
 
 
-def listing(status: dict) -> str:
-    """The whole chain for quest(): ✔ done / ▶ next / … blocked, scripted beats marked."""
-    lines = []
+class SideCtx(NamedTuple):
+    """What the availability gates read from the game."""
+    badges: int = 0
+    owned: int = 0            # species CAUGHT
+    game_clear: bool = False  # the Hall of Fame (FLAG_SYS_GAME_CLEAR)
+
+
+def gate_unmet(beat: Beat, ctx: SideCtx) -> str:
+    """Why `beat`'s extra gate is not met yet ('' when it is)."""
+    for kind, *arg in beat.gate:
+        if kind == "owned" and ctx.owned < arg[0]:
+            return f"needs {arg[0]} species caught (you have {ctx.owned})"
+        if kind == "badges" and ctx.badges < arg[0]:
+            return f"needs {arg[0]} badges (you have {ctx.badges})"
+        if kind == "gameclear" and not ctx.game_clear:
+            return "after the Hall of Fame"
+    return ""
+
+
+def side_quests(status: dict, ctx: SideCtx) -> dict:
+    """The optional beats by availability: {'now': [Beat], 'locked': [(Beat, why)], 'done': [Beat]}. 'now' = every need done AND the gate met."""
+    out: dict = {"now": [], "locked": [], "done": []}
     for b in BEATS:
+        if b.tier == "main":
+            continue
+        if status.get(b.key) == "done":
+            out["done"].append(b)
+        elif (why := gate_unmet(b, ctx)) or status.get(b.key) != "next":
+            out["locked"].append((b, why or "first: " + ", ".join(n.key for n in missing_needs(b, status))))
+        else:
+            out["now"].append(b)
+    return out
+
+
+def digest(status: dict, ctx: SideCtx) -> str:
+    """One observation line: the side quests open right now (and how many more unlock later). '' when none are open — silent, never nagging."""
+    sq = side_quests(status, ctx)
+    if not sq["now"]:
+        return ""
+    names = ", ".join(f"{b.key} ({b.payoff})" if b.payoff else b.key for b in sq["now"][:6])
+    more = f" (+{len(sq['now']) - 6} more)" if len(sq["now"]) > 6 else ""
+    later = f"; {len(sq['locked'])} more unlock as the story advances" if sq["locked"] else ""
+    return f"SIDE QUESTS you can do now (optional — your call): {names}{more}{later}. quest() lists them all."
+
+
+def league_advice(status: dict, ctx: SideCtx) -> str:
+    """Before the League: how many pre-Hall-of-Fame side quests are still open — advice, not a wall."""
+    sq = side_quests(status, ctx)
+    open_ = [b for b in sq["now"] if b.tier == "side"]
+    if not open_:
+        return ""
+    return (f"{len(open_)} side quest{'s' if len(open_) != 1 else ''} you could still do before the Hall of Fame: "
+            + ", ".join(f"{b.key} ({b.payoff})" for b in open_[:8]) + " — optional, your call (they give items, levels and Pokédex entries).")
+
+
+def listing(status: dict, ctx: SideCtx | None = None) -> str:
+    """The whole chain for quest(): MAIN, then the side quests (available now / locked), then post-game; ✔ done / ▶ next / … blocked, scripted beats marked."""
+    ctx = ctx or SideCtx()
+
+    def line(b: Beat, mark: str, extra: str = "") -> str:
         st = status.get(b.key, "blocked")
-        mark = {"done": "✔", "next": "▶", "blocked": "…"}[st]
         tag = f" [quest('{b.driver}') runs it]" if b.driver and st != "done" else (" [guide]" if not b.driver and st != "done" else "")
-        opt = " (optional)" if b.optional else ""
+        rec = ""
         from knowledge.beat_readiness import NEEDS
         if st != "done" and b.key in NEEDS:
-            opt += f" [rec. L{NEEDS[b.key].top}+]"
-        need = ""
-        if st == "blocked":
-            need = " — first: " + ", ".join(n.key for n in missing_needs(b, status))
-        lines.append(f"{mark} {b.key}: {b.title}{opt}{tag}{need}")
-    return "Story, start to Elite Four (quest('<name>') = the script or the plan):\n" + "\n".join(lines)
+            rec = f" [rec. L{NEEDS[b.key].top}+]"
+        pay = f" — {b.payoff}" if b.payoff and st != "done" else ""
+        return f"{mark} {b.key}: {b.title}{rec}{tag}{pay}{extra}"
+    marks = {"done": "✔", "next": "▶", "blocked": "…"}
+    main = [line(b, marks[status.get(b.key, "blocked")],
+                 (" — first: " + ", ".join(n.key for n in missing_needs(b, status))) if status.get(b.key, "blocked") == "blocked" else "")
+            for b in BEATS if b.tier == "main"]
+    sq = side_quests(status, ctx)
+    out = ["Story, start to Elite Four (quest('<name>') = the script or the plan):", "MAIN"] + main
+    if sq["now"]:
+        out += ["SIDE QUESTS — available now (optional: they are yours to choose, never forced)"] + [line(b, "▶") for b in sq["now"] if b.tier == "side"]
+    if sq["locked"]:
+        out += ["SIDE QUESTS — not yet"] + [line(b, "…", f" — {why}") for b, why in sq["locked"] if b.tier == "side"]
+    if sq["done"]:
+        out.append("SIDE QUESTS — done: " + ", ".join(b.key for b in sq["done"] if b.tier == "side"))
+    post = [(b, why) for b, why in sq["locked"] if b.tier == "post"] + [(b, "") for b in sq["now"] if b.tier == "post"]
+    if post:
+        out += ["POST-GAME"] + [line(b, "▶" if not why else "…", f" — {why}" if why else "") for b, why in post]
+    return "\n".join(out)
 
 
 def plan(beat: Beat, status: dict) -> str:
