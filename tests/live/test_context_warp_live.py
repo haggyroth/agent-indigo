@@ -1,10 +1,10 @@
 """A warp after a closed menu never reads IN_MENU, and real menus still do (#402), on the real core."""
 from game.constants import Addr
-from game.mgba_core import lib
 from game.state import GameContext
 
 
 def test_a_warp_after_a_closed_menu_is_never_a_menu_and_the_start_menu_still_is(live):
+    from game.mgba_core import lib                           # the native binding: imported here so collection works on CI, which has none
     live.load("fullparty")                                   # inside a Pokémon Center, facing the door
     m, r = live.m, live.r
     m.tap("Start")
