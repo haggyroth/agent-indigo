@@ -14,6 +14,8 @@ import json
 import time
 from pathlib import Path
 
+from memory.atomic import atomic_write_json
+
 
 class CheckpointManager:
     def __init__(self, directory, save_fn, every_ticks: int = 20, keep: int = 5, on_save=None, on_drop=None):
@@ -36,14 +38,16 @@ class CheckpointManager:
         return None
 
     def save(self, tag: str, step: int, meta: dict | None = None, permanent: bool = False) -> Path | None:
+        path = None
         try:
             self.dir.mkdir(parents=True, exist_ok=True)
             path = self.dir / f"{tag}.ss1"
             if not self.save_fn(str(path)):
+                path.unlink(missing_ok=True)          # the core may have truncated it before failing
                 return None
-            self._last_step = step
             if self.on_save:
                 self.on_save(path)
+            self._last_step = step
             if not permanent:
                 self._rolling.append(path)
                 while len(self._rolling) > self.keep:
@@ -51,11 +55,18 @@ class CheckpointManager:
                     old.unlink(missing_ok=True)
                     if self.on_drop:
                         self.on_drop(old)
-            (self.dir / "latest.json").write_text(json.dumps(
-                {"path": str(path), "step": step, "tag": tag, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                 "meta": meta or {}}, indent=2, default=str))
+            atomic_write_json(self.dir / "latest.json",
+                              {"path": str(path), "step": step, "tag": tag, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "meta": meta or {}},
+                              indent=2, default=str)
             return path
         except Exception:
+            if path is not None:                      # a state nothing points at (the snapshot or the pointer failed) would never be pruned
+                path.unlink(missing_ok=True)
+                if self.on_drop:
+                    try:
+                        self.on_drop(path)
+                    except Exception:
+                        pass
             return None
 
 

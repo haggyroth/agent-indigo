@@ -814,6 +814,16 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             time.sleep(1.0)
 
 
+# Process exit status by EpisodeResult.reason. 0 = the goal, or a cap the operator asked for (MAX_STEPS / MAX_LLM_CALLS / TOKEN_BUDGET / MAX_WALL_SECONDS: a bounded smoke run
+# that reaches its bound is a success). 1 = the run broke (stalled, error budget, the LLM endpoint refused). 2 = it could not start (see StartPointError). 130 = Ctrl-C.
+EXIT_CODES = {"goal": 0, "max_steps": 0, "max_llm_calls": 0, "token_budget": 0, "max_wall": 0,
+              "stalled": 1, "error_budget": 1, "llm_error": 1, "interrupted": 130}
+
+
+def exit_code(reason: str) -> int:
+    return EXIT_CODES.get(reason, 1)             # an unknown reason is a failure, never a silent 0
+
+
 def _resume_state() -> str:
     """Resolve RESUME ('latest' or a path) to a checkpoint file, or '' for a normal start."""
     if not RESUME:
@@ -858,12 +868,11 @@ def main():
                              goal=_cleared_this_run(rt.ltm), goal_desc="Hall of Fame (the game is cleared)")
     finally:
         rlog.close()
-    # run_episode already printed the stop line. Propagate any non-goal stop (a
-    # budget cap, interruption, or the error budget) as a non-zero exit so a
-    # wrapping shell/CI notices the run didn't actually finish; 0 means the goal
-    # was achieved.
-    if result.reason != "goal":
-        sys.exit(1)
+    # run_episode already printed the stop line. The exit status says WHY it stopped (see EXIT_CODES) so a wrapping shell/CI can tell a bounded run that
+    # reached its cap from one that broke.
+    code = exit_code(result.reason)
+    if code:
+        sys.exit(code)
 
 
 if __name__ == "__main__":

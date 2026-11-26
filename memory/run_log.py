@@ -15,6 +15,8 @@ import json
 import time
 from pathlib import Path
 
+from memory.atomic import atomic_write_json
+
 
 class NullRunLog:
     """Do-nothing log (default, and used by the eval harness / tests)."""
@@ -65,8 +67,7 @@ class RunLog(NullRunLog):
     def write_meta(self, **fields) -> None:
         self._meta.update(fields)
         try:
-            (self.dir / "meta.json").write_text(
-                json.dumps(self._meta, indent=2, default=str))
+            atomic_write_json(self.dir / "meta.json", self._meta, indent=2, default=str)
         except Exception:
             pass
 
