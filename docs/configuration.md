@@ -17,6 +17,7 @@ All settings are environment variables, read from `.env` (copy [`.env.example`](
 
 | Variable | Default | Description |
 |---|---|---|
+| `RUN_GOAL` | `hall_of_fame` | When a run is done. `hall_of_fame` = the Hall of Fame is recorded (bounded runs, evals). `completion` = keep playing past it until the completion target (the Kanto Pokédex, 151 caught, and every side quest) is reached — or a budget (`MAX_STEPS`, `TOKEN_BUDGET`, `MAX_WALL_SECONDS`, …) ends the run. After the Hall of Fame the observation carries a POST-GAME line (information only). The end record has `post_game_steps` and `dex_owned`. |
 | `MAX_STEPS` | `0` | Stop after N decision steps (`0` = until interrupted). |
 | `MAX_LLM_CALLS` | `0` | Stop after N chat-completion calls (`0` = unlimited). |
 | `TOKEN_BUDGET` | `0` | Stop once cumulative prompt + completion tokens reach this (`0` = unlimited). |

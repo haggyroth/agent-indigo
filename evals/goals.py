@@ -39,6 +39,11 @@ def has_milestone(name: str) -> Goal:
                 f"milestone '{name}'")
 
 
+def dex_owned_at_least(n: int) -> Goal:
+    """Kanto species caught (the journal's `dex_owned`, refreshed every tick from the Pokédex)."""
+    return Goal(lambda _s, l: int(l.data.get("dex_owned", 0) or 0) >= n, f"≥{n} species caught")
+
+
 def party_size_at_least(n: int) -> Goal:
     return Goal(lambda s, _l: s.party_count >= n,
                 f"party size ≥{n}")

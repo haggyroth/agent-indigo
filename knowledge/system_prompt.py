@@ -81,6 +81,12 @@ PP_RULES = """## PP rules
 """
 
 
+POST_GAME = """### The game is cleared
+You are the Champion. Nothing forces you to stop: the observation's POST-GAME line says what is left (the Kanto Pokédex, side quests, the National Pokédex from Prof. Oak, the Sevii
+Islands, the legendaries and roamers) in the order it is available. Choose what is worth your time; `quest()` lists the side quests and why a locked one is locked.
+"""
+
+
 def build_system_prompt(ltm: LongTermMemory, journal: BattleJournal,
                         state: GameState | None = None,
                         current_enemy: str = "",
@@ -111,6 +117,7 @@ def build_system_prompt(ltm: LongTermMemory, journal: BattleJournal,
     corner       = GAME_CORNER if badges >= 3 else ""             # Celadon is the 4th gym town
     safari       = SAFARI if badges >= 4 else ""
     pp_rules     = PP_RULES
+    post_game    = POST_GAME if "hall_of_fame" in milestones else ""      # the status tail: it changes once, when the game is cleared
 
     return f"""You are an AI agent playing Pokémon LeafGreen on a Game Boy Advance emulator.
 Goal: defeat all 8 Gym Leaders, the Elite Four, and Champion Gary.
@@ -349,7 +356,7 @@ Towns visited: {', '.join(p['towns_visited']) or 'none'}
 Battles: {p['battles_won']} won / {p['battles_lost']} lost  |  Starter: {p['starter'] or 'not chosen yet'}
 
 {lessons}
-
+{post_game}
 ### Navigation
 {route}
 {building_block}

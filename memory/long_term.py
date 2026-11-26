@@ -22,6 +22,7 @@ DEFAULTS = {
     "hidden_taken": [],   # "bank/id/x/y" hidden-item tiles already searched (overworld._pick_hidden_here)
     "pc_visited": [],     # "bank,id" towns whose Pokémon Center was visited on first arrival (nav._maybe_visit_new_town)
     "model_milestones": [],  # milestones the MODEL recorded by hand (record_milestone), not derived from the game — startup drops any the cartridge contradicts (#379)
+    "dex_owned": 0,       # Kanto species caught as last read (the eval goals and the scorecard read the journal, not the emulator)
     "shop_broke_at": None,  # money at the last shop() visit that bought nothing for lack of funds (readiness stays quiet until richer)
 }
 

@@ -125,6 +125,26 @@ SCENARIOS += [
 ]
 SCENARIOS += [
     Scenario(
+        name="post_game_national_dex",
+        goal=goals.has_milestone("national_dex"),
+        max_steps=600,
+        xfail="needs 60 species caught and One Island (the Sevii Islands) visited; nothing scripts either yet (#357, #360)",
+        start_state=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saves", "live", "post_hof.ss1"),
+        notes="Pallet Town after the Hall of Fame and the credits (21 species caught). With RUN_GOAL=completion the model is told what is left; the National Pokédex needs 60 caught, "
+              "the Sevii Islands reached and a talk with Prof. Oak. Measures how far a post-game run gets with no scripted help.",
+    ),
+]
+SCENARIOS += [
+    Scenario(
+        name="post_game_dex",
+        goal=goals.dex_owned_at_least(30),
+        max_steps=500,
+        start_state=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saves", "live", "post_hof.ss1"),
+        notes="Pallet Town after the Hall of Fame with 21 species caught: catch nine more (the Pokédex is the first post-game objective the briefing names). Run with RUN_GOAL=completion's observation.",
+    ),
+]
+SCENARIOS += [
+    Scenario(
         name="full_chain",
         goal=goals.has_milestone("hall_of_fame"),
         max_steps=40000,

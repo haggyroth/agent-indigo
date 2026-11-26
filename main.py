@@ -2,7 +2,7 @@ from agent.skills.base import log_once
 from datetime import datetime
 from config import (PER_SAVE_JOURNALS, START_NEW_GAME, RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, BATTLE_STYLE, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
-                    LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
+                    LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY, RUN_GOAL)
 from game.memory_reader import LeafGreenReader
 from game.options import apply_battle_style
 from game.state import GameContext, GameState, StateDiff
@@ -112,6 +112,8 @@ class EpisodeResult:
     stuck_ratio:       float = 0.0    # of the overworld ticks that follow a movement tool, the fraction where the player (map + tile) has not moved
     goal_desc:         str = ""
     cached_tokens:     int = 0        # prompt tokens served from the server's prompt cache (0 when the endpoint doesn't report it)
+    post_game_steps:   int = 0        # decision ticks played after the Hall of Fame (a completion run)
+    dex_owned:         int = 0        # Kanto species caught at the end
 
     @property
     def total_tokens(self) -> int:
@@ -413,6 +415,8 @@ class _RunState:
     pending_map_b64: Optional[str] = None
     pending_map_name: str = ""
     blackout_active: bool = False
+    post_game_steps: int = 0              # decision ticks since the Hall of Fame was in the journal
+    postgame_sig: Optional[tuple] = None  # the post-game briefing as last shown (see agent.observation._post_game_line)
     prev_was_nav: bool = False            # the previous decision tick ran a movement tool (what 'stuck' is measured against)
     blackout_passes: int = 0              # consecutive recovery passes with the party still wiped (capped: MAX_BLACKOUT_PASSES)
     decision_ticks: int = 0
@@ -510,10 +514,14 @@ def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
     run.prev_key_items = key_items
     try:
         run.prev_dex_owned = reader.read_pokedex()[0]       # absorbs dex gains from evolutions; catches book theirs in _record_battle
+        if run.prev_dex_owned != ltm.data.get("dex_owned"):
+            ltm.data["dex_owned"] = int(run.prev_dex_owned)
     except Exception:
         log_once("main._apply_progress", "main._apply_progress: tolerated failure (continuing with a default)")
         pass
 
+    if reader.read_flag(0x840) and ltm.add_milestone("national_dex", "Prof. Oak enabled the National Pokédex"):         # FLAG_SYS_NATIONAL_DEX
+        events.emit("milestone", "milestone: national_dex — the Pokédex goes beyond Kanto")
     if reader.read_flag(0x82C) and ltm.add_milestone("hall_of_fame", "beat the Pokémon League"):          # FLAG_SYS_GAME_CLEAR: set in the Hall of Fame
         events.emit("milestone", "milestone: hall_of_fame — the Pokémon League is beaten, the game is cleared")
 
@@ -630,6 +638,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             milestones=list(ltm.data.get("milestones", [])),
             stuck_ratio=round(run.stuck_ticks / run.decision_ticks, 3) if run.decision_ticks else 0.0,
             goal_desc=goal_desc,
+            post_game_steps=run.post_game_steps, dex_owned=int(ltm.data.get("dex_owned", 0) or 0),
         )
 
     while True:
@@ -825,6 +834,8 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
 
             run.prev_state = state
             mgba.tick()
+            if "hall_of_fame" in ltm.data.get("milestones", []):
+                run.post_game_steps += 1
 
             run.step_count += 1
             rlog.event("tick", step=run.step_count, ctx=state.context.name,
@@ -915,6 +926,21 @@ def _cleared_this_run(ltm):
     return lambda _s, l: not had and "hall_of_fame" in l.data.get("milestones", [])
 
 
+def _completion_goal(rt):
+    """Goal predicate for RUN_GOAL=completion: the Hall of Fame, the whole Kanto Pokédex and every side quest (knowledge.completion.reached). Evaluated from the live game
+    each tick; any unreadable value counts as 'not yet', so a read hiccup never ends a run early."""
+    from agent.story import side_ctx, story_status
+    from knowledge import completion
+
+    def goal(_state, ltm) -> bool:
+        try:
+            ctx = side_ctx(rt.reader)
+            return completion.reached(ctx.game_clear, int(ctx.owned), story_status(rt.reader, ltm), ctx)
+        except Exception:
+            return False
+    return goal
+
+
 def main():
     resume = _resume_state()
     try:
@@ -926,14 +952,17 @@ def main():
         sys.exit(1)
     from memory.run_log import RunLog
     rlog = RunLog(PROGRESS_PATH.parent / "runs")
-    rlog.write_meta(model=MODEL_NAME, backend="native", max_steps=MAX_STEPS,
+    rlog.write_meta(model=MODEL_NAME, backend="native", run_goal=RUN_GOAL, max_steps=MAX_STEPS,
                     max_llm_calls=MAX_LLM_CALLS, token_budget=TOKEN_BUDGET,
                     start_from_save=START_FROM_SAVE, use_vision=USE_VISION,
                     temperature=TEMPERATURE, started=time.strftime("%Y-%m-%d %H:%M:%S"))
     console.print(f"[cyan]Run log: {rlog.dir}[/]")
     try:
-        result = run_episode(rt, max_steps=MAX_STEPS, verbose=True, run_log=rlog,
-                             goal=_cleared_this_run(rt.ltm), goal_desc="Hall of Fame (the game is cleared)")
+        if RUN_GOAL == "completion":
+            goal, desc = _completion_goal(rt), "Completion: the Hall of Fame, the Kanto Pokédex (151) and every side quest"
+        else:
+            goal, desc = _cleared_this_run(rt.ltm), "Hall of Fame (the game is cleared)"
+        result = run_episode(rt, max_steps=MAX_STEPS, verbose=True, run_log=rlog, goal=goal, goal_desc=desc)
     finally:
         rlog.close()
     # run_episode already printed the stop line. The exit status says WHY it stopped (see EXIT_CODES) so a wrapping shell/CI can tell a bounded run that
