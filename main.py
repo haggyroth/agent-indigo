@@ -25,6 +25,11 @@ import os, time, sys, traceback
 
 console = Console()
 
+
+class StartPointError(RuntimeError):
+    """The save / state the run was asked to start from could not be loaded. Raised instead of carrying on from the power-on
+    screen: a run (or an eval scenario) that silently plays a new game is worse than no run (#370)."""
+
 # Where uncaught per-tick exceptions are recorded (full tracebacks). The console
 # only shows a scrolling summary; this file is the durable record for debugging a
 # run after the fact. Sits alongside progress.json in the logs dir.
@@ -239,7 +244,8 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
                   fresh_session: bool = True,
                   verbose: bool = True) -> Optional[AgentRuntime]:
     """Connect to the emulator, load the requested start point, and build every
-    component the decision loop needs. Returns None if the emulator isn't ready.
+    component the decision loop needs. Returns None if the emulator isn't ready; raises StartPointError if a requested
+    start_state / start_save is missing or cannot be loaded (the run never falls back to a new game on its own).
 
     ltm_path / journal_path isolate persistent state — the eval harness points
     them at a scratch dir so a scenario never touches the real logs/progress.json.
@@ -276,26 +282,28 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
         mgba.run_frames(600)                  # the boot logos: the game then sits on the title screen, waiting for quest('new_game')
         say("[green]New game: booted to the title screen (no save loaded)[/]")
     elif start_state:
-        if mgba.load_state_file(start_state):
-            mgba.tick(30)   # let post-load fade/flags settle before first read
-            s = reader.read_state()
-            say(f"[green]Loaded save state: {start_state} "
-                f"(map {s.map_bank}/{s.map_id}, pos ({s.player_x},{s.player_y}))[/]")
-        else:
-            say(f"[red]Could not load save state: {start_state}[/]")
+        if not Path(start_state).is_file():
+            raise StartPointError(f"start state not found: {start_state}")
+        if not mgba.load_state_file(start_state):
+            raise StartPointError(f"could not load save state: {start_state} (corrupt, or saved by a different libmgba?)")
+        mgba.tick(30)   # let post-load fade/flags settle before first read
+        s = reader.read_state()
+        say(f"[green]Loaded save state: {start_state} "
+            f"(map {s.map_bank}/{s.map_id}, pos ({s.player_x},{s.player_y}))[/]")
     # Otherwise, optionally boot from a battery save and drive to "Continue" so the
     # agent starts in real gameplay instead of the new-game intro (native only).
     elif start_save:
-        if mgba.load_save(start_save):
-            got_control = drive_into_gameplay(mgba, reader)
-            where = f"map {mgba.read8(Addr.MAP_BANK)}/{mgba.read8(Addr.MAP_ID)}"
-            if got_control:
-                say(f"[green]Continued from save: {start_save} ({where})[/]")
-            else:
-                say(f"[yellow]Continued from save but could not confirm player "
-                    f"control ({where}) — may still be in the quest recap[/]")
+        if not Path(start_save).is_file():
+            raise StartPointError(f"save not found: {start_save}")
+        if not mgba.load_save(start_save):
+            raise StartPointError(f"could not load save: {start_save}")
+        got_control = drive_into_gameplay(mgba, reader)
+        where = f"map {mgba.read8(Addr.MAP_BANK)}/{mgba.read8(Addr.MAP_ID)}"
+        if got_control:
+            say(f"[green]Continued from save: {start_save} ({where})[/]")
         else:
-            say(f"[red]Could not load save: {start_save}[/]")
+            say(f"[yellow]Continued from save but could not confirm player "
+                f"control ({where}) — may still be in the quest recap[/]")
 
     tilemap = TilemapReader(mgba)
     # The journal belongs to the save/state we just loaded (memory.journals): an old fixture must not inherit the milestones of the newest run. Explicit paths (the eval
@@ -843,7 +851,11 @@ def _cleared_this_run(ltm):
 
 def main():
     resume = _resume_state()
-    rt = build_runtime(verbose=True, **({"start_state": resume} if resume else {}))
+    try:
+        rt = build_runtime(verbose=True, **({"start_state": resume} if resume else {}))
+    except StartPointError as e:
+        console.print(f"[red bold]Cannot start: {e}[/]")
+        sys.exit(2)
     if rt is None:
         sys.exit(1)
     from memory.run_log import RunLog

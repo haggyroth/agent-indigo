@@ -29,6 +29,10 @@ def run_scenario(sc: Scenario, *, verbose: bool = False) -> dict | None:
     or None if the emulator couldn't be brought up."""
     import main as agent  # heavy import kept local so `evals` stays importable
 
+    missing = sc.missing_fixtures()
+    if missing:                                   # never boot (and spend a step budget on) a scenario that cannot start where it says
+        return _skipped(sc, f"fixture_missing: {', '.join(missing)}")
+
     scratch = EVAL_DIR / "scratch"
     scratch.mkdir(parents=True, exist_ok=True)
     ltm_path     = scratch / f"{sc.name}_progress.json"
@@ -37,10 +41,13 @@ def run_scenario(sc: Scenario, *, verbose: bool = False) -> dict | None:
         p.unlink(missing_ok=True)
 
     console.print(f"[bold]▶ {sc.name}[/] — goal: {sc.goal.desc} (≤{sc.max_steps} steps)")
-    rt = agent.build_runtime(
-        start_save=sc.start_save or "", start_state=sc.start_state or "",
-        ltm_path=str(ltm_path), journal_path=str(journal_path), verbose=verbose,
-    )
+    try:
+        rt = agent.build_runtime(
+            start_save=sc.start_save or "", start_state=sc.start_state or "",
+            ltm_path=str(ltm_path), journal_path=str(journal_path), verbose=verbose,
+        )
+    except agent.StartPointError as e:
+        return _skipped(sc, f"start_point_failed: {e}")
     if rt is None:
         console.print(f"[red]  could not start emulator for {sc.name} — skipping[/]")
         return None
@@ -59,6 +66,14 @@ def run_scenario(sc: Scenario, *, verbose: bool = False) -> dict | None:
     out["status"] = _status(result.passed, sc.xfail)
     console.print(f"  {result.summary()}  [{out['status']}]  ({elapsed}s)")
     return out
+
+
+def _skipped(sc: Scenario, why: str) -> dict:
+    """A scenario that could not start where it says is SKIPPED — never run, never scored FAIL."""
+    console.print(f"[yellow]  SKIPPED {sc.name}: {why}[/]")
+    return dict(scenario=sc.name, status="SKIPPED", reason=why, passed=False, steps=0, llm_calls=0, total_tokens=0,
+                prompt_tokens=0, completion_tokens=0, final_map=(0, 0), final_pos=(0, 0), badges=0, stats={}, milestones=[],
+                stuck_ratio=0.0, goal_desc=sc.goal.desc, cached_tokens=0, elapsed_s=0.0, xfail=sc.xfail)
 
 
 def _status(passed: bool, xfail: str) -> str:
@@ -91,7 +106,7 @@ def _report(results: list[dict]) -> None:
         table.add_column(col)
     for r in results:
         style = {"PASS": "green", "XPASS": "yellow bold",
-                 "FAIL": "red", "xfail": "dim"}.get(r["status"], "")
+                 "FAIL": "red", "xfail": "dim", "SKIPPED": "yellow"}.get(r["status"], "")
         table.add_row(
             r["scenario"], f"[{style}]{r['status']}[/]" if style else r["status"],
             r["reason"], str(r["steps"]), _event_cell(r.get("stats") or {}),
@@ -107,4 +122,6 @@ def _report(results: list[dict]) -> None:
     console.print(f"[dim]Wrote {path}[/]")
 
     passed = sum(r["status"] in ("PASS", "XPASS") for r in results)
-    console.print(f"\n[bold]{passed}/{len(results)} scenarios met their goal.[/]")
+    skipped = sum(r["status"] == "SKIPPED" for r in results)
+    console.print(f"\n[bold]{passed}/{len(results) - skipped} scenarios met their goal.[/]"
+                  + (f" [yellow]{skipped} skipped (could not start).[/]" if skipped else ""))

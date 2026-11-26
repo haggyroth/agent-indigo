@@ -35,6 +35,14 @@ class Scenario:
     # regression. Set to an issue reference.
     xfail:       str = ""
 
+    def fixtures(self) -> list[str]:
+        """The local start files this scenario needs (a battery save and/or a save state)."""
+        return [f for f in (self.start_state, self.start_save) if f]
+
+    def missing_fixtures(self) -> list[str]:
+        """The start files that are not on disk. `saves/*` is git-ignored, so a fresh checkout lacks the live fixtures."""
+        return [f for f in self.fixtures() if not os.path.isfile(f)]
+
 
 SCENARIOS: list[Scenario] = [
     Scenario(
