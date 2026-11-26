@@ -6,9 +6,6 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Fixed
-- **No `continue` path skips the run caps any more (#373).** The blackout recovery used to `continue` past `MAX_WALL_SECONDS` / `max_steps` / the spend caps, so a whiteout that never recovered tapped A forever. `_guard_stop` now runs at the top
-  of every loop iteration and after each decision; the recovery gives up as `stalled` after `MAX_BLACKOUT_PASSES` (40) passes (saving a stall state under the run's `stalls/`), and "the party is wiped" is confirmed with a fresh, fallback-free
-  read (`LeafGreenReader.read_party_fresh`) instead of a possibly stale last-good party. A failing `read_state` inside an exit path no longer masks the exit reason.
 - **Long-term memory no longer forgets four of its own keys on reload (#371).** `gym_losses` (a loss inside a gym blocks `challenge_leader` until the team grows), `hidden_taken`, `pc_visited` and
   `shop_broke_at` were written to `progress.json` but dropped by `LongTermMemory._load` because they were missing from `DEFAULTS`. They are declared now, and `_load` keeps any undeclared key
   (only `RETIRED_KEYS` are dropped). A test scans the source for every `ltm.data` key and fails if one is not in `DEFAULTS`.
