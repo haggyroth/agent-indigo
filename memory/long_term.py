@@ -18,7 +18,15 @@ DEFAULTS = {
     "battles_fled": 0,    "battles_caught": 0,
     "league_losses": 0,   # whiteouts in the Elite Four's rooms (the optional LEAGUE_LOSS_RULE raises the recommended levels per loss)
     "saved_badges": None, "saved_battles": 0,    # badges / battles when the game was last saved to the cartridge (save_game)
+    "gym_losses": {},     # {"bank/id": party level total} — a blackout inside a gym blocks challenge_leader until the team grows (main._handle_blackout)
+    "hidden_taken": [],   # "bank/id/x/y" hidden-item tiles already searched (overworld._pick_hidden_here)
+    "pc_visited": [],     # "bank,id" towns whose Pokémon Center was visited on first arrival (nav._maybe_visit_new_town)
+    "shop_broke_at": None,  # money at the last shop() visit that bought nothing for lack of funds (readiness stays quiet until richer)
 }
+
+# Keys that were once part of the schema and are deliberately dropped on load. Any OTHER key found in the file is kept: a
+# feature that stores state in ltm.data without declaring it here used to lose it on the next load (gym_losses & co, #371).
+RETIRED_KEYS = frozenset({"key_items_obtained"})
 
 class LongTermMemory:
     def __init__(self, path=None):
@@ -48,9 +56,8 @@ class LongTermMemory:
                 return copy.deepcopy(DEFAULTS)
             # deepcopy so absent keys don't alias DEFAULTS' mutable lists
             data = {**copy.deepcopy(DEFAULTS), **saved}
-            # Strip keys removed from the schema (e.g. key_items_obtained).
-            # Keeps the file from accumulating dead fields across schema changes.
-            data = {k: v for k, v in data.items() if k in DEFAULTS}
+            # Drop only keys explicitly retired from the schema; keep everything else so undeclared keys are never lost.
+            data = {k: v for k, v in data.items() if k not in RETIRED_KEYS}
             # Fix type mismatches from old schema versions.
             if not isinstance(data.get("pokemon_caught"), int):
                 old = data.get("pokemon_caught")
