@@ -120,6 +120,18 @@ class QuestMixin:
         from agent.story import story_status
         return story_status(self.reader, self.ltm, self._driver_done())
 
+    def _sweep_listing(self) -> str:
+        """The area sweeps that are started but not finished (knowledge.sweeps), and the one area that would be lost by moving on — information for quest()'s listing."""
+        try:
+            from knowledge import sweeps
+            flag = self.reader.read_flag
+            lines = [f"  {sweeps.line(a, p)}" for a, p in sweeps.started(flag)[:8]]
+            notes = [n for area in sweeps.MISSABLE if (n := sweeps.missable_note(area, sweeps.progress(area, flag), flag))]
+            out = ("\nAREA SWEEPS started, not finished (every trainer / item flag is read from the game):\n" + "\n".join(lines)) if lines else ""
+            return out + ("\n" + "\n".join(notes) if notes else "")
+        except Exception:
+            return ""
+
     def _quest_tool(self, name: str = "", auto_trainers: bool = False) -> str:
         """quest(name?) — the story chain (knowledge.story_beats). No name lists every beat from the Pokédex to the Elite Four with
         ✔ done / ▶ next / … blocked; a name runs its script when it has one (ss_ticket, cut, coin_case, rocket_hideout, tea, surf,
@@ -129,7 +141,7 @@ class QuestMixin:
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
         if not str(name or "").strip():
-            return sb.listing(status, ctx)
+            return sb.listing(status, ctx) + self._sweep_listing()
         head, *self._quest_opts = str(name).split()                 # 'new_game squirtle name=KYLE': the words after the name are the driver's options
         name = head
         beat = sb.resolve(name)

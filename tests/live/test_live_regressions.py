@@ -3010,3 +3010,15 @@ def test_rematch_progress_is_read_from_the_real_flags(live):
     st = rematches.status(live.r.read_flag)
     assert st["total"] == 221 and st["at_top"] >= 1 and st["waiting"].get(rematches.VS_SEEKER_FLAG, 0) >= 1
     assert rematches.line(live.r.read_flag).startswith("REMATCHES: ") and not live.r.read_flag(rematches.VS_SEEKER_FLAG)
+
+
+def test_area_progress_is_read_from_the_real_flags(live):
+    """#366: trainer / item / hidden-item flags per named area, from a real early fixture (Misty beaten) — and the S.S. Anne warning before HM01."""
+    from knowledge import sweeps
+    live.load("post_misty")
+    p = sweeps.progress("Viridian Forest", live.r.read_flag)
+    assert p["trainers"] == (1, 5) and p["items"][1] == 4                      # one forest trainer beaten on the way through
+    assert sweeps.progress("Mt. Moon", live.r.read_flag)["trainers"][0] >= 1
+    assert sweeps.progress("Rocket Hideout", live.r.read_flag)["items"][0] == 0   # story-conditional items are not counted as 'taken' from the start
+    out = live.c._sweep_listing()
+    assert "AREA SWEEPS started, not finished" in out and "Viridian Forest: 1/5 trainers" in out and "⚠ S.S. Anne" in out
