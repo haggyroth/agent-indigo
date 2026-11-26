@@ -1,12 +1,8 @@
-"""In-process mGBA backend — drop-in replacement for MGBAClient.
+"""In-process mGBA emulator client.
 
 Drives libmgba directly via the compiled `game._mgba_native` binding: no mGBA
-GUI, no Lua socket, no mGBA-http, no HTTP round-trips. The emulator only
-advances when we run frames, so button presses and `tick()` explicitly step it.
-
-Exposes the same method surface as `game.mgba_client.MGBAClient`, so the rest of
-the codebase (memory_reader, agent, tools, main) is unchanged apart from which
-client it constructs.
+GUI, no Lua socket, no HTTP round-trips. The emulator only advances when we run
+frames, so button presses and `tick()` explicitly step it.
 
 Build the binding first if needed:  python -m game._mgba_build
 """

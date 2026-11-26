@@ -19,7 +19,7 @@ Empirically verified via diagnostic_tilemap.py on FRLG US (AGB-BPGE):
 import logging
 from dataclasses import dataclass
 
-from game.mgba_client import MGBAClient
+from typing import TYPE_CHECKING
 from game.constants import Addr
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,10 @@ ELEV_WALL  = 0
 ELEV_WATER = 1
 ELEV_FLOOR = 3
 ELEV_BRIDGE = 4      # a bridge deck (Safari Zone East…): walkable, but only when a ramp joins it to ordinary floor
+
+
+if TYPE_CHECKING:
+    from game.mgba_core import NativeMGBAClient
 
 
 def bridge_tiles(entry, w: int, h: int) -> tuple[set, set]:
@@ -84,7 +88,7 @@ class TilemapReader:
     decks: set = frozenset()       # bridge-deck / ramp tiles of the map last read by passable_grid (see bridge_tiles)
     ramps: set = frozenset()
 
-    def __init__(self, client: MGBAClient):
+    def __init__(self, client: "NativeMGBAClient"):
         self.client = client
         self._map_ptr:        int | None = None
         self._layout_ptr:     int | None = None

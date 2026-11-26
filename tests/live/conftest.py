@@ -15,7 +15,7 @@ import pytest
 
 # Force a headless, text-only run BEFORE any project module (config reads .env at import — a developer's
 # SHOW_WINDOW=true would otherwise open a paced window and make these tests crawl).
-os.environ.update(USE_VISION="false", SHOW_WINDOW="false", MGBA_BACKEND="native")
+os.environ.update(USE_VISION="false", SHOW_WINDOW="false")
 os.environ.pop("START_FROM_STATE", None)
 os.environ.pop("RESUME", None)
 

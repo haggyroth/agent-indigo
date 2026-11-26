@@ -7,23 +7,22 @@
 > locations and shell commands below are host-specific. This file documents the macOS host.
 
 > **For AI coding assistants:** This is the *operational* reference — what you need to
-> build, run, and not break. Deep reference material (mGBA-http API, Gen III data
+> build, run, and not break. Deep reference material (the retired mGBA-http API, Gen III data
 > structures/decryption, the type chart, game strategy) moved to
 > [HISTORY.md](HISTORY.md); version history is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## Emulator Backend
+## Emulator
 
-Two backends, selected by `MGBA_BACKEND` in `.env`:
+The agent drives libmgba **in-process** via a cffi binding. No mGBA GUI, no Lua, no
+HTTP. The agent owns the emulator and steps frames directly (~50× real-time,
+deterministic). This is the only backend: the old mGBA GUI + Lua socket + mGBA-http
+transport (`MGBA_BACKEND=http`) was removed — its endpoint reference is kept in
+[HISTORY.md](HISTORY.md) for the memory-layout notes. (`~/mgba-http/` is just where the ROM
+and save live on this machine; the name is historical.)
 
-- **`native` (default)** — drives libmgba **in-process** via a cffi binding. No mGBA
-  GUI, no Lua, no mGBA-http, no HTTP. The agent owns the emulator and steps frames
-  directly (~50× real-time, deterministic). This is the recommended path.
-- **`http` (legacy)** — the old mGBA GUI + Lua socket + mGBA-http .NET transport.
-  Kept as a fallback; full endpoint reference + canonical `MGBAClient` in [HISTORY.md](HISTORY.md).
-
-### Native backend
+### Native binding
 
 | Component | Location | Notes |
 |-----------|----------|-------|
@@ -39,8 +38,8 @@ cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish        # bash/zsh: source .venv/bin/activate
 python -m game._mgba_build            # compiles game/_mgba_native*.so
 ```
-The binding reads/writes memory with the **same absolute GBA bus addresses** as the
-HTTP API, so `game/constants.py` and `memory_reader.py` are backend-agnostic.
+The binding reads/writes memory with **absolute GBA bus addresses** (`game/constants.py`,
+`memory_reader.py`).
 
 **Booting from a save.** `NativeMGBAClient.load_save(path)` loads a battery `.sav`
 into cartridge memory; call it before `reset()` so the title screen offers
@@ -48,24 +47,13 @@ into cartridge memory; call it before `reset()` so the title screen offers
 an mGBA save state — the binding does not read mGBA's compressed `.ss*`/`.svs`
 state files.)
 
-**Watching it play (live window).** The native backend is headless by default. Set
+**Watching it play (live window).** The emulator is headless by default. Set
 `SHOW_WINDOW=true` (needs `pip install pygame`) to open a window that renders
 libmgba's framebuffer each frame (`game/viewer.py`). It's smooth during actions and
 holds the last frame still while the LLM thinks (the game only advances when the
 agent runs frames). Tunables: `VIEWER_SCALE` (window size), `VIEWER_FPS` (playback
 cap; 0 = full emulator speed). Close the window or press Esc to stop cleanly.
 The framebuffer is 32-bit color, laid out `[R,G,B,pad]` (RGBX) per pixel.
-
-### Legacy `http` backend (fallback, `MGBA_BACKEND=http`)
-
-| Component | Location |
-|-----------|----------|
-| mGBA emulator | `/Applications/mGBA.app` |
-| mGBA-http binary | `~/mgba-http/mGBA-http-0.8.2-osx-arm64-self-contained` (self-contained Mach-O) |
-| Lua socket script | `~/mgba-http/mGBASocketServer.lua` (load in mGBA scripting console) |
-
-First-run note for that binary: it's a downloaded, unsigned Mach-O — if Gatekeeper
-blocks it, run `chmod +x` and `xattr -d com.apple.quarantine <binary>` once.
 
 ---
 
@@ -74,20 +62,17 @@ blocks it, run `chmod +x` and `xattr -d com.apple.quarantine <binary>` once.
 ```
 Pokemon_LeafGreen.gba
         │
-   ┌────────────────── native (default) ──────────────────┐
+   ┌───────────────────────────────────────────────────────┐
    │  libmgba (Homebrew)  ──cffi──►  game/_mgba_native.so  │   in-process,
    │                                 game/mgba_core.py     │   ~50× realtime
    └───────────────────────────────────────────────────────┘
-        │                     (or, legacy http backend:)
-        │            mGBA GUI → Lua socket → mGBA-http → REST :5000 → game/mgba_client.py
         │
    main.py                      build_runtime() + run_episode() decision loop; thin main()
                                 (run controls: START_FROM_SAVE, MAX_STEPS, MAX_LLM_CALLS,
                                  TOKEN_BUDGET). run_episode(goal=…) returns an EpisodeResult;
                                 the eval harness reuses it so eval and real runs never diverge.
    Python Agent
-   ├── game/mgba_core.py        NativeMGBAClient — in-process libmgba (default)
-   ├── game/mgba_client.py      MGBAClient — legacy REST wrapper (http backend)
+   ├── game/mgba_core.py        NativeMGBAClient — in-process libmgba
    ├── game/memory_reader.py    WRAM decoder — XOR decryption + detect_context
    ├── game/state.py            GameState, PokemonStatus, StateDiff, helpers
    ├── game/constants.py        Memory addresses (authoritative), lookup tables, charset
@@ -120,7 +105,7 @@ Pokemon_LeafGreen.gba
 ```
 
 **Module boundaries — never cross these:**
-- `game/` drives the emulator (native binding or legacy mGBA-http) and does memory decoding. No LLM, no scoring logic.
+- `game/` drives the emulator (the native binding) and does memory decoding. No LLM, no scoring logic.
 - `agent/` talks only to LM Studio. Interacts with the game only through tool execution.
 - `memory/` reads/writes memory structures only. No network I/O.
 - `knowledge/` is pure data and string construction. Zero I/O.
@@ -276,27 +261,18 @@ heals — printed at the end of a run (`events.stats_line()`), stored in the eva
 ### Errors to Never Repeat
 
 - mGBA is a **GBA** emulator. ROM must be `.gba`. Never `.nds`.
-- mGBA-http is a **self-contained binary** (bundles its own .NET runtime). Never run with Python. Run it directly.
-- Correct repo: `nikouu/mGBA-http`. Not `mgba-emu/mgbahttp`.
-- Memory reads: `/core/read8|16|32|readrange` with **full absolute GBA addresses**.
-- **No** `/core/memory/domain` endpoint — it doesn't exist.
-- **No** `/core/state/save` — correct is `/core/savestateslot`.
-- **No** `/core/frame/forward` — doesn't exist.
-- Response from `/core/read8`: `"255"` (plain text decimal). Parse with `int(r.text.strip())`.
-- Response from `/core/readrange`: `"d3,00,ea,66"` (comma-sep hex). Parse: `bytes(int(h,16) for h in r.text.strip().split(","))`.
-- `slot` param for savestateslot/loadstateslot is a **string**, not integer: `params={"slot": "0"}`
 
 ### Startup Order (Every Session)
 
-**Native backend (default) — two steps:**
+**Two steps:**
 ```
 1. LM Studio: load the model named in .env (MODEL_NAME), server port 1234, tools enabled
 2. Terminal (fish): cd /Users/kylec/Projects/pokemon-agent → source .venv/bin/activate.fish → python main.py
 ```
-main.py loads the ROM (`ROM_PATH`) in-process. No GUI, no Lua, no mGBA-http.
+main.py loads the ROM (`ROM_PATH`) in-process. No GUI, no Lua, no HTTP.
 First time only: `python -m game._mgba_build` to compile the binding.
 
-Run controls (env vars, native backend): `START_FROM_SAVE=<path.sav>` boots from a
+Run controls (env vars): `START_FROM_SAVE=<path.sav>` boots from a
 battery save and drives to "Continue" (real gameplay instead of the new-game
 intro); `MAX_STEPS=<n>` bounds a run for smoke/eval; `CHECKPOINT_EVERY=<ticks>` (default 20) saves emulator states under
 `logs/runs/<ts>/checkpoints/` (each with a journal snapshot beside it); `PER_SAVE_JOURNALS=true` (default) gives every save/state its OWN journal under `logs/journals/<save>/` — `START_FROM_SAVE` / `START_FROM_STATE` select it, `RESUME` restores the one saved with that checkpoint, a journal that doesn't exist yet is derived from the cartridge (badges, starter, visited towns), and `false` = the old single global `logs/progress.json` (see `memory/journals.py`; `python -m tools.reset_journal --source <save>` resets one); `RESUME=latest` (or a `.ss1` path) continues from the last one; `BATTLE_STYLE=shift|set|` (default `shift` — the free switch after a trainer's Pokémon faints; see `game/options.py`); `LLM_RETRIES=<n>` (default 8 — transient LLM failures are retried with a 2→60 s backoff before the error budget is charged; `agent/llm_retry.py`); `LEAGUE_LOSS_RULE=advise|wall|off` + `LEAGUE_LOSS_BUMP=<levels>` (default `advise`, 2 — the optional rule that raises the Elite Four's recommended levels per loss in the League: `advise` nudges once per loss and then lets the model decide, `wall` refuses until the raised levels are met, `off` keeps the base levels only; the base level shortfall is always a wall — see `knowledge/beat_readiness.py`); `LOG_LEVEL=quiet|events|debug` (default `events`) sets how much of the live
@@ -305,29 +281,14 @@ a status line) — see `agent/events.py`; `START_NEW_GAME=true` boots to the tit
 text-only (for text models or unstable vision). Example bounded text-only run:
 `USE_VISION=false MAX_STEPS=20 START_FROM_SAVE=~/mgba-http/Pokemon_LeafGreen.sav python main.py`
 
-**Legacy http backend (`MGBA_BACKEND=http`):**
-```
-1. Open /Applications/mGBA.app → File → Load ROM → ~/mgba-http/Pokemon_LeafGreen.gba
-2. mGBA: Tools → Scripting → File → Load Script → ~/mgba-http/mGBASocketServer.lua
-3. Terminal: ~/mgba-http/mGBA-http-0.8.2-osx-arm64-self-contained  (leave running)
-4. LM Studio: load the model, server port 1234, tools enabled
-5. Terminal (fish): cd .../pokemon-agent → source .venv/bin/activate.fish → python main.py
-```
-
 ### Verification Commands
 
 ```fish
-# Native backend: verify the binding loads the ROM in-process
+# Verify the binding loads the ROM in-process
 cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish
 python -c "from game.mgba_core import NativeMGBAClient as C; m=C(); print(m.get_game_title(), m.get_game_code(), m.verify_connection())"
 # Expected: POKEMON LEAF AGB-BPGE True
-
-# Legacy http backend (only if MGBA_BACKEND=http and the server is running):
-#   curl http://localhost:5000/core/getgametitle      -> "POKEMON LEAF"
-#   curl http://localhost:5000/core/getgamecode        -> "AGB-BPGE"
-#   curl "http://localhost:5000/core/read32?address=0x02024284"  -> 0-6
-#   curl -X POST "http://localhost:5000/mgba-http/button/tap?button=A"
 
 # Live suite (real ROM + fixtures in saves/live, never in CI): one command, preflight + summary; --post-status attests a PR via the `live-suite` commit status
 python tools/live_suite.py --changed origin/main --post-status      # see docs/live-ci.md
@@ -335,5 +296,5 @@ python tools/live_suite.py --changed origin/main --post-status      # see docs/l
 # Test Python imports  (fish shell)
 cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish
-python -c "import requests, openai, rich; print('OK')"
+python -c "import openai, rich; print('OK')"
 ```

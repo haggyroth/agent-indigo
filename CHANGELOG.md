@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Removed — the legacy mGBA-http backend
+The agent has run on the in-process libmgba binding since v0.x; the HTTP transport (mGBA GUI + Lua socket + mGBA-http .NET server) had no tests, no CI job and no support for checkpoints, screenshots,
+the watchdog, Running Shoes or the viewer, so it only worked as a degraded mode.
+- Deleted `game/mgba_client.py` (`MGBAClient`) and the `requests` dependency; `main.build_runtime` always builds `NativeMGBAClient` (the `backend=` argument is gone).
+- Removed `MGBA_BACKEND`, `MGBA_HTTP_BASE` and `BUTTON_TAP_DELAY` (only the HTTP client used it) from `config.py` / `.env.example`; a stray `MGBA_BACKEND=` in an existing `.env` is ignored.
+- README / CLAUDE.md lose the legacy startup steps and endpoint cheat-sheet; the API reference stays in HISTORY.md, marked retired. `ROM_PATH` still defaults to `~/mgba-http/…` (the folder name is
+  historical — where the ROM and save live).
+
 ### Added — one journal per save / state
 Loading a save used to pick up the ONE global journal (`logs/progress.json` + `logs/battles.jsonl`): a badge-1 fixture arrived with Misty, Surge, Cut, Celadon and 678 battles from the newest
 run, and "past losses" lessons leaked between playthroughs.

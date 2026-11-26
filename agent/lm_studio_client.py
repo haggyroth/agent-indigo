@@ -11,7 +11,7 @@ from agent.tool_args import repair_args, signature
 from agent.tools import SAFARI_CONTEXT, tool_schema, tools_for, normalize_button
 from agent.history import trim_messages, strip_control_tokens
 from game.memory_reader import LeafGreenReader
-from game.mgba_client import MGBAClient
+from typing import TYPE_CHECKING
 from memory.long_term import LongTermMemory
 from memory.run_log import NullRunLog
 from knowledge.leafgreen_data import MILESTONES
@@ -54,9 +54,13 @@ from agent.skills.tmhm import TMHMMixin
 
 
 
+if TYPE_CHECKING:
+    from game.mgba_core import NativeMGBAClient
+
+
 class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, NewGameMixin, ServicesMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
-    def __init__(self, mgba: MGBAClient, reader: LeafGreenReader, ltm: LongTermMemory):
+    def __init__(self, mgba: "NativeMGBAClient", reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
         self.mgba   = mgba
         self.reader = reader

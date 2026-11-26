@@ -24,7 +24,7 @@ def main():
     ap.add_argument("--state", default="", help="start from this emulator state instead of the save")
     ap.add_argument("--save", default=os.path.expanduser("~/mgba-http/Pokemon_LeafGreen.sav"))
     a = ap.parse_args()
-    os.environ.update(USE_VISION="false", SHOW_WINDOW="false", MGBA_BACKEND="native",
+    os.environ.update(USE_VISION="false", SHOW_WINDOW="false",
                       MAX_LLM_CALLS="0", TOKEN_BUDGET="0", START_FROM_SAVE=a.save)
     if a.state:
         os.environ["START_FROM_STATE"] = a.state

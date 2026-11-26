@@ -1,6 +1,6 @@
 from agent.skills.base import log_once
 from datetime import datetime
-from config import (PER_SAVE_JOURNALS, START_NEW_GAME, RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, MGBA_BACKEND, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
+from config import (PER_SAVE_JOURNALS, START_NEW_GAME, RESUME, CHECKPOINT_EVERY, MODEL_NAME, TEMPERATURE, START_FROM_SAVE, START_FROM_STATE, MAX_STEPS,
                     USE_VISION, BATTLE_STYLE, PROGRESS_PATH, MAX_LLM_CALLS, TOKEN_BUDGET,
                     LLM_BASE_URL, MAX_WALL_SECONDS, LOG_LEVEL, STATUS_EVERY)
 from game.memory_reader import LeafGreenReader
@@ -230,8 +230,7 @@ def drive_into_gameplay(mgba, reader, attempts: int = 4) -> bool:
     return False                              # budget exhausted; hand off anyway
 
 
-def build_runtime(*, backend: str = MGBA_BACKEND,
-                  start_save: str = START_FROM_SAVE,
+def build_runtime(*, start_save: str = START_FROM_SAVE,
                   start_state: str = START_FROM_STATE,
                   new_game: bool = START_NEW_GAME,
                   rom_path: str = "",
@@ -251,17 +250,13 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
 
     if verbose:
         console.rule("[bold green]Pokemon LeafGreen LLM Agent")
-    if backend == "native":
-        from game.mgba_core import NativeMGBAClient
-        mgba = NativeMGBAClient(rom_path or None)
-    else:
-        from game.mgba_client import MGBAClient
-        mgba = MGBAClient()
+    from game.mgba_core import NativeMGBAClient
+    mgba = NativeMGBAClient(rom_path or None)
     if not mgba.verify_connection():
-        say(f"[red]ERROR: emulator not ready or wrong ROM (backend={backend}).[/]")
-        say("Expected AGB-BPGE (Pokemon LeafGreen). Check ROM_PATH / startup order.")
+        say("[red]ERROR: emulator not ready or wrong ROM.[/]")
+        say("Expected AGB-BPGE (Pokemon LeafGreen). Check ROM_PATH and that the binding is built (python -m game._mgba_build).")
         return None
-    say(f"[green]Connected ({backend}): {mgba.get_game_title()} ({mgba.get_game_code()})")
+    say(f"[green]Loaded ROM: {mgba.get_game_title()} ({mgba.get_game_code()})")
 
     # Warn on the one config that can run up real money: a non-local LLM endpoint
     # with no stopping condition at all. The run still proceeds (the user may want
@@ -276,11 +271,11 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
 
     # Optionally load an mGBA save STATE directly — instant, no title/Continue/
     # recap. Takes precedence over start_save (native only).
-    if new_game and backend == "native":
+    if new_game:
         mgba.reset()
         mgba.run_frames(600)                  # the boot logos: the game then sits on the title screen, waiting for quest('new_game')
         say("[green]New game: booted to the title screen (no save loaded)[/]")
-    elif start_state and backend == "native":
+    elif start_state:
         if mgba.load_state_file(start_state):
             mgba.tick(30)   # let post-load fade/flags settle before first read
             s = reader.read_state()
@@ -290,7 +285,7 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
             say(f"[red]Could not load save state: {start_state}[/]")
     # Otherwise, optionally boot from a battery save and drive to "Continue" so the
     # agent starts in real gameplay instead of the new-game intro (native only).
-    elif start_save and backend == "native":
+    elif start_save:
         if mgba.load_save(start_save):
             got_control = drive_into_gameplay(mgba, reader)
             where = f"map {mgba.read8(Addr.MAP_BANK)}/{mgba.read8(Addr.MAP_ID)}"
@@ -305,13 +300,13 @@ def build_runtime(*, backend: str = MGBA_BACKEND,
     tilemap = TilemapReader(mgba)
     # The journal belongs to the save/state we just loaded (memory.journals): an old fixture must not inherit the milestones of the newest run. Explicit paths (the eval
     # harness, tests) and a new game keep what they were given / the global journal.
-    journal_origin, journal_src = "", (start_state or start_save) if (backend == "native" and not new_game) else ""
+    journal_origin, journal_src = "", (start_state or start_save) if not new_game else ""
     if PER_SAVE_JOURNALS and journal_src and ltm_path is None and journal_path is None:
         from memory import journals
         ltm_path, journal_path, journal_origin = journals.select(journal_src)
         say(f"[cyan]Journal for {Path(journal_src).name}: {journal_origin} ({ltm_path.parent.name})[/]")
     ltm     = LongTermMemory(path=ltm_path)
-    if new_game and backend == "native":
+    if new_game:
         backup = ltm.start_fresh()                  # stale milestones would make quest('new_game') say "already done" at the title
         say("[yellow]New game: the journal starts blank" + (f" (the old one is saved as {backup.name})" if backup else "") + "[/]")
     client  = AgentClient(mgba, reader, ltm)
@@ -853,7 +848,7 @@ def main():
         sys.exit(1)
     from memory.run_log import RunLog
     rlog = RunLog(PROGRESS_PATH.parent / "runs")
-    rlog.write_meta(model=MODEL_NAME, backend=MGBA_BACKEND, max_steps=MAX_STEPS,
+    rlog.write_meta(model=MODEL_NAME, backend="native", max_steps=MAX_STEPS,
                     max_llm_calls=MAX_LLM_CALLS, token_budget=TOKEN_BUDGET,
                     start_from_save=START_FROM_SAVE, use_vision=USE_VISION,
                     temperature=TEMPERATURE, started=time.strftime("%Y-%m-%d %H:%M:%S"))
