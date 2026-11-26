@@ -69,7 +69,8 @@ START_FROM_STATE  = os.path.expanduser(os.getenv("START_FROM_STATE", ""))
 # START_NEW_GAME: boot the ROM to the TITLE SCREEN with no save loaded (native backend) — the model then starts the game itself with quest('new_game')
 #   (title → names → Oak's lab → starter → the rival → Oak's parcel). Takes precedence over START_FROM_SAVE / START_FROM_STATE.
 START_NEW_GAME    = os.getenv("START_NEW_GAME", "").strip().lower() in ("1", "true", "yes", "on")
-# New-game choices (used by quest('new_game'); blank = the built-in default). Options typed in the quest call itself (quest('new_game squirtle name=KYLE')) override these.
+# New-game choices a HUMAN can fix for the model (used by quest('new_game')). Leave them blank and the MODEL chooses its starter, its name and its rival's name (and nicknames its starter
+#   and its Lapras) itself; set any one and the model is told the choice is already made (the rest fall back to bulbasaur / RED / BLUE, no nicknames). Options in the call override these.
 #   STARTER      bulbasaur | charmander | squirtle      (default bulbasaur)
 #   PLAYER_NAME  up to 7 letters                          (default RED)
 #   RIVAL_NAME   up to 7 letters                          (default BLUE)

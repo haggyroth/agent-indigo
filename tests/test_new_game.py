@@ -69,3 +69,24 @@ def test_the_quest_tool_passes_the_words_after_the_name_to_the_driver():
     c._get_new_game = lambda auto: (seen.append(list(c._quest_opts)), "ran")[1]
     assert c._quest_tool("new_game squirtle name=KYLE girl") == "ran" and seen == [["squirtle", "name=KYLE", "girl"]]
     assert c._quest_tool("parcel") == "ran" and seen[-1] == []                                                # the plain beat name works too, with no options
+
+
+def test_the_model_chooses_unless_env_or_defaults_decide_for_it(monkeypatch):
+    import config
+    from agent.skills.newgame import given_choices, model_chooses, nickname_by_model
+    assert model_chooses([]) and model_chooses(["squirtle", "name=ASH"])
+    assert nickname_by_model(["squirtle"]) and not nickname_by_model(["squirtle", "nonick"])          # `nonick`: choose everything, decline the nickname box
+    assert not model_chooses(["defaults"]) and not nickname_by_model(["defaults"])                    # scripted runs and tests
+    monkeypatch.setattr(config, "RIVAL_NAME", "gary")                                                  # a human fixed one choice: the model is not asked
+    assert not model_chooses([]) and not nickname_by_model([])
+    assert given_choices(["squirtle", "name=ASH", "rival=", "girl"]) == {"starter", "name"}           # an empty value is not a choice
+
+
+def test_the_choices_reply_asks_for_exactly_what_is_missing_and_gives_the_call():
+    from agent.skills.newgame import choices_message
+    full = choices_message(["starter", "name", "rival"])
+    assert "yours to make" in full and "bulbasaur" in full and "YOUR name" in full and "RIVAL's name" in full
+    assert "quest('new_game <starter> name=<YOU> rival=<RIVAL>')" in full and "name your starter" in full
+    only = choices_message(["starter"])
+    assert "STARTER" in only and "YOUR name" not in only and "RIVAL's name" not in only
+    assert "RED" not in full and "BLUE" not in full                                                    # no default is suggested: the model picks

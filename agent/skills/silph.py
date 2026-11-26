@@ -7,6 +7,7 @@ Eleven floors joined by stairs and teleport pads, with card-key doors. knowledge
   2. the Lapras — the worker at 7F (0,7) gives a level-25 one (FLAG_GOT_LAPRAS_FROM_SILPH 0x246); the rival's trigger tiles (2,4)/(2,5) sit beside him;
   3. Giovanni — stepping on 11F (5,15) or (6,15) starts the scene and the battle (FLAG_HIDE_SAFFRON_ROCKETS 0x3E is set when it ends);
   4. the President at 11F (9,9) gives the Master Ball (FLAG_GOT_MASTER_BALL_FROM_SILPH 0x250)."""
+from agent.skills.newgame import nickname_by_model
 from game.state import GameContext
 from knowledge import silph_route as route
 from knowledge.silph_data import FLOORS
@@ -38,8 +39,9 @@ class SilphMixin:
             return "the President", {route.SILPH_11F: {t for t, _f in route.beside(route.PRESIDENT)}}
         return None, None
 
-    def _silph_talk(self, stand, face, done_flag) -> bool:
-        """Walk to `stand`, face `face`, press A and run the talk to its end, answering NO to a nickname box. True once `done_flag` is set."""
+    def _silph_talk(self, stand, face, done_flag, ask_nick: bool = False) -> bool:
+        """Walk to `stand`, face `face`, press A and run the talk to its end. A nickname box is declined — or, with `ask_nick`, left open for the model (`_nick_pending`).
+        True once `done_flag` is set."""
         self._in_puzzle = True
         try:
             for _ in range(3):
@@ -54,12 +56,20 @@ class SilphMixin:
         self.mgba.tick(8)
         self.mgba.tap("A")
         self.mgba.tick(30)
+        from game.naming import NamingDriver
+        nd = NamingDriver(self.mgba)
         for _ in range(40):
             if self.reader.read_flag(done_flag) and self.reader.detect_context() == GameContext.OVERWORLD:
                 break
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 break
+            if ask_nick and not self.reader.read_flag(done_flag) and nd.active():
+                self._nick_pending = "keyboard"                  # a mashed A already said YES: the naming screen is up — the model types the name
+                return False
             if self._menus.choice_live():
+                if ask_nick and not self.reader.read_flag(done_flag):
+                    self._nick_pending = "box"                   # 'Give it a nickname?' — the model's call
+                    return False
                 self._menus.answer_prompt("no")                  # 'Give it a nickname?'
             else:
                 self.mgba.tap("A")
@@ -102,7 +112,14 @@ class SilphMixin:
                     if problem and not self._has_card_key():
                         return f"Couldn't pick up the Card Key: {problem}."
                 elif stage == "the Lapras":
-                    if not self._silph_talk(pos, dict(route.beside(route.LAPRAS_WORKER)).get(pos, "Left"), FLAG_LAPRAS):
+                    if not self._silph_talk(pos, dict(route.beside(route.LAPRAS_WORKER)).get(pos, "Left"), FLAG_LAPRAS, ask_nick=nickname_by_model(self._quest_opts)):
+                        if self._nick_pending:
+                            how, self._nick_pending = self._nick_pending, False
+                            if how == "keyboard":
+                                return ("The Silph Co. worker gave you a LAPRAS (L25)! The naming screen is open — name it yourself: enter_name('<a nickname, up to 10 letters>'). "
+                                        f"Then call {call} again to carry on.")
+                            return ("The Silph Co. worker gave you a LAPRAS (L25)! The game now asks 'Do you want to give a nickname to LAPRAS?' — name it yourself: "
+                                    f"answer_prompt('yes'), then enter_name('<a nickname, up to 10 letters>'); or answer_prompt('no') to keep LAPRAS. Then call {call} again to carry on.")
                         if (b := self._hideout_fight(call, "the rival", auto_trainers)):
                             return b
                         return "Couldn't get the Lapras from the worker at 7F (0,7) — walk_to (1,7), face left, press A (answer NO to the nickname)."

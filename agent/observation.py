@@ -604,7 +604,7 @@ def _loop_signals(t: Tick) -> list[str]:
 
 
 def _env_choice_note() -> str:
-    """When .env sets STARTER / PLAYER_NAME / RIVAL_NAME: say what they are, so the model just calls quest('new_game')."""
+    """When .env sets STARTER / PLAYER_NAME / RIVAL_NAME (the human chose for the model): say what they are, so the model just calls quest('new_game')."""
     if not env_configured():
         return ""
     d = env_defaults()
@@ -631,9 +631,9 @@ def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool,
         parts += _supplies(t)
     parts += _league(t) + _gym(t) + _area(t) + _field(t) + _exits(t) + _loop_signals(t)
     if not in_battle and (state.map_bank == 0 or not state.party):
-        parts.append("NEW GAME: the game has not started (title screen / intro / no Pokémon yet) — call quest('new_game') and it plays the intro, names you, picks the starter and "
-                     "fetches Oak's Parcel. Options go after the name: quest('new_game squirtle name=KYLE rival=GARY girl') (starter: bulbasaur | charmander | squirtle)"
-                     + _env_choice_note())
+        parts.append("NEW GAME: the game has not started (title screen / intro / no Pokémon yet) — quest('new_game') plays the intro, names you, picks the starter and "
+                     "fetches Oak's Parcel. YOU choose your name, your rival's name and your starter (bulbasaur | charmander | squirtle): quest('new_game squirtle name=KYLE rival=GARY girl'). "
+                     "It will also ask you to nickname your starter" + _env_choice_note())
     # Close every turn with an explicit call to action: some models read a bare state dump as "no question asked".
     parts.append("→ Your turn: decide the best next action and call a tool NOW (do not reply with text only)")
     return " | ".join(parts)

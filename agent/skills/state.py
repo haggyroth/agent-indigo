@@ -45,6 +45,7 @@ class SkillState:
     _balance_warned = None       # …and the lopsided-team warning
     _trainer_losses = lazy(dict)  # {map: n} lost trainer battles per map (a mandatory trainer beating an under-levelled team)
     _surf_search = 0              # >0 while _surf's second pass (the elevation-3 shores) walks to a shore: walk_to must not start Surf itself then (it would recurse into the search)
+    _nick_pending = False         # a quest left a nickname box open for the model (Lapras): the quest returns the hand-off message
     _quest_opts = ()              # the words after the quest name in quest('new_game squirtle name=KYLE') — read by the driver that was dispatched
     _pc_fail_streak = 0           # consecutive pc() calls whose storage screen would not open (two in a row: tell the model to stop retrying)
     _stall_log = lazy(dict)       # stall snapshots saved this run (see agent.failure_shots.note_stall): the failing result being repeated, its run length, how many states were saved

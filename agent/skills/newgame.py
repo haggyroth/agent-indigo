@@ -1,8 +1,11 @@
 """quest('new_game') — start the game from the title screen: the intro, the names, Oak's lab, the starter, the rival, Oak's parcel (#260, the one beat that had no driver).
 
-    quest('new_game')                        Bulbasaur, you are RED, the rival BLUE (or STARTER / PLAYER_NAME / RIVAL_NAME from .env)
-    quest('new_game charmander')             starter: bulbasaur | charmander | squirtle
-    quest('new_game squirtle name=KYLE rival=GARY girl')
+    quest('new_game squirtle name=KYLE rival=GARY girl')     the MODEL chooses its starter (bulbasaur | charmander | squirtle) and the two names
+    quest('new_game')                        with nothing chosen (and no STARTER / PLAYER_NAME / RIVAL_NAME in .env) the call only asks the model to choose
+    quest('new_game defaults')               scripted runs and tests: Bulbasaur, you are RED, the rival BLUE, no nicknames (.env values replace those defaults)
+    quest('new_game … nonick')               choose everything but decline the starter's nickname prompt
+
+The starter's nickname is the model's too: when the game asks, the call hands the box back ("answer_prompt('yes'), then enter_name('<name>')" or 'no') and quest('new_game') resumes.
 
 Boot the runtime to the title with START_NEW_GAME=true (no save loaded). Every phase is resumable — the driver reads what is on screen / in memory, never counts presses — so a call
 that is interrupted (a battle, a long dialogue) is simply called again:
@@ -32,6 +35,48 @@ def env_defaults() -> dict:
 
 def env_configured() -> bool:
     return any(str(v or "").strip() for v in (config.STARTER, config.PLAYER_NAME, config.RIVAL_NAME))
+
+
+_CHOICES = ("starter", "name", "rival")
+
+
+def model_chooses(words) -> bool:
+    """True when the MODEL picks the starter and the names: nothing in .env chose them for it and the call did not say `defaults` (scripted runs and tests)."""
+    return not env_configured() and "defaults" not in [str(w).strip().lower() for w in words]
+
+
+def nickname_by_model(words) -> bool:
+    """True when a nickname box (the starter's, Lapras's) is handed to the model instead of declined: the model chooses, and the call did not say `nonick`."""
+    return model_chooses(words) and "nonick" not in [str(w).strip().lower() for w in words]
+
+
+def given_choices(words) -> set:
+    """Which of 'starter' / 'name' / 'rival' the call spelled out itself."""
+    out = set()
+    for w in words:
+        k, _eq, v = str(w).partition("=")
+        key = k.strip().lower()
+        if key in STARTERS:
+            out.add("starter")
+        elif key in ("name", "player") and v.strip():
+            out.add("name")
+        elif key == "rival" and v.strip():
+            out.add("rival")
+    return out
+
+
+def choices_message(missing) -> str:
+    """The reply to a quest('new_game') that has not chosen yet: what is the model's to decide, then the exact call."""
+    asks = []
+    if "starter" in missing:
+        asks.append("your STARTER: bulbasaur (Grass/Poison), charmander (Fire) or squirtle (Water)")
+    if "name" in missing:
+        asks.append("YOUR name (up to 7 letters)")
+    if "rival" in missing:
+        asks.append("your RIVAL's name (up to 7 letters)")
+    return ("NEW GAME — these choices are yours to make: " + "; ".join(asks) + ". Pick what you like, then call "
+            "quest('new_game <starter> name=<YOU> rival=<RIVAL>') — add `girl` if you want to be the girl. "
+            "You will also be asked to name your starter (and later your Lapras).")
 
 
 def parse_options(words) -> dict:
@@ -102,8 +147,23 @@ class NewGameMixin:
     def _ng_party(self) -> int:
         return len(self.reader.read_party())
 
+    def _ng_nickname_handoff(self, species: str) -> str:
+        """The starter's nickname box is open: it is the model's to answer (and the exact calls), then the quest resumes."""
+        sp = species.title()
+        return (f"{sp} joined your party! The game now asks 'Do you want to give a nickname to {sp.upper()}?' — name it yourself: answer_prompt('yes'), then "
+                f"enter_name('<a nickname, up to 10 letters>'); or answer_prompt('no') to keep {sp.upper()}. Then call quest('new_game') again to carry on.")
+
+    def _ng_clear_text(self) -> None:
+        """Leftover lab text (the rival picks his Pokémon, Oak talks): B clears it without talking to anyone."""
+        for _ in range(8):
+            if self.reader.detect_context() == GameContext.OVERWORLD:
+                break
+            self.mgba.tap("B")
+            self.mgba.tick(40)
+
     def _ng_choose_starter(self, o: dict):
-        """In Oak's lab, party empty: walk to the ball, face it, A, YES to 'so you want X?', decline the nickname. None once the starter is in the party."""
+        """In Oak's lab, party empty: walk to the ball, face it, A, YES to 'so you want X?', then the nickname box — handed to the model, or declined when the call said `defaults`
+        / `nonick` or .env chose. None once the starter is in the party."""
         ball_x = {"bulbasaur": 8, "squirtle": 9, "charmander": 10}[o["starter"]]      # the balls stand on the table at (8..10, 4)
         for _ in range(4):
             if self._ng_party():
@@ -118,6 +178,8 @@ class NewGameMixin:
                 if self._ng_party() and self.reader.detect_context() == GameContext.OVERWORLD:
                     break
                 if self._menus.choice_live():
+                    if self._ng_party() and nickname_by_model(self._quest_opts):
+                        return self._ng_nickname_handoff(o["starter"])         # the nickname question: the model's call
                     if self._ng_party():                              # the nickname question: no
                         self.mgba.tap("Down")
                         self.mgba.tick(12)
@@ -128,11 +190,7 @@ class NewGameMixin:
                     self.mgba.tick(30)
         if not self._ng_party():
             return f"Couldn't pick up the {o['starter'].title()} ball in Oak's lab — walk to ({ball_x},5), face up, press A and answer YES, then call quest('new_game') again."
-        for _ in range(8):                                            # the rival picks his, Oak talks: B clears text without talking to anyone
-            if self.reader.detect_context() == GameContext.OVERWORLD:
-                break
-            self.mgba.tap("B")
-            self.mgba.tick(40)
+        self._ng_clear_text()
         return None
 
     def _ng_battle(self, msg: str) -> str:
@@ -154,6 +212,16 @@ class NewGameMixin:
             msg = self._ng_battle("You're in the rival's battle in Oak's lab.")          # resumed in the middle of the tutorial fight: play it out
             if self.reader.detect_context() == GameContext.IN_BATTLE:
                 return msg
+        if model_chooses(self._quest_opts):                           # the starter and the names are the MODEL's to choose: ask before the first button
+            have = given_choices(self._quest_opts)
+            if self._ng_party():
+                need = []
+            elif self._in_world():                                    # the names are already typed: only the starter is left to choose
+                need = [] if "starter" in have else ["starter"]
+            else:
+                need = [c for c in _CHOICES if c not in have]
+            if need:
+                return choices_message(need)
         if not self._in_world():
             if (msg := self._ng_intro(o)):
                 return msg
@@ -172,6 +240,8 @@ class NewGameMixin:
                 return msg
         if self.reader.read_flag(FLAG_POKEDEX):
             return "Oak's Parcel is delivered and you have the Pokédex: the story chain starts at quest('brock')."
+        if self.reader.detect_context() != GameContext.OVERWORLD:       # resumed after the nickname box: the rest of the lab scene
+            self._ng_clear_text()
         # Oak's parcel: the Viridian Mart clerk hands it over the moment you walk in (a forced scene), then Oak wants it. Leaving the lab starts the rival's battle (handed to the model).
         if OAKS_PARCEL not in self.reader.read_key_items():
             if (msg := self._hideout_travel("Viridian Mart", MART, call, auto_trainers)):

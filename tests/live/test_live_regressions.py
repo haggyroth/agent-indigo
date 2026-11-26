@@ -1088,11 +1088,14 @@ def test_blaine_gym_quiz_doors_reach_the_leader(live):
     _staged_gym(live, "cinnabar island", ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina"], (5, 5), (12, 0), flags=(0x1A8,), key_items=(351,))
 
 
-def test_silph_co_quest_clears_the_building(live):
+def test_silph_co_quest_clears_the_building(live, monkeypatch):
     """quest('silph_co') on the real ROM, staged by flying to Saffron: the floors are solved by knowledge.silph_route (stairs, teleport pads, card-key
     doors), the Card Key comes from the 5F item ball, the worker on 7F gives the Lapras, Giovanni's scene starts on 11F and the President hands over
     the Master Ball."""
     import pytest
+    import config
+    for k in ("STARTER", "PLAYER_NAME", "RIVAL_NAME"):             # nothing in .env chose for the model: the Lapras's nickname is its call
+        monkeypatch.setattr(config, k, "")
     live.load("celadon_gym_door")
     if live.r.read_current_map() != (10, 16):
         pytest.skip("fixture is not at the Celadon gym door")
@@ -1100,7 +1103,7 @@ def test_silph_co_quest_clears_the_building(live):
     c._execute("go_to", json.dumps({"destination": "Celadon City"}))
     live.fly_to("saffron city", flags=(0x23C, 0x2A6))                  # Fuji rescued: the Rocket guard at the Silph door falls asleep
     live.strong_lead()                                           # a L60 lead (like the Victory Road test): the fixture's L36 lost the 7F rival fight whenever the frame timing shifted its dice
-    out = ""
+    out, named = "", ""
     for _ in range(80):
         live.boost_party()                                       # the fixture party is far under the Rockets / rival / Giovanni
         live.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])
@@ -1108,9 +1111,17 @@ def test_silph_co_quest_clears_the_building(live):
             c._auto_fight()
             continue
         out = c._execute("quest", json.dumps({"name": "silph_co", "auto_trainers": True}))
+        if "gave you a LAPRAS" in out:                           # the worker's gift: the nickname is the MODEL's call (answer_prompt, then enter_name)
+            assert "enter_name(" in out, out
+            if "answer_prompt('yes')" in out:
+                c._execute("answer_prompt", json.dumps({"answer": "yes"}))
+            named = c._execute("enter_name", json.dumps({"name": "Nessie"}))
+            assert named.startswith("Named"), named
+            continue
         if live.r.read_flag(0x250) and live.r.read_flag(0x246):
             break
     assert 355 in live.r.read_key_items(), out                                  # the Card Key
+    assert named.startswith("Named") and "Nessie" in named, named              # (the fixture's party is full, so the Lapras went to the PC box — named all the same)
     assert live.r.read_flag(0x246), out                                         # FLAG_GOT_LAPRAS_FROM_SILPH
     assert live.r.read_flag(0x250), out                                         # FLAG_GOT_MASTER_BALL_FROM_SILPH
 
@@ -1941,6 +1952,46 @@ def test_new_game_quest_plays_the_intro_picks_the_starter_and_delivers_the_parce
     sb2 = m.read32(Addr.SAVEBLOCK2_PTR)
     assert "".join(GEN3_CHARSET.get(b, "?") for b in m.read_range(sb2, 8) if b != 0xFF) == "KYLE"
     assert c._story()["parcel"] == "done"
+
+
+def test_new_game_lets_the_model_choose_its_names_starter_and_the_starters_nickname(tmp_path, monkeypatch):
+    """The model, not the code, picks its name, its rival's name, the starter and the starter's nickname. quest('new_game') with nothing chosen presses no button and asks; with the choices
+    it plays the intro; at the starter's 'Give a nickname?' box it hands the decision back (answer_prompt + enter_name), then carries on to the parcel."""
+    import pytest
+    from game.constants import GEN3_CHARSET, Addr
+    from live.conftest import ROM
+    if not ROM.exists():
+        pytest.skip(f"ROM not found at {ROM}")
+    import config
+    import main
+    for k in ("STARTER", "PLAYER_NAME", "RIVAL_NAME"):                  # nothing in .env chose for the model
+        monkeypatch.setattr(config, k, "")
+    link = tmp_path / "blank.gba"
+    link.symlink_to(ROM)
+    rt = main.build_runtime(new_game=True, rom_path=str(link), ltm_path=str(tmp_path / "ltm.json"), journal_path=str(tmp_path / "j.jsonl"), verbose=False)
+    assert rt is not None
+    c, r, m = rt.client, rt.reader, rt.mgba
+    out = c._execute("quest", json.dumps({"name": "new_game"}))
+    assert "yours to make" in out and "name=<YOU>" in out, out
+    assert m.read8(Addr.MAP_BANK) == 0 and not r.read_party()             # still at the title: nothing was pressed
+    named = ""
+    for _ in range(60):
+        if r.detect_context().name == "IN_BATTLE":
+            c._auto_fight()
+            continue
+        out = c._execute("quest", json.dumps({"name": "new_game squirtle name=ash rival=gary"}))
+        if "give a nickname" in out:
+            assert "answer_prompt('yes')" in out and "enter_name(" in out, out
+            c._execute("answer_prompt", json.dumps({"answer": "yes"}))
+            named = c._execute("enter_name", json.dumps({"name": "Sprout"}))
+            continue
+        if r.read_flag(0x829):
+            break
+    assert named.startswith("Named"), named
+    assert r.read_flag(0x829) and "delivered" in out, out
+    assert r.read_party()[0].species_name == "Squirtle" and r.read_party()[0].nickname == "Sprout", r.read_party()[0]
+    sb2 = m.read32(Addr.SAVEBLOCK2_PTR)
+    assert "".join(GEN3_CHARSET.get(b, "?") for b in m.read_range(sb2, 8) if b != 0xFF) == "ASH"
 
 
 def test_watched_run_fixes_stale_move_reply_long_nickname_and_switch_outside_a_battle(live):
