@@ -395,6 +395,9 @@ class Addr:
     VSSEEKER_STEPS_OFFSET   = 0x638
     VSSEEKER_TABLE_OFFSET   = 0x63A
     VSSEEKER_TABLE_SLOTS    = 100
+    # Fame Checker: gSaveBlock1.fameChecker[16] (u16 each; bits 0-1 pickState, bit 2+n = flavor text n of that person, 0-5), deref SAVEBLOCK1_PTR + 0x3A54.
+    FAMECHECKER_OFFSET  = 0x3A54
+    FAMECHECKER_PERSONS = 16
     # HM obstacle objects (loaded object events' graphicsId) and the avatar flags byte.
     OBJ_GFX_CUT_TREE    = 95
     OBJ_GFX_ROCK_SMASH  = 96
