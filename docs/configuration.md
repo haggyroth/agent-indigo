@@ -38,10 +38,11 @@ All settings are environment variables, read from `.env` (copy [`.env.example`](
 | `MODEL_NAME` | `qwen/qwen2.5-14b-instruct` | The model id your endpoint serves. Must support tool calling. |
 | `TEMPERATURE` | `0.6` | Sampling temperature. |
 | `MAX_TOKENS` | `4096` | Cap on the response. `prompt + MAX_TOKENS` must fit the model's *loaded* context window. |
+| `CONTEXT_TOKENS` | `0` | The model's *loaded* context window (LM Studio shows it). When set, the history is trimmed by estimated tokens so `prompt + MAX_TOKENS` fits (5 % margin; must be larger than `MAX_TOKENS`). `0` = unknown: the client learns a ceiling from the first context-overflow error instead. |
 | `ENABLE_THINKING` | `false` | `true` for reasoning models that expose `reasoning_content` / `<think>` tokens. |
 | `USE_VISION` | `true` | Attach the screenshot (and overhead area maps) to the model. `false` for text-only models or unstable vision; the text observation carries the key state either way. |
 | `LLM_TIMEOUT` | `180` | Seconds allowed for one chat completion (`0` = none). A timed-out call counts against the consecutive-error budget. |
-| `LLM_RETRIES` | `8` | Retries for a transient failure (connection reset, timeout, rate limit, 5xx) with 2 → 60 s exponential backoff, before the error budget is charged. `0` = none. |
+| `LLM_RETRIES` | `8` | Retries for a transient failure (connection reset, timeout, rate limit, 5xx) with 2 → 60 s exponential backoff (a `Retry-After` header is honoured), before the error budget is charged. `0` = none. A quota/billing 429, bad credentials (401/403/402) or an unknown model/URL (404) are never retried: the run ends at once with reason `llm_error`. A context-overflow 400 is answered by shrinking the request (images, then older turns, then the observation) and resending. |
 
 See [models](models.md) for how to choose and size a model.
 

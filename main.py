@@ -8,6 +8,7 @@ from game.options import apply_battle_style
 from game.state import GameContext, GameState, StateDiff
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
+from agent.llm_retry import LLMFatalError
 from agent import events
 from memory.short_term import ShortTermMemory
 from memory.long_term import LongTermMemory
@@ -24,6 +25,11 @@ from pathlib import Path
 import os, time, sys, traceback
 
 console = Console()
+
+
+class StartPointError(RuntimeError):
+    """The save / state the run was asked to start from could not be loaded. Raised instead of carrying on from the power-on
+    screen: a run (or an eval scenario) that silently plays a new game is worse than no run (#370)."""
 
 # Where uncaught per-tick exceptions are recorded (full tracebacks). The console
 # only shows a scrolling summary; this file is the durable record for debugging a
@@ -88,7 +94,7 @@ class AgentRuntime:
 @dataclass
 class EpisodeResult:
     """Outcome of one run_episode() call — the eval scorecard for a scenario."""
-    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget
+    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget | llm_error
     passed:            bool           # goal predicate satisfied
     steps:             int
     llm_calls:         int
@@ -239,7 +245,8 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
                   fresh_session: bool = True,
                   verbose: bool = True) -> Optional[AgentRuntime]:
     """Connect to the emulator, load the requested start point, and build every
-    component the decision loop needs. Returns None if the emulator isn't ready.
+    component the decision loop needs. Returns None if the emulator isn't ready; raises StartPointError if a requested
+    start_state / start_save is missing or cannot be loaded (the run never falls back to a new game on its own).
 
     ltm_path / journal_path isolate persistent state — the eval harness points
     them at a scratch dir so a scenario never touches the real logs/progress.json.
@@ -276,26 +283,28 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
         mgba.run_frames(600)                  # the boot logos: the game then sits on the title screen, waiting for quest('new_game')
         say("[green]New game: booted to the title screen (no save loaded)[/]")
     elif start_state:
-        if mgba.load_state_file(start_state):
-            mgba.tick(30)   # let post-load fade/flags settle before first read
-            s = reader.read_state()
-            say(f"[green]Loaded save state: {start_state} "
-                f"(map {s.map_bank}/{s.map_id}, pos ({s.player_x},{s.player_y}))[/]")
-        else:
-            say(f"[red]Could not load save state: {start_state}[/]")
+        if not Path(start_state).is_file():
+            raise StartPointError(f"start state not found: {start_state}")
+        if not mgba.load_state_file(start_state):
+            raise StartPointError(f"could not load save state: {start_state} (corrupt, or saved by a different libmgba?)")
+        mgba.tick(30)   # let post-load fade/flags settle before first read
+        s = reader.read_state()
+        say(f"[green]Loaded save state: {start_state} "
+            f"(map {s.map_bank}/{s.map_id}, pos ({s.player_x},{s.player_y}))[/]")
     # Otherwise, optionally boot from a battery save and drive to "Continue" so the
     # agent starts in real gameplay instead of the new-game intro (native only).
     elif start_save:
-        if mgba.load_save(start_save):
-            got_control = drive_into_gameplay(mgba, reader)
-            where = f"map {mgba.read8(Addr.MAP_BANK)}/{mgba.read8(Addr.MAP_ID)}"
-            if got_control:
-                say(f"[green]Continued from save: {start_save} ({where})[/]")
-            else:
-                say(f"[yellow]Continued from save but could not confirm player "
-                    f"control ({where}) — may still be in the quest recap[/]")
+        if not Path(start_save).is_file():
+            raise StartPointError(f"save not found: {start_save}")
+        if not mgba.load_save(start_save):
+            raise StartPointError(f"could not load save: {start_save}")
+        got_control = drive_into_gameplay(mgba, reader)
+        where = f"map {mgba.read8(Addr.MAP_BANK)}/{mgba.read8(Addr.MAP_ID)}"
+        if got_control:
+            say(f"[green]Continued from save: {start_save} ({where})[/]")
         else:
-            say(f"[red]Could not load save: {start_save}[/]")
+            say(f"[yellow]Continued from save but could not confirm player "
+                f"control ({where}) — may still be in the quest recap[/]")
 
     tilemap = TilemapReader(mgba)
     # The journal belongs to the save/state we just loaded (memory.journals): an old fixture must not inherit the milestones of the newest run. Explicit paths (the eval
@@ -310,6 +319,11 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
         backup = ltm.start_fresh()                  # stale milestones would make quest('new_game') say "already done" at the title
         say("[yellow]New game: the journal starts blank" + (f" (the old one is saved as {backup.name})" if backup else "") + "[/]")
     client  = AgentClient(mgba, reader, ltm)
+    from config import CONTEXT_TOKENS, MAX_TOKENS, prompt_token_budget
+    if CONTEXT_TOKENS:
+        say(f"[cyan]Context: {CONTEXT_TOKENS} tokens loaded − {MAX_TOKENS} reply cap → history is fitted to ~{prompt_token_budget()} prompt tokens[/]")
+    else:
+        say("[dim]CONTEXT_TOKENS is not set: the history is bounded by message count; a context-overflow error teaches the client a ceiling.[/]")
     stm     = ShortTermMemory()
     journal = BattleJournal(path=journal_path)
 
@@ -797,6 +811,14 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 console.print(f"\n[red]Stopped.[/] {_run_summary(client, run.step_count)}")
             ltm.save()
             return _result("interrupted", False)
+        except LLMFatalError as e:
+            # Bad credentials, exhausted quota, unknown model: no retry can fix it, so end the run with the reason instead of
+            # spending the error budget (and, for a quota 429, hours of backoff) on it.
+            _log_exception(e)
+            if verbose:
+                console.print(f"[red bold]LLM endpoint refused the run: {e.reason}[/] {_run_summary(client, run.step_count)}")
+            ltm.save()
+            return _result("llm_error", False)
         except Exception as e:
             run.consecutive_errors += 1
             _log_exception(e)
@@ -843,7 +865,11 @@ def _cleared_this_run(ltm):
 
 def main():
     resume = _resume_state()
-    rt = build_runtime(verbose=True, **({"start_state": resume} if resume else {}))
+    try:
+        rt = build_runtime(verbose=True, **({"start_state": resume} if resume else {}))
+    except StartPointError as e:
+        console.print(f"[red bold]Cannot start: {e}[/]")
+        sys.exit(2)
     if rt is None:
         sys.exit(1)
     from memory.run_log import RunLog

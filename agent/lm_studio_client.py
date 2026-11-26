@@ -5,10 +5,10 @@ import time
 from pathlib import Path
 from openai import OpenAI
 from agent.usage import cached_prompt_tokens
-from agent.llm_retry import call_with_retry
+from agent.llm_retry import call_with_retry, fatal_reason, is_context_overflow, LLMFatalError
 from agent.tool_args import repair_args, signature
 from agent.tools import SAFARI_CONTEXT, tool_schema, tools_for, normalize_button
-from agent.history import trim_messages, strip_control_tokens, split_think
+from agent.history import (trim_messages, strip_control_tokens, split_think, estimate_tokens, strip_images, last_user_group, fit_to_budget)
 from game.memory_reader import LeafGreenReader
 from typing import TYPE_CHECKING
 from memory.long_term import LongTermMemory
@@ -16,7 +16,7 @@ from memory.run_log import NullRunLog
 from knowledge.leafgreen_data import MILESTONES
 from knowledge.navigation import get_map_image_path, MAP_NAMES
 from config import (LLM_BASE_URL, LLM_API_KEY, MODEL_NAME, TEMPERATURE, MAX_TOKENS,
-                    ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT, LLM_RETRIES)
+                    ENABLE_THINKING, SCREENSHOT_PATH, LLM_TIMEOUT, LLM_RETRIES, prompt_token_budget)
 from agent import events
 from agent.skills.base import SkillBase
 from agent.skills.gamecorner import GameCornerMixin
@@ -83,6 +83,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
 
     MAX_HISTORY = 20  # keep last ~10 user/assistant turns (text only for old turns)
     MAX_TOOL_ROUNDS = 6  # cap model tool-call rounds per decision step, then re-observe
+    OBS_TRUNCATE_CHARS = 2500   # last rung of the overflow ladder: the current observation is cut to this
 
     def set_system(self, prompt: str):
         if self.messages and self.messages[0]["role"] == "system":
@@ -200,8 +201,8 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
         else:
             user_content = observation
 
-        checkpoint = len(self.messages)     # roll back to here if this step fails (#69)
         self.messages.append({"role": "user", "content": user_content})
+        appended = 1                        # messages this step added (roll back exactly these if it fails, #69; counted from the END because fitting may drop older turns from the front)
         self._trim_image_history()
         actions: list[str] = []
         last_reasoning = ""
@@ -215,23 +216,20 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             if flush:
                 flush()           # the window only presents ~60×/s: show the latest frame before we wait on the LLM
             try:
-                resp = call_with_retry(
-                    lambda: self.llm.chat.completions.create(
-                        model=MODEL_NAME, messages=self.messages,
-                        tools=tools_for(self._tool_context()), tool_choice="auto",
-                        temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
-                        timeout=LLM_TIMEOUT or None,   # bound a single call (see config)
-                    ),
-                    tries=LLM_RETRIES,
-                    on_retry=lambda e, n, wait: events.emit("note", f"LLM call failed ({type(e).__name__}) — retry {n}/{LLM_RETRIES} in {wait:.0f}s", log=False),
-                )
-            except Exception:
-                # A failed LLM call (e.g. an LLM_TIMEOUT) must not leave a dangling user
-                # turn — or a half-finished tool_calls group — in history: the API would
-                # reject the next request, and each retried step would pile on another,
-                # inflating token cost. Roll back everything this step appended (#69).
-                del self.messages[checkpoint:]
+                resp = self._chat()
+            except LLMFatalError:
+                del self.messages[len(self.messages) - appended:]
                 raise
+            except Exception as e:
+                if _round == 0:
+                    # A failed first call must not leave a dangling user turn in history: the API would reject the next request,
+                    # and each retried step would pile on another, inflating token cost (#69).
+                    del self.messages[len(self.messages) - appended:]
+                    raise
+                # Later rounds: the earlier rounds' tool calls already moved the game and their messages are complete
+                # tool_calls/tool groups, so KEEP them — the model must still know what it just did. The next tick re-observes.
+                events.emit("note", f"LLM call failed after {_round} round(s) ({type(e).__name__}) — keeping what was done, re-observing", log=False)
+                return last_reasoning, actions
             self.llm_calls += 1
             usage = getattr(resp, "usage", None)
             if usage:
@@ -263,6 +261,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             if msg.tool_calls:
                 history_entry["tool_calls"] = [tc.model_dump() for tc in msg.tool_calls]
             self.messages.append(history_entry)
+            appended += 1
 
             if not msg.tool_calls:
                 return last_reasoning, actions
@@ -287,6 +286,7 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                 self.messages.append({
                     "role": "tool", "tool_call_id": tc.id, "content": str(result)
                 })
+                appended += 1
                 try:
                     args = json.loads(tc.function.arguments) if tc.function.arguments else {}
                 except (json.JSONDecodeError, ValueError):
@@ -297,6 +297,74 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                     actions.append(tc.function.name)
 
         return last_reasoning, actions
+
+    def _prompt_budget(self) -> int:
+        """The prompt-token ceiling in force: the configured one (CONTEXT_TOKENS), the one learned from an overflow, or the smaller of the two; 0 = unknown."""
+        known = [b for b in (prompt_token_budget(), self._learned_budget) if b]
+        return min(known) if known else 0
+
+    def _chat(self):
+        """One chat completion, fitted to the context window and with the failures told apart (#372):
+        fatal (credentials, quota, unknown model) → LLMFatalError, stop the run now; transient → backed off inside call_with_retry;
+        context overflow → shrink and resend (images, then old turns, then the observation) instead of repeating the identical request."""
+        rung = 0
+        while True:
+            tools = tools_for(self._tool_context())
+            tool_tokens = estimate_tokens(tools)
+            budget = self._prompt_budget()
+            if budget:
+                self.messages, did = fit_to_budget(self.messages, budget, int(tool_tokens * self._tok_ratio), self._tok_ratio)
+                if did:
+                    events.emit("note", f"context: {', '.join(did)} to fit ~{budget} prompt tokens", log=False)
+            raw_est = estimate_tokens(self.messages) + tool_tokens
+            try:
+                resp = call_with_retry(
+                    lambda: self.llm.chat.completions.create(
+                        model=MODEL_NAME, messages=self.messages, tools=tools, tool_choice="auto",
+                        temperature=TEMPERATURE, max_tokens=MAX_TOKENS,
+                        timeout=LLM_TIMEOUT or None,   # bound a single call (see config)
+                    ),
+                    tries=LLM_RETRIES,
+                    on_retry=lambda e, n, wait: events.emit("note", f"LLM call failed ({type(e).__name__}) — retry {n}/{LLM_RETRIES} in {wait:.0f}s", log=False),
+                )
+            except Exception as e:
+                why = fatal_reason(e)
+                if why:
+                    raise LLMFatalError(why, e) from e
+                if is_context_overflow(e) and rung < 3:
+                    ceiling = int(raw_est * self._tok_ratio * 0.8)
+                    self._learned_budget = min(self._learned_budget or ceiling, ceiling)
+                    changed = False
+                    while rung < 3 and not changed:         # skip rungs that would change nothing (no images to drop, one turn already) — resending the identical request is the bug
+                        rung += 1
+                        changed = self._shrink_for_overflow(rung)
+                    events.emit("note", f"context overflow (~{int(raw_est * self._tok_ratio)} prompt tokens) — "
+                                        f"{('dropped images', 'kept only the current turn', 'truncated the observation')[rung - 1] if changed else 'nothing left to cut'}; "
+                                        f"ceiling now ~{self._learned_budget}", log=False)
+                    continue
+                raise
+            usage = getattr(resp, "usage", None)
+            sent = getattr(usage, "prompt_tokens", 0) or 0
+            if sent and raw_est:                      # calibrate the estimator against what the server counted
+                self._tok_ratio = min(4.0, max(0.3, 0.5 * self._tok_ratio + 0.5 * sent / raw_est))
+            return resp
+
+    def _shrink_for_overflow(self, rung: int) -> bool:
+        """The overflow ladder, one rung per failure: 1 images out · 2 only the current user turn (and what it started) · 3 the observation cut short.
+        True when the messages actually changed."""
+        before = self.messages
+        if rung == 1:
+            self.messages = strip_images(self.messages)
+        elif rung == 2:
+            self.messages = last_user_group(strip_images(self.messages))
+        else:
+            self.messages = last_user_group(strip_images(self.messages))
+            for i in range(len(self.messages) - 1, -1, -1):
+                m = self.messages[i]
+                if m.get("role") == "user" and isinstance(m.get("content"), str) and len(m["content"]) > self.OBS_TRUNCATE_CHARS:
+                    self.messages[i] = {**m, "content": m["content"][:self.OBS_TRUNCATE_CHARS] + "\n…[observation truncated to fit the context window]"}
+                    break
+        return self.messages != before
 
     def _tool_context(self):
         """The screen the tool list is gated on (re-read every round: a go_to can turn into a battle mid-step). Any

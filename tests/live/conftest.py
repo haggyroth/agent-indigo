@@ -43,8 +43,11 @@ def rt(tmp_path_factory):
     sys.path.insert(0, str(ROOT))
     import main
     tmp = tmp_path_factory.mktemp("live")
-    runtime = main.build_runtime(ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"),
-                                 verbose=False)
+    try:
+        runtime = main.build_runtime(ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"),
+                                     verbose=False)
+    except main.StartPointError as e:
+        pytest.skip(f"start point could not be loaded: {e}")
     if runtime is None:
         pytest.skip("emulator runtime could not be built")
     return runtime
