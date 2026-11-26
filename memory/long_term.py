@@ -21,6 +21,7 @@ DEFAULTS = {
     "gym_losses": {},     # {"bank/id": party level total} — a blackout inside a gym blocks challenge_leader until the team grows (main._handle_blackout)
     "hidden_taken": [],   # "bank/id/x/y" hidden-item tiles already searched (overworld._pick_hidden_here)
     "pc_visited": [],     # "bank,id" towns whose Pokémon Center was visited on first arrival (nav._maybe_visit_new_town)
+    "model_milestones": [],  # milestones the MODEL recorded by hand (record_milestone), not derived from the game — startup drops any the cartridge contradicts (#379)
     "shop_broke_at": None,  # money at the last shop() visit that bought nothing for lack of funds (readiness stays quiet until richer)
 }
 
@@ -128,14 +129,32 @@ class LongTermMemory:
             self.save()
         return {"adopted": adopted, "dropped": dropped}
 
-    def add_milestone(self, name: str, note: str = "") -> bool:
+    def add_milestone(self, name: str, note: str = "", source: str = "derived") -> bool:
+        """Record a milestone. `source="model"` marks one the model asserted by hand (record_milestone) so startup can re-check it against the cartridge."""
         if name in self.data["milestones"]:
             return False
         self.data["milestones"].append(name)
+        if source == "model":
+            self.data.setdefault("model_milestones", []).append(name)
         if note:
             self.data["notes"].append(f"{name}: {note}")
         self.save()
         return True
+
+    def reconcile_model_milestones(self, check) -> list[str]:
+        """Drop the milestones the model recorded by hand that the loaded cartridge contradicts (an older save, a wrong claim). `check(spec) -> bool` is the
+        story chain's done-check; milestones with no RAM evidence are kept. Returns what was dropped."""
+        from knowledge.milestone_evidence import verify
+        dropped = []
+        for ms in list(self.data.get("model_milestones", [])):
+            if not verify(ms, check)[0]:
+                dropped.append(ms)
+                self.data["model_milestones"].remove(ms)
+                if ms in self.data["milestones"]:
+                    self.data["milestones"].remove(ms)
+        if dropped:
+            self.save()
+        return dropped
 
     def add_league_loss(self) -> int:
         """One more whiteout in the Elite Four's rooms; returns the running count."""

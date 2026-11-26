@@ -8,6 +8,7 @@ from game.options import apply_battle_style
 from game.state import GameContext, GameState, StateDiff
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
+from agent.llm_retry import LLMFatalError
 from agent import events
 from memory.short_term import ShortTermMemory
 from memory.long_term import LongTermMemory
@@ -40,6 +41,10 @@ ERRORS_LOG = Path(PROGRESS_PATH).parent / "errors.log"
 # forever at ~1 Hz printing the same line; stopping cleanly saves progress and
 # surfaces the failure instead of hiding it.
 MAX_CONSECUTIVE_ERRORS = 30
+
+# A whiteout sequence needs a handful of A presses (6 per pass). If the whole party still reads fainted after this many passes the recovery is
+# not progressing (a hung sequence, or a misread party): end the episode as stalled instead of tapping forever.
+MAX_BLACKOUT_PASSES = 40
 
 
 def _log_exception(exc: Exception) -> None:
@@ -93,7 +98,7 @@ class AgentRuntime:
 @dataclass
 class EpisodeResult:
     """Outcome of one run_episode() call — the eval scorecard for a scenario."""
-    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget
+    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget | llm_error
     passed:            bool           # goal predicate satisfied
     steps:             int
     llm_calls:         int
@@ -132,6 +137,20 @@ _NAV_ACTIONS = frozenset({"go_to", "walk_to", "go_to_map", "fly_to", "quest", "p
 
 def _is_nav(actions) -> bool:
     return any(a in _NAV_ACTIONS for a in actions or ())
+
+
+def _guard_stop(run: "_RunState", client, wall_deadline: float, max_steps: int) -> Optional[tuple[str, str]]:
+    """The run caps, in the order they are checked: (reason, message) of the first one hit, else None. Called at the TOP of every loop iteration
+    (so no `continue` path — the blackout recovery, the transition auto-tap — can skip it) and again after each completed decision."""
+    if max_steps and run.step_count >= max_steps:
+        return "max_steps", f"Reached max_steps={max_steps} — stopping."
+    if MAX_LLM_CALLS and client.llm_calls >= MAX_LLM_CALLS:
+        return "max_llm_calls", f"Reached MAX_LLM_CALLS={MAX_LLM_CALLS} — stopping."
+    if TOKEN_BUDGET and client.total_tokens >= TOKEN_BUDGET:
+        return "token_budget", f"Reached TOKEN_BUDGET={TOKEN_BUDGET} — stopping."
+    if wall_deadline and time.time() >= wall_deadline:
+        return "max_wall", "Reached the wall-clock cap — stopping."
+    return None
 
 
 def _status_line(state, ltm, client, reader, step: int, t_start: float) -> str:
@@ -327,6 +346,11 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
         backup = ltm.start_fresh()                  # stale milestones would make quest('new_game') say "already done" at the title
         say("[yellow]New game: the journal starts blank" + (f" (the old one is saved as {backup.name})" if backup else "") + "[/]")
     client  = AgentClient(mgba, reader, ltm)
+    from config import CONTEXT_TOKENS, MAX_TOKENS, prompt_token_budget
+    if CONTEXT_TOKENS:
+        say(f"[cyan]Context: {CONTEXT_TOKENS} tokens loaded − {MAX_TOKENS} reply cap → history is fitted to ~{prompt_token_budget()} prompt tokens[/]")
+    else:
+        say("[dim]CONTEXT_TOKENS is not set: the history is bounded by message count; a context-overflow error teaches the client a ceiling.[/]")
     stm     = ShortTermMemory()
     journal = BattleJournal(path=journal_path)
 
@@ -354,6 +378,10 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
             f"{', '.join(_sync['dropped'])} to match the cartridge "
             f"(badges now {ltm.data['badges_earned']}/8). "
             f"Use `python -m tools.reset_journal` for a full reset.[/]")
+    from agent.story import make_done_check
+    _contradicted = ltm.reconcile_model_milestones(make_done_check(reader, ltm))
+    if _contradicted:
+        say(f"[yellow]Dropped milestones recorded by hand that this save does not confirm: {', '.join(_contradicted)}[/]")
     if _sync["adopted"]:
         say(f"[yellow]Adopted from the save into LTM: {', '.join(_sync['adopted'])}[/]")
 
@@ -383,6 +411,7 @@ class _RunState:
     pending_map_name: str = ""
     blackout_active: bool = False
     prev_was_nav: bool = False            # the previous decision tick ran a movement tool (what 'stuck' is measured against)
+    blackout_passes: int = 0              # consecutive recovery passes with the party still wiped (capped: MAX_BLACKOUT_PASSES)
     decision_ticks: int = 0
     stuck_ticks: int = 0
     step_count: int = 0
@@ -502,9 +531,16 @@ def _handle_blackout(run: _RunState, state: GameState, mgba, reader: LeafGreenRe
 
     Returns True if the caller should `continue` (the blackout path never falls through to the LLM decision step)."""
     party_wiped = bool(state.party) and all(p.current_hp == 0 for p in state.party)
+    if party_wiped and hasattr(reader, "read_party_fresh"):
+        # state.party may be the reader's last-good fallback (an implausible decode returns the PREVIOUS party, which can be the wiped one):
+        # confirm with a read that has no fallback before tapping through a whiteout that is not happening.
+        fresh = reader.read_party_fresh()
+        party_wiped = bool(fresh) and all(p.current_hp == 0 for p in fresh)
     if not party_wiped:
         run.blackout_active = False   # recovered (respawn/heal) → re-arm
+        run.blackout_passes = 0
         return False
+    run.blackout_passes += 1
     # Announce ONCE per blackout, not every tick while the party stays fainted.
     if not run.blackout_active:
         run.blackout_active = True
@@ -576,14 +612,17 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
 
     def _result_inner(reason: str, passed: bool, s: Optional[GameState] = None) -> EpisodeResult:
         if s is None:
-            s = reader.read_state()
+            try:
+                s = reader.read_state()
+            except Exception:              # a read failing inside an exit path must not mask the real exit reason
+                s = run.prev_state
         return EpisodeResult(
             reason=reason, passed=passed, steps=run.step_count,
             stats=events.run_stats(), llm_calls=client.llm_calls,
             prompt_tokens=client.total_prompt_tokens,
             completion_tokens=client.total_completion_tokens,
             cached_tokens=client.total_cached_tokens,
-            final_map=(s.map_bank, s.map_id), final_pos=(s.player_x, s.player_y),
+            final_map=(s.map_bank, s.map_id) if s else (0, 0), final_pos=(s.player_x, s.player_y) if s else (0, 0),
             badges=ltm.data["badges_earned"],
             milestones=list(ltm.data.get("milestones", [])),
             stuck_ratio=round(run.stuck_ticks / run.decision_ticks, 3) if run.decision_ticks else 0.0,
@@ -617,6 +656,13 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                         console.print(f"[yellow]Stopping — stalled: {why}[/]")
                     ltm.save()
                     return _result("stalled", False, state)
+
+            hit = _guard_stop(run, client, wall_deadline, max_steps)
+            if hit:                                   # before ANY `continue` path below can skip the caps
+                if verbose:
+                    console.print(f"[green]{hit[1]} {_run_summary(client, run.step_count)}[/]")
+                ltm.save()
+                return _result(hit[0], False, state)
 
             in_battle = state.context == GameContext.IN_BATTLE
             if in_battle and not run.battle_was_active:
@@ -720,6 +766,17 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
 
             # ── Blackout check ───────────────────────────────────────────────
             if _handle_blackout(run, state, mgba, reader, ltm):
+                if run.blackout_passes >= MAX_BLACKOUT_PASSES:
+                    events.emit("note", f"the whiteout has not recovered after {run.blackout_passes} passes — stopping as stalled")
+                    snap = getattr(rlog, "dir", None)
+                    if snap and hasattr(mgba, "save_state_file"):
+                        try:
+                            (snap / "stalls").mkdir(parents=True, exist_ok=True)
+                            mgba.save_state_file(str(snap / "stalls" / "blackout.ss1"))
+                        except Exception:
+                            log_once("main.blackout_snapshot", "main: could not save the blackout stall snapshot (ignored)")
+                    ltm.save()
+                    return _result("stalled", False, state)
                 continue
 
             # ── LLM decision step ────────────────────────────────────────────
@@ -781,42 +838,26 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                                          "party": _party_brief(state), "llm_calls": client.llm_calls})
                 if saved:
                     events.emit("checkpoint", f"checkpoint saved: {getattr(saved, 'name', saved)}", major=False)
-            if max_steps and run.step_count >= max_steps:
+            hit = _guard_stop(run, client, wall_deadline, max_steps)
+            if hit:                                   # (spend caps stop cleanly, like max_steps: an unattended run can't run up a bill, or hang for hours on a degrading model)
                 if verbose:
-                    console.print(f"[green]Reached max_steps={max_steps} — stopping. "
-                                  f"{_run_summary(client, run.step_count)}[/]")
+                    console.print(f"[green]{hit[1]} {_run_summary(client, run.step_count)}[/]")
                 ltm.save()
-                return _result("max_steps", False, state)
-            # Spend guards (matter for cloud endpoints; 0 = unlimited). Stop
-            # cleanly, same as max_steps, so an unattended run can't run up an
-            # unbounded bill.
-            if MAX_LLM_CALLS and client.llm_calls >= MAX_LLM_CALLS:
-                if verbose:
-                    console.print(f"[green]Reached MAX_LLM_CALLS={MAX_LLM_CALLS} — stopping. "
-                                  f"{_run_summary(client, run.step_count)}[/]")
-                ltm.save()
-                return _result("max_llm_calls", False, state)
-            if TOKEN_BUDGET and client.total_tokens >= TOKEN_BUDGET:
-                if verbose:
-                    console.print(f"[green]Reached TOKEN_BUDGET={TOKEN_BUDGET} — stopping. "
-                                  f"{_run_summary(client, run.step_count)}[/]")
-                ltm.save()
-                return _result("token_budget", False, state)
-            # Wall-clock guard: an unattended run (esp. a local model that degrades on a
-            # marathon) can't hang for hours — checked each step, so at worst one over-
-            # long step past the deadline (LLM_TIMEOUT bounds that single step).
-            if wall_deadline and time.time() >= wall_deadline:
-                if verbose:
-                    console.print(f"[green]Reached wall-clock cap ({max_wall_s:.0f}s) — stopping. "
-                                  f"{_run_summary(client, run.step_count)}[/]")
-                ltm.save()
-                return _result("max_wall", False, state)
+                return _result(hit[0], False, state)
 
         except KeyboardInterrupt:
             if verbose:
                 console.print(f"\n[red]Stopped.[/] {_run_summary(client, run.step_count)}")
             ltm.save()
             return _result("interrupted", False)
+        except LLMFatalError as e:
+            # Bad credentials, exhausted quota, unknown model: no retry can fix it, so end the run with the reason instead of
+            # spending the error budget (and, for a quota 429, hours of backoff) on it.
+            _log_exception(e)
+            if verbose:
+                console.print(f"[red bold]LLM endpoint refused the run: {e.reason}[/] {_run_summary(client, run.step_count)}")
+            ltm.save()
+            return _result("llm_error", False)
         except Exception as e:
             run.consecutive_errors += 1
             _log_exception(e)
