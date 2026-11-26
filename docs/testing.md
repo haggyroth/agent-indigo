@@ -50,4 +50,13 @@ There is also a **tier-1** deterministic check that drives the navigation skills
 
 ## Mining a watched run
 
+```sh
+python -m tools.analyze_run                    # the newest run under logs/runs: timeline, tool usage, refusals, loops, model behaviour
+python -m tools.analyze_run 20261125-235411    # a run by name (or a directory / run.jsonl path)
+python -m tools.analyze_run A --diff B         # two runs side by side (two models from the same fixture)
+python -m tools.analyze_run A --json           # the numbers, for a scorecard
+```
+
+It answers the usual questions in one go: where the time went (seconds per tool, the slowest calls), which tool results were refusals (grouped by text, numbers blanked, with the tools that caused them — "unknown move", "can't switch", "trainer battle started"), runs of identical calls and how much of the stream is `read_game_state`, and the model's calls per step, tokens, cache hit rate and empty rounds.
+
 When you watch a run and something looks off, `logs/runs/<timestamp>/run.jsonl` has everything: the observation the model saw, its tool calls, and the results. The usual loop is: find the pattern in the log (refused calls, repeated results, contradictory advice), reproduce it in a unit test if it is logic, or a live test if it needs the real ROM, then fix it. Most of the live suite exists because of that loop.
