@@ -120,8 +120,8 @@ class Live:
             b = Addr.PARTY_DATA + 100 * i
             self.m.write16(b + 0x56, self.m.read16(b + 0x58))
 
-    def patch_mon(self, slot, moves=None, pps=None, level=None, exp=None) -> None:
-        """Rewrite a party member's moves / PP / level / exp in the encrypted struct (and its checksum).
+    def patch_mon(self, slot, moves=None, pps=None, level=None, exp=None, species=None) -> None:
+        """Rewrite a party member's moves / PP / level / exp / species in the encrypted struct (and its checksum).
         Keep exp consistent with level, or the game hangs on the 'gained EXP' text."""
         m = self.m
         b = Addr.PARTY_DATA + 100 * slot
@@ -133,6 +133,8 @@ class Live:
             enc[i:i + 4] = (int.from_bytes(enc[i:i + 4], "little") ^ key).to_bytes(4, "little")
         order = SUBSTRUCT_ORDER[pid % 24]
         ai, gi = order.index("A") * 12, order.index("G") * 12
+        if species is not None:
+            enc[gi:gi + 2] = species.to_bytes(2, "little")
         if exp is not None:
             enc[gi + 4:gi + 8] = exp.to_bytes(4, "little")
         for i, mv in enumerate(moves or []):
