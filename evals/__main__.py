@@ -14,6 +14,8 @@ def main() -> None:
                                  description="Run agent eval scenarios.")
     ap.add_argument("--scenario", "-s", help="run only this scenario by name")
     ap.add_argument("--list", "-l", action="store_true", help="list scenarios and exit")
+    ap.add_argument("--strict", action="store_true",
+                    help="exit 1 if any scenario was SKIPPED (a missing fixture or a start point that would not load)")
     ap.add_argument("--verbose", "-v", action="store_true",
                     help="stream the per-tick agent output (default: quiet)")
     args = ap.parse_args()
@@ -21,6 +23,8 @@ def main() -> None:
     if args.list:
         for sc in SCENARIOS:
             tag = f" [xfail {sc.xfail}]" if sc.xfail else ""
+            if sc.missing_fixtures():
+                tag += f" [MISSING: {', '.join(sc.missing_fixtures())}]"
             print(f"{sc.name:16} ≤{sc.max_steps:<4} {sc.goal.desc}{tag}")
             if sc.notes:
                 print(f"{'':16} {sc.notes}")
@@ -35,9 +39,12 @@ def main() -> None:
                   f"Known: {', '.join(s.name for s in SCENARIOS)}", file=sys.stderr)
             sys.exit(2)
         r = run_scenario(sc, verbose=args.verbose)
-        _report([r] if r else [])
+        results = [r] if r else []
+        _report(results)
     else:
-        run_all(verbose=args.verbose)
+        results = run_all(verbose=args.verbose)
+    if args.strict and any(r["status"] == "SKIPPED" for r in results):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

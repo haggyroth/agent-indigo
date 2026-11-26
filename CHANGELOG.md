@@ -6,6 +6,9 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Fixed
+- **A start point that will not load now stops the run (#370).** `build_runtime` raises `StartPointError` when `START_FROM_STATE`, `START_FROM_SAVE` or `RESUME` names a file that is missing or that libmgba rejects, instead
+  of printing a (quiet-mode: nothing) warning and playing from the power-on screen. `python main.py` prints the reason and exits 2. The eval harness checks each scenario's fixtures first and reports
+  `SKIPPED (fixture_missing: …)` / `SKIPPED (start_point_failed: …)` without booting an emulator; `python -m evals --list` marks missing fixtures and `--strict` exits 1 when anything was skipped.
 - **Long-term memory no longer forgets four of its own keys on reload (#371).** `gym_losses` (a loss inside a gym blocks `challenge_leader` until the team grows), `hidden_taken`, `pc_visited` and
   `shop_broke_at` were written to `progress.json` but dropped by `LongTermMemory._load` because they were missing from `DEFAULTS`. They are declared now, and `_load` keeps any undeclared key
   (only `RETIRED_KEYS` are dropped). A test scans the source for every `ltm.data` key and fails if one is not in `DEFAULTS`.
