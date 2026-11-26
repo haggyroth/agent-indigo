@@ -124,18 +124,24 @@ def build(pf: str):
     tindex = trainer_index(pf)
     preset = preset_hide_flags(pf, flags)
     renewable = renewable_hidden(pf)
+    script_set = set()                                                                  # FLAG_HIDE_* flags some script SETS (a story event that makes the object vanish)
+    for sp in glob.glob(f"{pf}/data/**/*.inc", recursive=True):
+        script_set.update(re.findall(r"setflag (FLAG_HIDE_\w+)", open(sp, errors="ignore").read()))
     per_map, unresolved = {}, []
     for mj in sorted(glob.glob(f"{pf}/data/maps/*/map.json")):
         folder = os.path.basename(os.path.dirname(mj))
         if folder not in gn:
             continue
         d = json.load(open(mj))
-        tr, items, hidden = [], [], []
+        tr, items, hidden, vanish = [], [], [], []
         for o in d.get("object_events", []):
             if o.get("trainer_type", "TRAINER_TYPE_NONE") not in ("TRAINER_TYPE_NONE",) and o.get("script") and o["trainer_type"].startswith("TRAINER_TYPE_"):
                 const = tindex.get(o["script"])
                 if const and const in trainers:
                     tr.append((trainer_start + trainers[const], const, o["x"], o["y"]))
+                    hf = o.get("flag")
+                    if hf in script_set and hf in flags:
+                        vanish.append((flags[hf], hf, trainer_start + trainers[const]))      # this trainer disappears when a script sets `hf`
                 else:
                     unresolved.append((folder, o["script"]))
             elif o.get("graphics_id") == "OBJ_EVENT_GFX_ITEM_BALL" and o.get("flag") in flags and flags[o["flag"]] not in preset:
@@ -144,7 +150,7 @@ def build(pf: str):
             if b.get("type") == "hidden_item" and b.get("flag") in flags and b["flag"] not in renewable:
                 hidden.append((flags[b["flag"]], b["flag"], b["x"], b["y"]))
         if tr or items or hidden:
-            per_map[folder] = {"map": gn[folder], "trainers": tr, "items": items, "hidden": hidden}
+            per_map[folder] = {"map": gn[folder], "trainers": tr, "items": items, "hidden": hidden, "vanish": vanish}
     return per_map, unresolved
 
 
@@ -186,6 +192,11 @@ def main():
         out.append(f"        'hidden': {[fl for fl, _ in hd]!r},")
         out.append(f"        'trainer_pos': {pos('trainers')!r},")
         out.append(f"        'item_pos': {pos('items')!r},")
+        van = {}
+        for f in fs:
+            for num, name, tf in per_map[f]["vanish"]:
+                van.setdefault((num, name), set()).add(tf)
+        out.append(f"        'vanish': {[(n, name, sorted(t)) for (n, name), t in sorted(van.items())]!r},       # (hide flag, its name, trainer flags that vanish when a script sets it)")
         out.append("    },")
     out.append("}")
     sys.stdout.write("\n".join(out) + "\n")
