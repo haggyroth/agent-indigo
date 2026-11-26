@@ -11,8 +11,7 @@ All settings are environment variables, read from `.env` (copy [`.env.example`](
 | `START_FROM_SAVE` | — | A battery `.sav` to load and "Continue" into. |
 | `START_FROM_STATE` | — | An emulator state (`.ss*`) to load directly: instant, no title screen, no quest-log recap. Takes precedence over `START_FROM_SAVE`. |
 | `RESUME` | — | `latest` (the newest checkpoint under `logs/runs/*/checkpoints/`) or a checkpoint `.ss1` path. Loaded as `START_FROM_STATE`, with the journal snapshot saved beside it. |
-| `STARTER` | `bulbasaur` | New game only: `bulbasaur`, `charmander` or `squirtle`. |
-| `PLAYER_NAME`, `RIVAL_NAME` | `RED`, `BLUE` | New game only: up to 7 letters. Arguments typed in the `quest('new_game …')` call override these. |
+| `STARTER`, `PLAYER_NAME`, `RIVAL_NAME` | — (**the model chooses**) | New game only. **Leave these blank and the model picks its own starter (`bulbasaur`, `charmander` or `squirtle`), its own name and its rival's name (up to 7 letters), and nicknames its starter and its Lapras.** Set any one and you decide for the model: the unset ones fall back to `bulbasaur` / `RED` / `BLUE` and no nicknames are asked for. |
 
 ## Run control
 
@@ -76,7 +75,10 @@ MODEL_NAME=qwen/qwen3-14b ENABLE_THINKING=true SHOW_WINDOW=true python main.py
 LLM_BASE_URL=https://openrouter.ai/api/v1 LLM_API_KEY=sk-or-... MODEL_NAME=<provider id> \
   MAX_LLM_CALLS=2000 TOKEN_BUDGET=20000000 python main.py
 
-# A fresh game with a chosen starter
+# A fresh game — the model names itself, its rival, its starter and its Lapras
+START_NEW_GAME=true python main.py
+
+# …or you choose for it
 START_NEW_GAME=true STARTER=squirtle PLAYER_NAME=ASH RIVAL_NAME=GARY python main.py
 
 # Pick up a stopped run

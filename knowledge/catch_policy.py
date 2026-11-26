@@ -44,11 +44,9 @@ def weakest_line(party):
     return min(rows) if rows else None
 
 
-def evaluate(party, species_id: int, level: int, max_team: int = 6, dex_owned: bool | None = None,
-             wanted: dict | None = None, stored=None) -> Verdict:
-    """Verdict for a wild `species_id` at `level` against the current `party`. `wanted` is {species id: reason}
-    from knowledge.team.wanted_species — a catch that fills a team gap (a counter for the next gym, an HM carrier) is
-    worth a ball whatever its BST, within the premium level debt. `stored` = species ids already in the PC boxes: a watched
+def evaluate(party, species_id: int, level: int, max_team: int = 6, dex_owned: bool | None = None, stored=None) -> Verdict:
+    """Verdict for a wild `species_id` at `level` against the current `party` — generic quality only (line strength, a new type, an upgrade): it never names a Pokémon the team
+    "should" have for a gym, which is the model's decision. `stored` = species ids already in the PC boxes: a watched
     run caught 8 Meowth, 5 Pidgey and 5 Bellsprout in one session because only the PARTY was checked for "already have one"."""
     data = SPECIES_DATA.get(species_id)
     if data is None:
@@ -62,9 +60,6 @@ def evaluate(party, species_id: int, level: int, max_team: int = 6, dex_owned: b
     debt = max(0, min_level_for(top) - level) if top else 0
     weak = weakest_line(party)
     upgrade = bool(weak and line_best >= weak[0] + UPGRADE_MARGIN)
-    if wanted and species_id in wanted and debt <= PREMIUM_DEBT:
-        tail = " — the party is full, so it goes to the PC box; pc('swap') it in" if len(party) >= max_team else ""
-        return Verdict(True, f"fills a team gap: {wanted[species_id]}{tail}", debt)
     if len(party) >= max_team:
         if upgrade and debt <= PREMIUM_DEBT:
             return Verdict(True, f"a stronger line than your {weak[1]} (best form BST {line_best} vs {weak[0]}) "

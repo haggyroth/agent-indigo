@@ -41,7 +41,6 @@ from knowledge.party import can_attack, healthy_enough
 from knowledge.readiness import FLAG_POKEDEX, assess as readiness_assess, render as readiness_render, battles_total, save_note
 from knowledge.repel import REPEL_IDS, VAR_REPEL_STEP_COUNT, note as repel_note
 from knowledge.shopping import shopping_summary
-from knowledge.team import wanted_species
 
 if TYPE_CHECKING:                       # annotations only — main.py owns these types
     from game.memory_reader import LeafGreenReader
@@ -289,7 +288,6 @@ def _safari_battle(t: Tick) -> list[str]:
         out.append(f"SAFARI battle: {enemy.species_name} L{enemy.level} — you have {balls} Safari Balls and {steps} steps left. "
                    "Act with safari('ball'|'bait'|'rock'|'run').")
         v = catch_evaluate(party, enemy.species_id, enemy.level or 0, dex_owned=r.read_dex_owned(enemy.species_id),
-                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])),
                            stored=_safe("stored", r.read_stored_species, set()))
         if v.catch:
             taken = [p.nickname for p in party if p.nickname]
@@ -439,7 +437,6 @@ def _catch_advice(t: Tick, enemy, move_names, pp_view) -> list[str]:
     balls = sum(r.read_bag().get(b, 0) for b in BALL_IDS)
     if balls > 0 and enemy and enemy.species_id and enemy.species_id not in {p.species_id for p in party}:
         v = catch_evaluate(party, enemy.species_id, enemy.level or 0, dex_owned=r.read_dex_owned(enemy.species_id),
-                           wanted=wanted_species(party, None, t.ltm.data.get("gyms_beaten", [])),
                            stored=_safe("stored", r.read_stored_species, set()))
         if not v.catch:
             return [f"NOT worth a ball right now: {v.reason}. "
@@ -604,7 +601,7 @@ def _loop_signals(t: Tick) -> list[str]:
 
 
 def _env_choice_note() -> str:
-    """When .env sets STARTER / PLAYER_NAME / RIVAL_NAME: say what they are, so the model just calls quest('new_game')."""
+    """When .env sets STARTER / PLAYER_NAME / RIVAL_NAME (the human chose for the model): say what they are, so the model just calls quest('new_game')."""
     if not env_configured():
         return ""
     d = env_defaults()
@@ -631,9 +628,9 @@ def build_observation(*, state: "GameState", diff: "StateDiff", in_battle: bool,
         parts += _supplies(t)
     parts += _league(t) + _gym(t) + _area(t) + _field(t) + _exits(t) + _loop_signals(t)
     if not in_battle and (state.map_bank == 0 or not state.party):
-        parts.append("NEW GAME: the game has not started (title screen / intro / no Pokémon yet) — call quest('new_game') and it plays the intro, names you, picks the starter and "
-                     "fetches Oak's Parcel. Options go after the name: quest('new_game squirtle name=KYLE rival=GARY girl') (starter: bulbasaur | charmander | squirtle)"
-                     + _env_choice_note())
+        parts.append("NEW GAME: the game has not started (title screen / intro / no Pokémon yet) — quest('new_game') plays the intro, names you, picks the starter and "
+                     "fetches Oak's Parcel. YOU choose your name, your rival's name and your starter (bulbasaur | charmander | squirtle): quest('new_game squirtle name=KYLE rival=GARY girl'). "
+                     "It will also ask you to nickname your starter" + _env_choice_note())
     # Close every turn with an explicit call to action: some models read a bare state dump as "no question asked".
     parts.append("→ Your turn: decide the best next action and call a tool NOW (do not reply with text only)")
     return " | ".join(parts)

@@ -44,7 +44,7 @@ def test_the_no_walk_message_says_what_to_do_instead_by_what_the_party_can_do():
     capable = client([mon("Pidgey", ["Gust"], 16)])
     assert "could learn it" in capable._go_to("Pewter City")
     nobody = client([mon("Rattata", ["Tackle"], 19)])
-    assert "catch a Fly-capable bird" in nobody._go_to("Pewter City")
+    assert "find a Pokémon that can learn it" in nobody._go_to("Pewter City")
 
 
 # ── stop reasons ──────────────────────────────────────────────────────────────────────────────────────

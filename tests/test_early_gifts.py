@@ -49,5 +49,10 @@ def test_the_errands_pass_the_right_yes_no_answers_and_the_magikarp_notes_a_full
     c = client(party=6)
     c._gift_errand = lambda call, dest, dm, spots, flag, who, auto, answers=("yes",): (seen.append((who, answers)), None)[1]
     c.reader.read_flag = lambda f: f in {errands.FLAG_GOT_TEA, errands.FLAG_BEAT_KOICHI}          # Koichi already beaten: straight to the ball
+    asked = c._get_hitmon()
+    assert "Choose: quest('hitmon lee') or quest('hitmon chan')" in asked and not seen[-1][0].startswith("the Hit")      # the code never picks one of the two for the model
+    c._quest_opts = ["chan"]
     out = c._get_hitmon()
-    assert seen[-1] == ("the Hitmonchan ball", ("yes", "no")) and "PC box" in out
+    assert seen[-1] == ("the Hitmonchan ball", ("yes", "no")) and "PC box" in out and "Took Hitmonchan" in out
+    c._quest_opts = ["lee"]
+    assert "Took Hitmonlee" in c._get_hitmon() and seen[-1][0] == "the Hitmonlee ball"

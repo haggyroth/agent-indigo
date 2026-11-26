@@ -1,13 +1,11 @@
-"""Team composition (#207): coverage, weaknesses, HM carriers, gym fit, hunt hints, catch-policy gap bonus (no emulator)."""
+"""Team composition (#207): coverage, weaknesses, HM carriers, gym fit and the NEEDS the team has — never which species to get (no emulator)."""
 from types import SimpleNamespace as P
 
 from game.constants import SPECIES_NAMES
-from knowledge.catch_policy import PREMIUM_DEBT, evaluate
+from knowledge.catch_policy import evaluate
 from knowledge.gym_teams import TRAINER_TEAMS
 from knowledge.readiness import assess
-from knowledge.team import (GYM_COUNTERS, HM_NEEDS, coverage, gaps, hm_candidates, hm_status, next_gym_fit,
-                            shared_weaknesses, team_report, wanted_species, where_to_find)
-from knowledge.wild_locations import WILD_LOCATIONS
+from knowledge.team import HM_NEEDS, coverage, gaps, hm_status, next_gym_fit, shared_weaknesses, team_report
 
 ID = {v: k for k, v in SPECIES_NAMES.items()}
 BROCK, MISTY = ["Brock"], ["Brock", "Misty"]
@@ -29,19 +27,6 @@ def test_gym_and_e4_teams_come_from_the_decomp():
     assert len(TRAINER_TEAMS) == 15           # 8 leaders + 4 Elite Four + the Champion's three starter variants
 
 
-def test_every_counter_on_the_shortlist_really_exists_in_leafgreen():
-    for leader, names in GYM_COUNTERS.items():
-        assert leader in TRAINER_TEAMS
-        for n in names:
-            assert ID[n] in WILD_LOCATIONS, (leader, n)       # a hunt hint must never name something uncatchable
-
-
-def test_where_to_find_reads_the_encounter_tables():
-    assert where_to_find(ID["Diglett"]) == "Diglett's Cave B1F (grass L15-22)"
-    assert "Route 4" in where_to_find(ID["Sandshrew"])
-    assert where_to_find(ID["Eevee"]) == ""                   # gift only
-
-
 # ── coverage / weaknesses / HMs ───────────────────────────────────────────────────────────────
 def test_coverage_uses_the_moves_actually_known():
     cov = coverage([IVY()])
@@ -61,8 +46,6 @@ def test_hm_status_names_the_knower_and_the_capable():
     knower, capable = hm_status([PIDGEY()], "Surf")
     assert knower is None and capable == []
     assert hm_status([PIDGEY()], "Fly")[1] == ["Pidgey"]
-    cands = hm_candidates("Surf")
-    assert cands and all(c in WILD_LOCATIONS for c in cands)
 
 
 # ── the next gym ─────────────────────────────────────────────────────────────────────────────
@@ -75,18 +58,20 @@ def test_grass_answers_brock_but_not_surge():
     assert next_gym_fit([IVY()], ["Brock", "Misty", "Lt. Surge", "Erika", "Koga", "Sabrina", "Blaine", "Giovanni"]) is None
 
 
-# ── hunt hints ───────────────────────────────────────────────────────────────────────────────
-def test_the_surge_hint_names_a_ground_type_and_where_to_get_it():
+# ── what the team lacks: a need, never a species ───────────────────────────────────────────────────
+def test_the_surge_gap_states_the_need_and_names_no_pokemon_to_get():
     g = [x for x in gaps([IVY(), PIDGEY()], None, MISTY) if x.code == "gym"]
     assert len(g) == 1
-    assert "Lt. Surge's gym (Electric)" in g[0].text and "Diglett — Diglett's Cave B1F" in g[0].text
-    assert ID["Diglett"] in g[0].species
+    assert "Lt. Surge's gym (Electric)" in g[0].text and "hits only 0/" in g[0].text
+    for fixed_pick in ("Diglett", "Sandshrew", "Geodude", "catch a counter", "Cave"):      # an earlier version told the model which counter to catch and where
+        assert fixed_pick not in g[0].text, g[0].text
+    assert not hasattr(g[0], "species")
 
 
-def test_a_counter_already_in_the_pc_is_swapped_in_not_hunted():
+def test_a_stored_pokemon_that_could_help_is_never_singled_out_for_a_gym():
     box = [{"species_id": ID["Diglett"], "species_name": "Diglett", "box": 0, "slot": 7}]
     g = [x for x in gaps([IVY(), PIDGEY()], box, MISTY) if x.code == "gym"][0]
-    assert "pc('swap')" in g.text and "1:7" in g.text and "Diglett's Cave" not in g.text
+    assert "Diglett" not in g.text and "pc('list', detail=true)" in g.text                  # it points at the model's own box, not at a pick
 
 
 def test_no_gym_hint_when_the_team_already_answers_it():
@@ -99,31 +84,27 @@ def test_surf_is_only_a_gap_once_the_story_needs_it_and_nobody_can_carry_it():
     early = [x for x in gaps([IVY(), PIDGEY()], None, MISTY) if x.code == "hm"]
     assert not [x for x in early if "Surf" in x.text]
     late = [x for x in gaps([IVY(), PIDGEY()], None, four) if x.code == "hm"]
-    assert any("Surf" in x.text and "catch one that can" in x.text for x in late)
+    assert any("Surf" in x.text and "must join the team" in x.text for x in late)
+    box = [{"species_id": ID["Squirtle"], "species_name": "Squirtle", "box": 0, "slot": 3}]
+    stored = [x for x in gaps([IVY(), PIDGEY()], box, four) if "Surf" in x.text]
+    assert stored and "in the PC that can: Squirtle (1:3)" in stored[0].text                  # what the model OWNS that can do it (a fact), not a species to go and get
     with_surfer = [mon("Squirtle", ["Tackle"]), IVY()]
     assert not [x for x in gaps(with_surfer, None, four) if "Surf" in x.text]
 
 
 # ── catch policy + readiness + report ────────────────────────────────────────────────────────────────
-def test_filling_a_gap_makes_a_catch_worthwhile_even_for_a_weak_line():
+def test_catch_policy_never_prefers_a_species_because_a_gym_needs_it():
+    """The old `wanted` list made Diglett 'fill a team gap' for Surge whatever its quality; the verdict is now generic (line strength, type, upgrade) only."""
+    import inspect
+    assert "wanted" not in inspect.signature(evaluate).parameters
     party = [mon("Ivysaur", level=24), mon("Pidgey", level=20)]
-    plain = evaluate(party, ID["Diglett"], 18)
-    wanted = wanted_species(party, None, MISTY)
-    assert ID["Diglett"] in wanted
-    v = evaluate(party, ID["Diglett"], 18, wanted=wanted)
-    assert v.catch and v.reason.startswith("fills a team gap")
-    assert v.debt <= PREMIUM_DEBT
-    far = evaluate([mon("Ivysaur", level=60)], ID["Diglett"], 15, wanted=wanted)       # hopelessly under-levelled
-    assert not far.catch
-    full = [mon("Ivysaur", level=24)] + [mon("Pidgey", level=20)] * 5
-    assert "pc('swap')" in evaluate(full, ID["Diglett"], 18, wanted=wanted).reason
-    assert plain.reason != v.reason
+    assert "fills a team gap" not in evaluate(party, ID["Diglett"], 18).reason
 
 
 def test_readiness_carries_team_gaps_as_should_items():
     needs = assess([IVY(), PIDGEY()], balls=9, potions=9, money=0, gyms_beaten=MISTY)
     hunt = [n for n in needs if n.code == "hunt"]
-    assert len(hunt) == 1 and hunt[0].level == "should" and "Diglett" in hunt[0].text
+    assert len(hunt) == 1 and hunt[0].level == "should" and "Lt. Surge" in hunt[0].text and "Diglett" not in hunt[0].text
 
 
 def test_team_report_is_a_readable_summary():

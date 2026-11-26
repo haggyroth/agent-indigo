@@ -5,6 +5,15 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 
 ## [Unreleased]
 
+### Changed — the model makes the choices code used to make
+- **Names.** `quest('new_game')` with nothing chosen (and no `STARTER` / `PLAYER_NAME` / `RIVAL_NAME` in `.env`) presses no button and asks the model to pick its starter, its name and its rival's name; with
+  the choices it plays the intro. The starter's and the Silph Co. Lapras's "Give a nickname?" boxes are handed back to the model (`answer_prompt('yes')` then `enter_name(...)`, or `'no'`) instead of
+  being declined; the quests resume afterwards. `new_game defaults` and `nonick` keep scripted runs and tests working, and a value set in `.env` still decides for the model. **Remove those three lines from your `.env` to let the model choose.**
+- **No fixed Pokémon picks.** Removed the table that named a counter per gym (Diglett for Surge …) with where to find it, the HM "catch one that can: …" lists, the catch-policy bonus for those species,
+  and every hard-coded species suggestion in the prompts and hints (Bulbasaur's Vine Whip for Brock/Misty, "catch a Diglett", "Pidgey / Spearow lines" for Fly, teach Dig to Diglett/Sandshrew …). The team
+  report and readiness now state the NEED (types the leader is weak to, which HM nobody can learn, what the PC already holds) and leave who to catch, bring or box to the model.
+- `quest('hitmon')` no longer always takes Hitmonchan: `quest('hitmon lee')` or `quest('hitmon chan')` — the model chooses.
+
 ### Changed — the project is now Agent Indigo
 The repository is renamed **Agent Indigo** (`agent-indigo`; it was `pokemon-agent`) and the documentation is rebuilt from the ground up.
 - New README with the project banner (`docs/assets/agent-indigo.png`): what it is, why the model/skill split exists, a quickstart, the tool areas, how to watch / resume / measure runs, responsible use and acknowledgements.

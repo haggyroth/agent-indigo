@@ -30,7 +30,7 @@ TM28_ITEM = 316                                                         # TM01 =
 MAGIKARP_PRICE = 500
 GRUNT_SPOTS = (((33, 7), "Up"), ((32, 6), "Right"), ((34, 6), "Left"))              # the grunt stands at (33,6)
 KOICHI_SPOTS = (((6, 6), "Up"), ((5, 5), "Right"), ((7, 5), "Left"))                # Master Koichi at (6,5)
-HITMONCHAN_SPOTS = (((7, 4), "Up"),)                                                # the ball at (7,3); Hitmonlee's is at (5,3)
+HITMON_SPOTS = {"chan": (((7, 4), "Up"),), "lee": (((5, 4), "Up"),)}                     # the balls at (7,3) Hitmonchan / (5,3) Hitmonlee
 SALESMAN_SPOTS = (((1, 4), "Up"), ((2, 3), "Left"), ((0, 3), "Right"))              # the Magikarp salesman at (1,3)
 AIDE_SPOTS = (((4, 7), "Up"), ((3, 6), "Right"), ((5, 6), "Left"))            # the Aide stands at (4,6)
 FLY_WOMAN_SPOTS = (((4, 3), "Up"), ((3, 2), "Right"), ((5, 2), "Left"))      # the woman stands at (4,2)
@@ -157,17 +157,17 @@ class ErrandsMixin:
                     "Pokémon that knows Cut (and the Cascade Badge): quest('cut').")
         if (msg := self._gift_errand(call, "Route 16 House", ROUTE16_HOUSE, FLY_WOMAN_SPOTS, FLAG_GOT_HM02, "the woman at (4,2)", auto_trainers)):
             return msg
-        return "Got HM02 Fly. teach_move('Fly') to a Pokémon that can learn it (Pidgeotto, Fearow…), then fly_to(<town>) — it needs the Thunder Badge and an outdoor spot."
+        return "Got HM02 Fly. teach_move('Fly') to a Pokémon that can learn it (team_report shows who), then fly_to(<town>) — it needs the Thunder Badge and an outdoor spot."
 
     def _get_dig(self, auto_trainers: bool = False) -> str:
         call = "quest('dig')"
         if self.reader.read_flag(FLAG_GOT_TM28) or self.reader.count_item(TM28_ITEM):
-            return "You already have TM28 Dig — teach_move('Dig') to a Pokémon (Diglett, Sandshrew, Nidoking, Golem… ). The Rocket grunt is gone."
+            return "You already have TM28 Dig — teach_move('Dig') to a Pokémon that can learn it. The Rocket grunt is gone."
         if self.reader.detect_context() == GameContext.IN_BATTLE:
             return "You're in a battle — finish it first."
         if (msg := self._gift_errand(call, "Cerulean City", CERULEAN, GRUNT_SPOTS, FLAG_GOT_TM28, "the Rocket grunt behind the robbed house", auto_trainers)):
             return msg
-        return "Beat the Rocket grunt and got TM28 Dig back. teach_move('Dig') to a Pokémon that can learn it (Ground types, Sandshrew, Diglett…)."
+        return "Beat the Rocket grunt and got TM28 Dig back. teach_move('Dig') to a Pokémon that can learn it."
 
     def _get_copycat(self, auto_trainers: bool = False) -> str:
         """quest('copycat'): the Saffron Copycat teaches Mimic (a one-time tutor lesson) for a Poké Doll — buy one at the Celadon Dept. Store 2F if the bag has none, then tutor('Mimic')."""
@@ -188,6 +188,15 @@ class ErrandsMixin:
                 return f"Couldn't get a Poké Doll for the Copycat: {out}"
         return self._tutor("Mimic")
 
+    def _hitmon_choice(self) -> str:
+        """'lee' | 'chan' | '' — which ball the MODEL chose in quest('hitmon lee'|'hitmon chan'); the code never picks one for it."""
+        words = {str(w).strip().lower() for w in self._quest_opts}
+        if words & {"lee", "hitmonlee", "kick", "kicks"}:
+            return "lee"
+        if words & {"chan", "hitmonchan", "punch", "punches"}:
+            return "chan"
+        return ""
+
     def _get_hitmon(self, auto_trainers: bool = False) -> str:
         call = "quest('hitmon')"
         if self.reader.read_flag(FLAG_GOT_HITMON):
@@ -196,14 +205,18 @@ class ErrandsMixin:
             return "You're in a battle — finish it first."
         if not self._has_tea():
             return "Saffron's gate guards want Tea first: quest('tea')."
+        pick = self._hitmon_choice()
+        if not pick:                                                                  # a one-time choice between two Pokémon: the model's, not the code's
+            return ("The Saffron Dojo lets you keep ONE of two Pokémon (both L25) after you beat Master Koichi; the other is gone for good: Hitmonlee (the kicker) or Hitmonchan "
+                    "(the puncher). Choose: quest('hitmon lee') or quest('hitmon chan').")
+        name = {"lee": "Hitmonlee", "chan": "Hitmonchan"}[pick]
         where = "it went to the PC box: your party is full — pc('swap')" if len(self.reader.read_party()) >= 6 else "it joined your party"
         if not self.reader.read_flag(FLAG_BEAT_KOICHI):                               # the Dojo's master: a trainer battle, then the balls behind him are free
             if (msg := self._gift_errand(call, "Saffron Dojo", SAFFRON_DOJO, KOICHI_SPOTS, FLAG_BEAT_KOICHI, "Master Koichi", auto_trainers)):
                 return msg
-        if (msg := self._gift_errand(call, "Saffron Dojo", SAFFRON_DOJO, HITMONCHAN_SPOTS, FLAG_GOT_HITMON, "the Hitmonchan ball", auto_trainers, ("yes", "no"))):
+        if (msg := self._gift_errand(call, "Saffron Dojo", SAFFRON_DOJO, HITMON_SPOTS[pick], FLAG_GOT_HITMON, f"the {name} ball", auto_trainers, ("yes", "no"))):
             return msg
-        return (f"Took Hitmonchan from the Dojo ({where}; Hitmonlee is gone: a one-time choice). It is L25 with Fighting punches — teach it Thunder Punch / "
-                "Ice Punch / Fire Punch if you find the TMs.")
+        return f"Took {name} from the Dojo ({where}; the other one is gone: a one-time choice). It is L25."
 
     def _get_magikarp(self, auto_trainers: bool = False) -> str:
         call = "quest('magikarp')"
