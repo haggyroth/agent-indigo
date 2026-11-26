@@ -40,10 +40,11 @@ Reading hundreds of log lines does not tell you whether a run made progress. The
 python -m evals --list                # the scenarios
 python -m evals                       # run all (needs a model endpoint + the ROM, like main.py)
 python -m evals -s first_badge -v     # one scenario, streaming output
-python -m evals --strict              # exit 1 if any scenario was SKIPPED (fixture missing / start point would not load)
+python -m evals first_badge -n 5      # one scenario, 5 trials -> a pass rate (the model samples at TEMPERATURE > 0)
+python -m evals --strict              # exit 3 if any scenario was SKIPPED (fixture missing / start point would not load / goal already met at the start)
 ```
 
-Results print as a table and are written to `logs/eval/<timestamp>.json`. Scenarios live in [`evals/scenarios.py`](../evals/scenarios.py) — from `reach_viridian` and `first_badge` up to `elite_four` and `full_chain` (the whole story to the Hall of Fame; days of wall time with a real model, run by hand) — and goals (reach a map, earn N badges, hit a milestone) in [`evals/goals.py`](../evals/goals.py). A scenario can be marked `xfail=<issue>` to document a known failure; it flips to a loud **XPASS** the day the bug is fixed.
+Results print as a table and are written to `logs/eval/<timestamp>.json`, each with a `meta` block (model, temperature, `MAX_TOKENS`, vision, git SHA, ROM and fixture SHA-1, Python) so two runs can be compared. Exit status: `0` nothing failed · `1` a scenario FAILED · `2` unknown scenario · `3` `--strict` and something was SKIPPED. `stuck` is the share of ticks after a movement tool where the player (map and tile) has not moved. Scenarios live in [`evals/scenarios.py`](../evals/scenarios.py) — from `reach_viridian` and `first_badge` up to `elite_four` and `full_chain` (the whole story to the Hall of Fame; days of wall time with a real model, run by hand) — and goals (reach a map, earn N badges, hit a milestone) in [`evals/goals.py`](../evals/goals.py). A scenario can be marked `xfail=<issue>` to document a known failure; it flips to a loud **XPASS** the day the bug is fixed.
 
 There is also a **tier-1** deterministic check that drives the navigation skills with *no LLM*, so a failure is unambiguously a pathfinding or routing bug. It boots a real emulator, so it is opt-in: `RUN_NAV_EVALS=1 python -m pytest tests/test_nav_scenarios.py`.
 

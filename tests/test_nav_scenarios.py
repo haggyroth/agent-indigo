@@ -37,28 +37,37 @@ pytestmark = [
 ]
 
 
-@pytest.fixture(scope="module")
-def runtime():
-    rt = main.build_runtime(start_save=SAVE, start_state="", verbose=False,
-                            fresh_session=False)
+@pytest.fixture
+def runtime(tmp_path):
+    """A fresh emulator from the standard save for EVERY test (no test inherits another's position), with scratch journals: the real
+    logs/journals/<save>/ journal of the maintainer is never written to."""
+    try:
+        rt = main.build_runtime(start_save=SAVE, start_state="", verbose=False, fresh_session=False,
+                                ltm_path=str(tmp_path / "ltm.json"), journal_path=str(tmp_path / "battles.jsonl"))
+    except main.StartPointError as e:
+        pytest.skip(f"start point unavailable: {e}")
     if rt is None:
         pytest.skip("emulator/ROM not available")
-    return rt
+    yield rt
+    close = getattr(rt.mgba, "close", None)         # (NativeMGBAClient.close, #381)
+    if close:
+        close()
 
 
-def _drive_go_to(rt, destination, tries=6):
-    """Call the nav skill repeatedly (resuming past wild battles by fleeing/using
-    a move is out of scope here — we just re-issue go_to a few times) and return
-    the final (map, message)."""
+def _drive_go_to(rt, destination, tries=12):
+    """Call the nav skill repeatedly and return the final (map, message). A WILD battle that interrupts it is fled (the same skill the model uses), so a
+    route full of encounters is walked through instead of skipped; a trainer battle cannot be fled and fails the test loudly."""
+    from game.constants import Addr
     msg = ""
     for _ in range(tries):
         msg = rt.client._go_to(destination)
-        cur = rt.reader.read_current_map()
         if rt.reader.detect_context() == GameContext.IN_BATTLE:
-            # A wild battle interrupted nav; this test doesn't fight — bail out.
-            pytest.skip("wild battle interrupted the nav skill (needs battle handling)")
+            if rt.mgba.read32(Addr.BATTLE_TYPE_FLAGS) & Addr.BATTLE_TYPE_TRAINER:
+                pytest.fail(f"a trainer battle interrupted go_to({destination!r}) — this no-LLM drive cannot fight: {msg}")
+            rt.client._flee_battle()
+            continue
         if "Arrived" in msg:
-            return cur, msg
+            break
     return rt.reader.read_current_map(), msg
 
 
@@ -68,11 +77,9 @@ def test_go_to_viridian_from_pallet(runtime):
     assert cur == (3, 1), f"expected Viridian City (3,1), got {cur} — {msg}"
 
 
-@pytest.mark.xfail(reason="the no-LLM drive helper can't fight/flee the forest's "
-                          "wild battles, so it usually skips; the full LLM eval "
-                          "(python -m evals -s reach_pewter) is what confirms Pewter "
-                          "is reachable end-to-end (it XPASSed)",
-                   strict=False)
+@pytest.mark.xfail(strict=True, raises=pytest.fail.Exception,
+                   reason="Viridian Forest has trainers that cannot be fled and this no-LLM drive cannot fight them; the full LLM eval "
+                          "(python -m evals reach_pewter) is what confirms Pewter is reachable end to end. strict: if the drive ever gets through, say so.")
 def test_go_to_pewter_crosses_viridian_forest(runtime):
-    cur, _msg = _drive_go_to(runtime, "Pewter City", tries=10)
-    assert cur == (3, 2), "reached Pewter City"
+    cur, msg = _drive_go_to(runtime, "Pewter City", tries=20)
+    assert cur == (3, 2), f"expected Pewter City (3,2), got {cur} — {msg}"

@@ -13,9 +13,11 @@ from dataclasses import dataclass
 from typing import Optional
 from evals import goals
 
-# The standard save the project boots from (post-parcel, Pokédex obtained).
-DEFAULT_SAVE = os.path.expanduser(
-    os.getenv("EVAL_START_SAVE", "~/mgba-http/Pokemon_LeafGreen.sav"))
+# The standard save the project boots from (post-parcel, Pokédex obtained). The stable fixture `saves/live/work.sav` (what the live suite boots from: Pallet /
+# Viridian, Bulbasaur L8) is preferred: the maintainer's own play save in ~/mgba-http moves on with every run, and a scenario started from a late-game save
+# measures nothing (first_badge would already be met). EVAL_START_SAVE overrides both.
+_LIVE_WORK_SAV = os.path.join(os.environ.get("LIVE_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saves", "live")), "work.sav")
+DEFAULT_SAVE = os.path.expanduser(os.getenv("EVAL_START_SAVE") or (_LIVE_WORK_SAV if os.path.isfile(_LIVE_WORK_SAV) else "~/mgba-http/Pokemon_LeafGreen.sav"))
 
 
 @dataclass
