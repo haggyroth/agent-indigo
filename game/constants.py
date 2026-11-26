@@ -154,6 +154,14 @@ class Addr:
     # gMain.callback2 while the game LOADS a map after a warp (door, stairs, fly, hole): the run goes CB2_OVERWORLD -> 0x0805671D -> 0x080C9BD1 -> 0x0805674D -> CB2_OVERWORLD.
     # Found by sampling callback2 on every frame across a Pokémon Center exit (#391); it appears once per warp-load and not on a plain step. The emulator client counts its edges.
     CB2_MAP_LOAD    = 0x0805671D
+    # The whole warp-load run of callback2 values (CB2_OVERWORLD -> these three -> CB2_OVERWORLD). While any of them is live a map is loading: never a menu, whatever the stale
+    # MENU_OPEN byte says (it is not a boolean — it stays 1, or any other value, after a menu closes — and a warp that followed read as IN_MENU, #402).
+    CB2_MAP_LOAD_SET = (0x0805671D, 0x080C9BD1, 0x0805674D)
+    # gTasks (16 × 0x28 bytes: func u32, isActive u8 …). On the field callback the Start menu is a task (0x0806F1F1, present only while it is open) and a warp's fade-out / fade-in
+    # are tasks too; they are what tells a menu from a warp fade when the stale MENU_OPEN byte and SCREEN_FADE read the same for both.
+    TASKS_BASE, TASK_STRIDE, TASK_COUNT = 0x03005090, 0x28, 16
+    START_MENU_TASK = 0x0806F1F1                   # present in gTasks only while the Start menu is open
+    WARP_TASKS = (0x0807E6ED, 0x08079D91, 0x0807F1D9, 0x0807F2D1)   # a warp's fade-out, fade-in and the arrival pop-ups (sampled every frame across a Pokémon Center exit)
     CB2_BATTLE      = 0x08011101   # callback2 value during battle
     # Post-battle evolution scene (CB2_EvolutionSceneUpdate). Present ONLY while a mon
     # is evolving — a normal battle end goes straight to CB2_OVERWORLD (verified live).

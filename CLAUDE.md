@@ -171,6 +171,10 @@ else:                                     # full-screen menu has its own callbac
     else:                                 #              -> TRANSITIONING  (warps, load screens)
 ```
 
+**Warps are never menus (#402).** `MENU_OPEN` is not a boolean — after any menu it keeps 1 (or another value) on the field — so a warp's fade used to read `IN_MENU`
+(`go_to` then reported "Interrupted (context IN_MENU)"). Now: the map-load callbacks (`Addr.CB2_MAP_LOAD_SET`) are always `TRANSITIONING`, and on the field callback a
+menu-byte + fade is `IN_MENU` only unless gTasks shows a warp task (`Addr.WARP_TASKS`) without the Start-menu task (`Addr.START_MENU_TASK`).
+
 `GameContext` values: `OVERWORLD`, `IN_BATTLE`, `DIALOG_OPEN`, `IN_MENU`,
 `TRANSITIONING`, `UNKNOWN`. The `CB2_*` and menu addresses are specific to this
 LeafGreen build; re-derive by diffing live states if OVERWORLD is misdetected.
