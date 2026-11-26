@@ -1,4 +1,6 @@
 
+> Third-party reference kept for convenience (community-maintained; sources credited below). The authoritative addresses *this project uses* are in [`game/constants.py`](../../game/constants.py) — several were re-derived empirically from live save states.
+
 # Pokémon 3rd Generation/Pokémon FireRed and LeafGreen/RAM map
 From Data Crystal
 

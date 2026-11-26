@@ -1,5 +1,7 @@
 # Live tests
 
+Part of [Agent Indigo](../../README.md); see the [testing guide](../../docs/testing.md).
+
 Replay real bugs against the **real ROM** through the in-process libmgba binding. They are skipped when
 the binding, ROM or fixtures are missing, so CI (no ROM) simply skips them.
 

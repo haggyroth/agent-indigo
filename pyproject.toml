@@ -1,7 +1,7 @@
 [project]
-name = "pokemon-agent"
+name = "agent-indigo"
 version = "0.31.2"
-description = "Autonomous LLM agent that plays Pokemon LeafGreen via in-process libmgba"
+description = "Agent Indigo: an autonomous LLM agent that plays Pokemon LeafGreen via in-process libmgba and direct Gen III memory decoding"
 requires-python = ">=3.11"
 
 # This is an application, not a pip-installable package. Disable setuptools'

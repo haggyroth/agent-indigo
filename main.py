@@ -249,7 +249,7 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
             console.print(msg)
 
     if verbose:
-        console.rule("[bold green]Pokemon LeafGreen LLM Agent")
+        console.rule("[bold cyan]Agent Indigo")
     from game.mgba_core import NativeMGBAClient
     mgba = NativeMGBAClient(rom_path or None)
     if not mgba.verify_connection():

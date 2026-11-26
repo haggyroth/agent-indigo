@@ -1,207 +1,131 @@
-# Pokemon LeafGreen LLM Agent
+<p align="center">
+  <img src="docs/assets/agent-indigo.png" alt="Agent Indigo — autonomous AI agent, libmgba core, Gen III WRAM decoding" width="100%">
+</p>
 
-[![CI](https://github.com/haggyroth/pokemon-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/haggyroth/pokemon-agent/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/haggyroth/agent-indigo/actions/workflows/ci.yml"><img src="https://github.com/haggyroth/agent-indigo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
+</p>
 
-An autonomous AI agent that plays **Pokemon LeafGreen** using a locally-running large language model. The agent reads live game state directly from emulator memory, reasons about what to do next, and sends button inputs — no ROM hacks, no scripted walkthroughs.
+**Agent Indigo is an autonomous AI agent that plays Pokémon LeafGreen.** It runs the game in an in-process emulator, reads the game's memory directly (no screen-scraping required), and lets a large language model make the decisions — which route to take, which move to use, who to switch in, when to heal — while tested Python code does the button-level work.
 
-By default it drives **libmgba in-process** (via a small cffi binding): no emulator GUI, no Lua, no HTTP — just Python controlling the core directly at many times real-time.
+It plays the whole story: a new game, eight gyms, Victory Road, the Elite Four and the Hall of Fame.
 
-## How it works
-
+```text
+   you  ──  python main.py  ──►  ┌─────────────────────────────────────────────────────────────┐
+                                 │  observe        decide                act                   │
+   LeafGreen ROM (yours)         │  ┌────────┐    ┌──────────────┐    ┌────────────────────┐   │
+          │                      │  │ memory │──► │  LLM (tools) │──► │  skills            │   │
+     libmgba (in-process) ◄──────┼──│ reader │    │  any OpenAI- │    │  go_to · use_move  │   │
+          ▲                      │  └────────┘    │  compatible  │    │  catch · heal · …  │   │
+          └────── button frames ─┼────────────────┴──────────────┴────┴────────────────────┘   │
+                                 └─────────────────────────────────────────────────────────────┘
 ```
-Pokemon_LeafGreen.gba
-        │
-   libmgba  ──cffi──►  game/_mgba_native  (in-process, headless, ~50× realtime)
-        │
-   Python agent
-     ├── Reads GBA WRAM/IRAM (party data, badges, map, position)
-     ├── Decrypts Gen III XOR-encrypted Pokémon substructures
-     ├── Builds an observation string + live screenshot
-     └── Calls a local LLM (LM Studio) with tool use → presses buttons
-```
 
-The agent works through **deterministic high-level skills**, not raw button-mashing: the LLM picks *what* to do (a destination, a move, a Pokémon to switch to) and tested Python code drives the emulator to do it reliably. This is the core design — the model reasons about strategy while the skills handle the finicky menu/frame timing. A shaped reward system tracks progress and transitions to sparse rewards after badge 4.
+## Why it exists
 
-## What it can do
+Most "LLM plays a game" projects hand the model raw button presses and a screenshot. That makes the model spend its budget on menu timing and pathfinding, and makes every run unrepeatable. Agent Indigo splits the job instead:
 
-The agent has a full gameplay skill set. The LLM calls these as tools:
+- **The model decides *what*.** A destination, a move, a Pokémon to send in, a quest to start.
+- **Code decides *how*.** Each tool is a deterministic skill — A* over the real tilemap, the exact menu cursor writes, verified outcomes read back from memory — that either succeeds, or fails cleanly and tells the model why.
+- **The harness supplies the context a player would have.** The foe's types and ability, which of the model's moves are super-effective or have *no effect*, what the next gym needs, what the team lacks, which Pokémon a trainer is about to send out — the model should never have to guess what the game already knows.
 
-**Navigation**
-- `go_to("<place>")` — travel to a named map or waypoint ("Pewter City", "Pokémon Center", "Mart", "Gym"), auto-routing across map connections and building/cave warps (BFS over a graph generated from the pokefirered decomp). Auto-flees wild battles so a whole route/forest is one call; stops resumably on a trainer, low HP, or a block. Detects a stalled route and gives actionable guidance instead of looping. Stops on a *new* wild species so the agent can build a team.
-- `walk_to(x, y)` — A* to a tile on the current map, routing around walls, ledges, and loaded NPCs.
-- `go_to_map(direction)` — cross a seamless map-edge connection.
+That makes runs fast (~50× real time, headless), reproducible (deterministic frame stepping, checkpoints, per-save journals), and measurable (an eval harness scores real runs against goals).
 
-**Battle**
-- `use_move("<name>")` — drive the FIGHT menu by memory (opponent identified from RAM, type-chart + Gen III physical/special-split analysis in the observation). Resolves a level-up **move-learn** prompt per a policy that never cripples the moveset.
-- `switch_pokemon(target)` — swap in another party member (type advantage / save a low mon).
-- `use_item(name)` — Potions and status cures from the bag, on the active Pokémon.
-- `catch()` — throw a Poké Ball (verdict read from `gBattleOutcome`); `flee_battle()` — run from a wild battle.
+## At a glance
 
-**Progression & survival**
-- `heal()` — restore the party at the nearest Pokémon Center; `shop()` — buy a badge-gated, par-level restock at a Mart; `grind(level)` — auto-fight wild Pokémon to a target level.
-- `pick_up_items()` — collect item balls on the ground; `challenge_leader()` — walk up to a Gym Leader and start the fight.
-- `record_milestone`, `save_state` / `load_state`, `read_game_state`, `press_button`, `wait_frames`.
+| | |
+|---|---|
+| **Emulator** | [libmgba](https://mgba.io/) driven in-process through a small cffi binding — no GUI, no Lua, no network hop |
+| **Observation** | Gen III RAM decoded directly: the XOR-encrypted party structs, badges, map, position, the battle structs, the script engine, the menu state |
+| **Actions** | 41 high-level tools — navigation, battle, party & PC, shopping, quests for every story beat, HM field moves, and more ([full list](docs/tools.md)) |
+| **Knowledge** | Maps, warps, shops, encounters, learnsets, gym teams and puzzle routes *generated from the [pokefirered](https://github.com/pret/pokefirered) decompilation*, not remembered from another game version |
+| **Models** | Anything OpenAI-compatible **with tool calling** — LM Studio, Ollama, or a cloud endpoint ([models](docs/models.md)) |
+| **Memory** | Per-save long-term journal and battle journal; emulator checkpoints you can resume ([details](docs/memory-and-logs.md)) |
+| **Quality** | 1,000+ hardware-free unit tests, a 130-test live suite against the real ROM, and a goal-based eval harness ([testing](docs/testing.md)) |
 
-## Features
+## Quickstart
 
-- **In-process emulation** — libmgba driven directly in Python; deterministic frame stepping, no network round-trips, ~50× real-time
-- **Direct memory reading** — parses the 100-byte Gen III party struct, XOR-decrypts species ID and moves, reads HP/level/status/PP unencrypted
-- **Context detection** — distinguishes OVERWORLD / IN_BATTLE / DIALOG / IN_MENU / TRANSITIONING via the live `gMain.callback2` dispatcher
-- **Team-building & resource awareness** — nudges the agent to catch a team, surfaces move PP (so it heals before running its moves dry), recommends restocks
-- **Navigation hints** — tilemap passability, warps, and connections from ROM data; overhead area maps
-- **Persistent memory** — battle journal (JSONL), long-term progress (JSON), session tracking, loss-lesson retrieval
-- **Live viewer** — optional pygame window to watch the agent play (`SHOW_WINDOW=true`)
-- **Run guardrails** — per-call `LLM_TIMEOUT` and a wall-clock cap so an unattended run can't hang; state save/load before gyms and on blackout
-- **Eval harness** — score real agent runs against goals (see below)
-
-## Requirements
-
-- **Python 3.11+**
-- **libmgba** — `brew install mgba` (macOS) or your distro's `libmgba` package (Linux). Provides the core the binding compiles against.
-- A C compiler (Xcode Command Line Tools on macOS; `build-essential` on Linux) — cffi builds a small extension.
-- [LM Studio](https://lmstudio.ai/) with a **tool-capable** model, local server on port 1234
-- Pokemon LeafGreen ROM (`.gba`, US version, game code `AGB-BPGE`) — supply your own
-
-## Setup
+You need Python 3.11+, a C compiler, [libmgba](https://mgba.io/), a tool-calling LLM endpoint, and **your own legally obtained** Pokémon LeafGreen (US, v1.0) ROM — the repository contains none.
 
 ```sh
-python3 -m venv .venv
-source .venv/bin/activate
+git clone https://github.com/haggyroth/agent-indigo.git
+cd agent-indigo
+
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-brew install mgba                 # or your Linux libmgba package
-python -m game._mgba_build        # compiles game/_mgba_native (the cffi binding)
+brew install mgba                  # or your distro's libmgba package
+python -m game._mgba_build         # compiles the cffi binding
 
-cp .env.example .env              # then edit: set MODEL_NAME and ROM_PATH
+cp .env.example .env               # set ROM_PATH and MODEL_NAME (and LLM_BASE_URL / LLM_API_KEY for a cloud model)
+python main.py
 ```
 
-Point `ROM_PATH` in `.env` at your LeafGreen `.gba`, and set `MODEL_NAME` to match the model loaded in LM Studio.
+Start a brand-new game with `START_NEW_GAME=true python main.py`, or continue a cartridge save with `START_FROM_SAVE=path/to/game.sav`. Add `SHOW_WINDOW=true` (needs `pip install pygame`) to watch it play. The [getting-started guide](docs/getting-started.md) walks through every option, local vs cloud models, and troubleshooting.
 
-### Run
+## What the agent can do
 
-1. **LM Studio** — load your model, start the local server on port 1234, enable tool use.
-2. **Agent**:
-   ```sh
-   source .venv/bin/activate
-   python main.py
-   ```
+| Area | Tools (examples) |
+|---|---|
+| **Navigate** | `go_to("Pewter City" / "Pokemon Center" / "Mart" / "Gym")` routes across map connections, doors and caves, flies when that is faster, and stops for anything worth the model's attention; `walk_to(x, y)`, `go_to_map(direction)` |
+| **Battle** | `use_move`, `switch_pokemon`, `use_item`, `catch`, `flee_battle`; the observation ranks moves by type effectiveness, STAB, immunities and foe abilities |
+| **Build a team** | `team_report`, `inspect_pokemon` (IVs, nature, quality grade), `pc` (swap / deposit / withdraw), `reorder_party`, `teach_move`, `tutor`, `daycare` |
+| **Keep going** | `heal`, `shop`, `grind(level)`, `fish`, `use_hm`, `fly_to`, `save_game`, `save_state` |
+| **Play the story** | `quest(...)` — the story chain (39 beats, required and optional) from Oak's parcel to the Champion, each a resumable driver: gyms, SS Anne, Rocket Hideout, Silph Co., Pokémon Tower, Safari Zone, Victory Road, the League |
+| **Recover** | `advance_dialog`, `close_menus`, `answer_prompt`, `read_game_state` |
 
-That's it — `main.py` loads the ROM in-process. Set `SHOW_WINDOW=true` in `.env` to watch it play in a window.
+Skills self-verify against memory, are resumable, and end on any encounter so the **model** plays every battle. The model is only offered the tools that fit the screen (about 1.2k tokens of tool schema in battle, 3.9k on the overworld).
 
-## Configuration
+## Watching, resuming and measuring
 
-All settings live in `.env` (copy from `.env.example`). Key options:
+- **Watch:** `SHOW_WINDOW=true` opens a live pygame view; `LOG_LEVEL=events|debug` controls the terminal stream.
+- **Resume:** the agent writes an emulator checkpoint (plus a journal snapshot) every 20 ticks and on every badge — `RESUME=latest python main.py` picks up where a run stopped.
+- **One journal per save:** loading a save or state selects the journal that belongs to it, so an old fixture never inherits the milestones of a newer run.
+- **Run logs:** every run writes `logs/runs/<timestamp>/run.jsonl` — each LLM call, tool call, event and observation — which makes watched runs easy to mine for bugs.
+- **Measure:** `python -m evals` scores the real agent loop against goals (reach a city, earn badges, clear the League) with a step budget, and reports stuck-ratio, event statistics, calls and tokens.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ROM_PATH` | `~/mgba-http/Pokemon_LeafGreen.gba` | Path to the LeafGreen `.gba` |
-| `LLM_BASE_URL` | `http://localhost:1234/v1` | OpenAI-compatible endpoint. Point at a cloud provider (OpenAI, OpenRouter, …) to use cloud models |
-| `LLM_API_KEY` | `lm-studio` | API key for the endpoint (placeholder for local; your provider key for cloud) |
-| `MODEL_NAME` | — | Model id: the LM Studio name locally, or the provider's id (e.g. `gpt-4o`) for cloud |
-| `START_FROM_STATE` | — | Path to an mGBA save state (`.ss*`) to boot into directly (no title/Continue/recap) |
-| `ENABLE_THINKING` | `false` | Set `true` for reasoning models that expose thinking tokens |
-| `TEMPERATURE` | `0.6` | LLM sampling temperature |
-| `MAX_TOKENS` | `4096` | Response cap. `prompt + MAX_TOKENS` must fit the model's **loaded** context, or calls fail with "Context size exceeded" |
-| `USE_VISION` | `true` | Attach the screenshot to the model. Set `false` for text-only models or unstable vision |
-| `START_FROM_SAVE` | — | Path to a battery `.sav` to load and "Continue" into at startup (native) |
-| `MAX_STEPS` | `0` | Stop after N decision steps (`0` = run until interrupted) |
-| `MAX_LLM_CALLS` | `0` | Stop after N LLM API calls (`0` = unlimited). Spend guard for cloud endpoints |
-| `TOKEN_BUDGET` | `0` | Stop once cumulative prompt+completion tokens reach this (`0` = unlimited) |
-| `SHOW_WINDOW` | `false` | Live pygame window (native backend; requires `pygame`) |
-| `VIEWER_SCALE` | `3` | Window scale — 240×160 × scale |
-| `VIEWER_FPS` | `120` | Viewer playback pace cap (≈2× GBA speed); `0` = full emulator speed |
-| `LLM_TIMEOUT` | `180` | Per chat-completion timeout (s); bounds a single call so a slow/hung endpoint can't stall a run. `0` = none |
-| `MAX_WALL_SECONDS` | `0` | Hard wall-clock cap on a whole run (`0` = unlimited) |
+## Documentation
 
-## Testing
+| | |
+|---|---|
+| [Getting started](docs/getting-started.md) | Install, ROM, models, first run, new game vs save, troubleshooting |
+| [Architecture](docs/architecture.md) | The decision loop, observation, skills, the knowledge layer, module boundaries |
+| [Configuration](docs/configuration.md) | Every environment variable |
+| [Tools](docs/tools.md) | The generated tool table |
+| [Models](docs/models.md) | Choosing a model, context sizing, spend controls |
+| [Memory, journals and logs](docs/memory-and-logs.md) | Long-term memory, per-save journals, checkpoints, run logs |
+| [Testing](docs/testing.md) | Unit tests, the live suite, the eval harness |
+| [Reference](docs/reference) | Gen III data structures, RAM map, game knowledge |
+| [CLAUDE.md](CLAUDE.md) | The operational reference for AI coding assistants working in this repo |
+| [CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) | How to contribute · what changed and why |
 
-Hardware-free unit tests cover the Gen III decoder, state machine, type chart, event stream, and charset — no ROM, libmgba, or network required.
+## Project layout
 
-```sh
-pip install -r requirements-test.txt
-python -m pytest          # unit tests
-ruff check .              # lint (real-error rules)
+```text
+main.py            decision loop (build_runtime / run_episode)
+config.py          settings from .env
+agent/             LLM client, tool schemas, observation builder, skills/ (navigation, battle, quests, …)
+game/              libmgba binding, memory reader, tilemap + pathfinding, viewer
+knowledge/         type chart, maps, shops, encounters, gym teams, prompts (much of it generated)
+memory/            short-term, long-term and per-save journals, battle journal, checkpoints, run log
+evals/             goals, scenarios and the runner (python -m evals)
+tools/             data generators (from the decomp), the live-suite runner, journal reset
+tests/             unit tests; tests/live/ replays real bugs against the real ROM
+docs/              guides and reference
 ```
 
-Tests that need the compiled binding or a ROM skip automatically when those aren't present. [CI](.github/workflows/ci.yml) runs the suite on Python 3.11–3.13 and separately builds the native binding against libmgba on macOS.
+## Responsible use
 
-## Eval harness
+Agent Indigo is an independent research and hobby project. It is not affiliated with or endorsed by Nintendo, Game Freak, Creatures Inc. or The Pokémon Company; *Pokémon* and *LeafGreen* are their trademarks. No ROM, save, or game asset is included or distributed — you must supply your own legally obtained copy. The agent only observes memory and sets menu cursors the way a D-pad would; it does not modify save data, stats, RNG or battle outcomes (see [architecture](docs/architecture.md#what-the-agent-writes-to-memory)).
 
-Measuring whether a run actually made progress — instead of reading hundreds of
-log lines — is what `evals/` is for. It runs the **real agent loop**
-(`main.run_episode`) from a start state toward a goal with a step budget, and
-scores the episode: pass/fail, steps, event statistics (battles by outcome, level-ups), **stuck-ratio** (overworld ticks
-with no movement — the signature of a nav skill that can't cross), LLM calls, and
-tokens. Each scenario runs in isolation (its own scratch `progress.json`), so the
-real save is never touched.
+## Acknowledgements
 
-```sh
-python -m evals --list            # show scenarios
-python -m evals                   # run all (needs LM Studio/cloud + ROM up, like main.py)
-python -m evals -s reach_pewter -v  # one scenario, streaming output
-```
+- [mGBA](https://mgba.io/) (MPL-2.0) — the emulator core.
+- [pret/pokefirered](https://github.com/pret/pokefirered) — the decompilation the knowledge tables are generated from.
+- The community RAM maps credited in [docs/reference/ram-map.md](docs/reference/ram-map.md).
 
-Results print as a table and are written to `logs/eval/<timestamp>.json`.
-Scenarios live in [`evals/scenarios.py`](evals/scenarios.py); goals (reach a map,
-earn N badges, hit a milestone, …) in [`evals/goals.py`](evals/goals.py). Goals
-and scenarios are pure/light-importing so they unit-test in CI.
+## License
 
-A scenario can be marked `xfail=<issue>` to document a known failure — e.g.
-`reach_pewter` (#59: Route 2 is gated by Viridian Forest, and `go_to` walks to the
-sealed north edge instead of warping through). The harness reports it as an
-expected failure, flipping to a loud **XPASS** the day the bug is fixed.
-
-There's also a **Tier-1** deterministic skill check
-([`tests/test_nav_scenarios.py`](tests/test_nav_scenarios.py)) that drives the nav
-skills directly with **no LLM** — a failure there is unambiguously a
-pathfinding/routing bug. It boots a real emulator, so it's opt-in:
-`RUN_NAV_EVALS=1 python -m pytest tests/test_nav_scenarios.py`.
-
-## Project structure
-
-```
-├── main.py                   Main agent loop
-├── config.py                 Settings loaded from .env
-├── agent/
-│   ├── lm_studio_client.py   LLM client (local/cloud) + nav/battle skills, tool loop
-│   ├── tools.py              Tool schemas (go_to, walk_to, use_move, press_button, …)
-│   ├── history.py            Message trimming + control-token stripping
-├── game/
-│   ├── _mgba_build.py        cffi builder for the in-process libmgba binding
-│   ├── mgba_core.py          NativeMGBAClient — drives libmgba in-process
-│   ├── viewer.py             Optional pygame window (SHOW_WINDOW)
-│   ├── memory_reader.py      Gen III XOR decryption + state machine
-│   ├── state.py              GameState, PokemonStatus, StateDiff dataclasses
-│   ├── constants.py          Memory addresses, charset, lookup tables
-│   ├── pathfinding.py        A* grid pathfinding (pure/testable)
-│   └── tilemap_reader.py     ROM passability, warps, and connections
-├── memory/                   Short-term, long-term, and battle-journal memory
-├── knowledge/                Type chart, gym data, navigation, map_graph, prompts
-├── evals/                    Eval harness — goals, scenarios, runner (python -m evals)
-├── tools/gen_map_graph.py    Regenerate knowledge/map_graph.py from a pokefirered checkout
-└── tests/                    Hardware-free unit tests
-```
-
-## Memory layout notes
-
-All memory reads use full GBA bus addresses, as used by the native binding. Party data at `0x02024284` uses Gen III XOR encryption (PID ^ OT_ID key); HP, level, status, and PP are unencrypted and always reliable.
-
-**On writes:** the agent treats game RAM as read-only for observation — it does not touch save data, badges, stats, experience, RNG, or battle outcomes. The only sanctioned writes are **menu cursor positions** — the FIGHT move cursor, the battle action cursor (FIGHT/BAG/POKÉMON/RUN), and the bag/party list cursors — which the skills set to a target before pressing A. That's exactly equivalent to navigating a menu with the D-pad (it only chooses *which* legal option to select, deterministically, avoiding dropped-input flakiness); it never alters game logic or outcomes. This is why "no ROM hacks" above refers to the ROM and game rules, not a claim that no RAM byte is ever written.
-
-The authoritative memory map is [`game/constants.py`](game/constants.py); see [CLAUDE.md](CLAUDE.md) for context-detection details, backend notes, and Gen III data structure documentation.
-
-## Model recommendations
-
-The agent requires a model with **function/tool calling** support — pure chat models won't work. Practical notes from running it:
-
-- **Reasoning models work well** and don't need vision — the observation string carries the key state. A ~9B reasoning model with tool calling reasons and navigates coherently.
-- **Vision is optional and can be flaky.** Some quantized multimodal builds crash or blow their context on the screenshot; set `USE_VISION=false` to run text-only.
-- **Mind the context window.** `prompt + MAX_TOKENS` must fit the model's *loaded* context in LM Studio (not its max) — an oversized `MAX_TOKENS` makes every call fail with "Context size exceeded."
-- On consumer hardware, keep LM Studio to **one concurrent generation**.
-
-## Logs
-
-- `logs/progress.json` — session count, badges, battles won/lost, towns visited
-- `logs/battles.jsonl` — per-battle records used for loss-lesson retrieval
-
-Both are gitignored. The `logs/` directory is preserved by `.gitkeep`.
+[MIT](LICENSE).

@@ -1,15 +1,17 @@
-# CLAUDE.md — Pokemon LeafGreen LLM Agent
-**Project root:** `/Users/kylec/Projects/pokemon-agent`
-**Platform:** macOS (Apple Silicon, arm64)
+# CLAUDE.md — Agent Indigo
+**Project:** Agent Indigo (`agent-indigo`) — an autonomous LLM agent that plays Pokémon LeafGreen
+**Commands below run from the repository root.** (The maintainer's local checkout directory may still be called `pokemon-agent`; the project was renamed.)
+**Platform:** macOS (Apple Silicon, arm64) — the maintainer's host
 **Python:** 3.14 (project `.venv`) — all required packages compatible
 
 > The code is cross-platform (paths use `pathlib`/`tempfile`); only the environment
 > locations and shell commands below are host-specific. This file documents the macOS host.
+> User-facing documentation lives in [README.md](README.md) and [docs/](docs/README.md); this file is for AI coding assistants.
 
 > **For AI coding assistants:** This is the *operational* reference — what you need to
-> build, run, and not break. Deep reference material (the retired mGBA-http API, Gen III data
-> structures/decryption, the type chart, game strategy) moved to
-> [HISTORY.md](HISTORY.md); version history is in [CHANGELOG.md](CHANGELOG.md).
+> build, run, and not break. Deep reference material (Gen III data
+> structures/decryption, the RAM map, game strategy) lives in [docs/reference/](docs/reference/); the retired mGBA-http API is archived in
+> [docs/archive/mgba-http.md](docs/archive/mgba-http.md); version history is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -18,8 +20,8 @@
 The agent drives libmgba **in-process** via a cffi binding. No mGBA GUI, no Lua, no
 HTTP. The agent owns the emulator and steps frames directly (~50× real-time,
 deterministic). This is the only backend: the old mGBA GUI + Lua socket + mGBA-http
-transport (`MGBA_BACKEND=http`) was removed — its endpoint reference is kept in
-[HISTORY.md](HISTORY.md) for the memory-layout notes. (`~/mgba-http/` is just where the ROM
+transport (`MGBA_BACKEND=http`) was removed — its endpoint reference is archived in
+[docs/archive/mgba-http.md](docs/archive/mgba-http.md). (`~/mgba-http/` is just where the ROM
 and save live on this machine; the name is historical.)
 
 ### Native binding
@@ -28,13 +30,12 @@ and save live on this machine; the name is historical.)
 |-----------|----------|-------|
 | libmgba | Homebrew (`brew install mgba`) — `/opt/homebrew/lib/libmgba.dylib` | Provides the core + headers the binding builds against |
 | Binding source | `game/_mgba_build.py` | cffi builder → `game/_mgba_native*.so` (gitignored) |
-| Native client | `game/mgba_core.py` (`NativeMGBAClient`) | Drop-in for `MGBAClient` |
+| Native client | `game/mgba_core.py` (`NativeMGBAClient`) | The emulator client: reads/writes memory, steps frames, presses buttons |
 | LeafGreen ROM | `~/mgba-http/Pokemon_LeafGreen.gba` (override with `ROM_PATH`) | US v1.0, 16 MB |
 | LLM (local or cloud) | `MODEL_NAME` + `LLM_BASE_URL`/`LLM_API_KEY` in `.env` — a tool-capable model | Local: LM Studio on port 1234. Cloud: point `LLM_BASE_URL` at any OpenAI-compatible endpoint (OpenAI, OpenRouter, …). Text-only models: `USE_VISION=false`; ensure `MAX_TOKENS` fits the loaded context |
 
 Build the binding once (or after upgrading libmgba):
 ```fish
-cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish        # bash/zsh: source .venv/bin/activate
 python -m game._mgba_build            # compiles game/_mgba_native*.so
 ```
@@ -124,7 +125,7 @@ ones:
 
 | What | Address | Notes |
 |------|---------|-------|
-| Party count / data | `0x02024284` / `0x02024288` | 6 × 100-byte structs (Gen III XOR, see HISTORY.md) |
+| Party count / data | `0x02024284` / `0x02024288` | 6 × 100-byte structs (Gen III XOR, see docs/reference/gen3-data.md) |
 | Badges | `0x02025968` | u8 bitmask; popcount = badge count |
 | Map bank / id | `0x02031DBC` / `0x02031DBD` | |
 | Player X/Y | deref `PLAYER_PTR` `0x03005008` +0/+2 | DMA-protected block; camera = player tile |
@@ -173,8 +174,8 @@ else:                                     # full-screen menu has its own callbac
 LeafGreen build; re-derive by diffing live states if OVERWORLD is misdetected.
 
 Party-data XOR decryption, the 100-byte struct layout, and the Gen III charset are
-documented in [HISTORY.md](HISTORY.md) (implemented in `memory_reader.py` /
-`constants.py`). Dialog/event detection via state-diffing is also in HISTORY.md.
+documented in [docs/reference/gen3-data.md](docs/reference/gen3-data.md) (implemented in `memory_reader.py` /
+`constants.py`). Dialog/event detection via state-diffing is in the same file.
 
 ---
 
@@ -267,7 +268,7 @@ heals — printed at the end of a run (`events.stats_line()`), stored in the eva
 **Two steps:**
 ```
 1. LM Studio: load the model named in .env (MODEL_NAME), server port 1234, tools enabled
-2. Terminal (fish): cd /Users/kylec/Projects/pokemon-agent → source .venv/bin/activate.fish → python main.py
+2. Terminal (fish), from the repo root: source .venv/bin/activate.fish → python main.py
 ```
 main.py loads the ROM (`ROM_PATH`) in-process. No GUI, no Lua, no HTTP.
 First time only: `python -m game._mgba_build` to compile the binding.
@@ -285,7 +286,6 @@ text-only (for text models or unstable vision). Example bounded text-only run:
 
 ```fish
 # Verify the binding loads the ROM in-process
-cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish
 python -c "from game.mgba_core import NativeMGBAClient as C; m=C(); print(m.get_game_title(), m.get_game_code(), m.verify_connection())"
 # Expected: POKEMON LEAF AGB-BPGE True
@@ -294,7 +294,6 @@ python -c "from game.mgba_core import NativeMGBAClient as C; m=C(); print(m.get_
 python tools/live_suite.py --changed origin/main --post-status      # see docs/live-ci.md
 
 # Test Python imports  (fish shell)
-cd /Users/kylec/Projects/pokemon-agent
 source .venv/bin/activate.fish
 python -c "import openai, rich; print('OK')"
 ```

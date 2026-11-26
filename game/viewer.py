@@ -36,7 +36,7 @@ class PygameViewer:
         self._closed = False
 
         pygame.init()
-        pygame.display.set_caption("Pokemon LeafGreen — LLM Agent")
+        pygame.display.set_caption("Agent Indigo")
         self.screen = pygame.display.set_mode((width * scale, height * scale))
 
     def render(self, buf) -> None:
