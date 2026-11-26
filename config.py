@@ -160,6 +160,17 @@ MODEL_NAME        = os.getenv("MODEL_NAME",        "qwen/qwen2.5-14b-instruct")
 TEMPERATURE       = _env_float("TEMPERATURE", 0.6, minimum=0.0)
 MAX_TOKENS        = _env_int("MAX_TOKENS", 4096, minimum=1)
 ENABLE_THINKING   = os.getenv("ENABLE_THINKING",   "false").lower() == "true"
+# CONTEXT_TOKENS: the model's LOADED context window (LM Studio shows it; not the model's maximum). 0 = unknown. When set, the history is trimmed by estimated TOKENS so
+#   prompt + MAX_TOKENS fits (a 5 % margin is kept); when 0 the client learns a ceiling from the first context-overflow error instead (agent/lm_studio_client.py).
+CONTEXT_TOKENS    = _env_int("CONTEXT_TOKENS", 0, minimum=0)
+if CONTEXT_TOKENS and CONTEXT_TOKENS <= MAX_TOKENS:
+    raise SystemExit(f"CONTEXT_TOKENS={CONTEXT_TOKENS} must be larger than MAX_TOKENS={MAX_TOKENS} (the response cap comes out of the same window)")
+
+
+def prompt_token_budget() -> int:
+    """Prompt tokens that fit the loaded context after reserving MAX_TOKENS for the reply and a 5 % estimate margin; 0 when CONTEXT_TOKENS is unset."""
+    return int((CONTEXT_TOKENS - MAX_TOKENS) * 0.95) if CONTEXT_TOKENS else 0
+
 
 # ── Spend controls (matter once LLM_BASE_URL points at a paid cloud endpoint) ──
 # The main loop is otherwise unbounded (MAX_STEPS=0) and issues up to 6 completions

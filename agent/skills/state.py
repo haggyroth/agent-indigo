@@ -27,6 +27,9 @@ class lazy:
 
 
 class SkillState:
+    # ── llm: context budget (agent/lm_studio_client.py _chat, #372) ───────────────────────────────
+    _tok_ratio = 1.0             # the server's reported prompt_tokens ÷ our estimate (smoothed): how far estimate_tokens is off for this model
+    _learned_budget = 0          # prompt-token ceiling learned from a context-overflow error (0 = none yet); only ever lowered
     # ── nav: travel (go_to / go_to_map / challenge_leader) ───────────────────────────────────────
     _trip = None                 # {"dest", "target", "call"?} of a trip an encounter interrupted; cleared on arrival / a new go_to
     _go_depth = 0                # nesting of _go_to (re-entrancy guard, MAX_TRIP_DEPTH); always unwinds to 0

@@ -8,6 +8,7 @@ from game.options import apply_battle_style
 from game.state import GameContext, GameState, StateDiff
 from game.tilemap_reader import TilemapReader
 from agent.lm_studio_client import AgentClient
+from agent.llm_retry import LLMFatalError
 from agent import events
 from memory.short_term import ShortTermMemory
 from memory.long_term import LongTermMemory
@@ -93,7 +94,7 @@ class AgentRuntime:
 @dataclass
 class EpisodeResult:
     """Outcome of one run_episode() call — the eval scorecard for a scenario."""
-    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget
+    reason:            str            # goal | max_steps | max_wall | max_llm_calls | token_budget | stalled | interrupted | error_budget | llm_error
     passed:            bool           # goal predicate satisfied
     steps:             int
     llm_calls:         int
@@ -318,6 +319,11 @@ def build_runtime(*, start_save: str = START_FROM_SAVE,
         backup = ltm.start_fresh()                  # stale milestones would make quest('new_game') say "already done" at the title
         say("[yellow]New game: the journal starts blank" + (f" (the old one is saved as {backup.name})" if backup else "") + "[/]")
     client  = AgentClient(mgba, reader, ltm)
+    from config import CONTEXT_TOKENS, MAX_TOKENS, prompt_token_budget
+    if CONTEXT_TOKENS:
+        say(f"[cyan]Context: {CONTEXT_TOKENS} tokens loaded − {MAX_TOKENS} reply cap → history is fitted to ~{prompt_token_budget()} prompt tokens[/]")
+    else:
+        say("[dim]CONTEXT_TOKENS is not set: the history is bounded by message count; a context-overflow error teaches the client a ceiling.[/]")
     stm     = ShortTermMemory()
     journal = BattleJournal(path=journal_path)
 
@@ -805,6 +811,14 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
                 console.print(f"\n[red]Stopped.[/] {_run_summary(client, run.step_count)}")
             ltm.save()
             return _result("interrupted", False)
+        except LLMFatalError as e:
+            # Bad credentials, exhausted quota, unknown model: no retry can fix it, so end the run with the reason instead of
+            # spending the error budget (and, for a quota 429, hours of backoff) on it.
+            _log_exception(e)
+            if verbose:
+                console.print(f"[red bold]LLM endpoint refused the run: {e.reason}[/] {_run_summary(client, run.step_count)}")
+            ltm.save()
+            return _result("llm_error", False)
         except Exception as e:
             run.consecutive_errors += 1
             _log_exception(e)
