@@ -6,6 +6,8 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Added
+- **`RUN_GOAL=completion` and a post-game briefing (#357).** By default a run still ends at the Hall of Fame; with `RUN_GOAL=completion` it keeps going until the completion target — the Kanto Pokédex (151 caught) and every side quest — or a budget ends it. After the Hall of Fame the observation shows what is left, ordered by availability and never forced (dex count, side quests open, what the National Pokédex needs: 60 caught + the Sevii Islands reached + a talk with Prof. Oak, and honestly that the Sevii/legendaries/roamers are not scripted yet), the
+  system prompt says the game is cleared, `quest()` gets a populated POST-GAME section (`national_dex`), `national_dex` is recorded as a milestone when the game enables it, and the run's end record / eval scorecard carry `post_game_steps` and `dex_owned`. New eval scenario `post_game_national_dex` (from `post_hof.ss1`, an xfail until the Sevii work lands).
 - **A side-quest log (#356).** `quest()` now lists MAIN (the road to the Elite Four), SIDE QUESTS available now — each with what it is worth (TM28 Dig, the Old Rod, a legendary …) — and those not open yet with why (the Oak's Aide counts, a missing story step), plus what is done. When the set of open side quests changes the
   observation says so once (`SIDE QUESTS you can do now …`), and `quest('elite_four')`'s prep notes how many are still open before the Hall of Fame: advice, never a wall, and the either/or choices (Hitmonlee / Hitmonchan) stay the model's. `Beat` gains `tier`, `gate` and `payoff`; a unit test pins the gates to the Aide thresholds, a live test runs it from the Misty fixture.
 

@@ -183,7 +183,16 @@ BEATS: tuple[Beat, ...] = (
                 "Lorelei (Ice, L51-56) → Bruno (Fighting/Rock) → Agatha (Ghost/Poison) → Lance (Dragon/Flying, L56-62) → your rival the Champion (L53-65, a mixed team that counters your starter).",
                 "Every room: walk up to the leader and talk; each win opens the next door. After the Champion: the Hall of Fame, Oak's speech and the credits."),
          tip="A loss resets the whole League (the decomp's EventScript_ResetEliteFourEnd clears every defeated flag), heals the party, costs some money and respawns you in the Plateau's Center: quest('elite_four') starts again from the first door. You keep every level the losing fights gave you — train first if the shortfall is large; don't load_state (it discards that Exp)."),
+    Beat("national_dex", "National Pokédex from Prof. Oak (post-game)", "Pallet Town, Oak's Lab — after the Hall of Fame, with 60 species caught and One Island visited",
+         needs=("elite_four",), optional=True, done=(("flag", 0x840),),                       # FLAG_SYS_NATIONAL_DEX
+         steps=("Only after the Hall of Fame. The scene needs 60 species CAUGHT and the Sevii Islands reached (One Island: Celio's Network Machine, then the Seagallop from Vermilion).",
+                "Then talk to Prof. Oak in his lab in Pallet Town: he asks a favour, your rival joins, and the Pokédex is extended beyond Kanto (EnableNationalPokedex).",
+                "It adds no new wild Pokémon by itself; it is progress for a completion run (Pokédex entries, the Sevii Islands)."),
+         tip="Nothing here is scripted yet: reach One Island yourself (go_to / fly_to), then talk to Oak."),
 )
+# Gate flags beyond the badges/owned counts, with the reason shown while they are unmet (agent.story.side_ctx reads exactly these).
+FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}      # FLAG_WORLD_MAP_ONE_ISLAND
+
 # What each optional beat is worth, and any gate beyond its `needs` (the Oak's Aide counts are knowledge/aides.py). Information for the model, never a wall.
 SIDE_INFO = {
     "dig": ("TM28 Dig", ()), "magikarp": ("a Magikarp for ¥500 (a slow starter, a strong finish)", ()), "flash": ("HM05 Flash (lights the caves)", (("owned", 10),)),
@@ -191,7 +200,8 @@ SIDE_INFO = {
     "copycat": ("the move Mimic", ()), "running_shoes": ("the Running Shoes (hold B to run)", ()), "old_rod": ("the Old Rod (fishing)", ()),
     "good_rod": ("the Good Rod (better fishing)", ()), "super_rod": ("the Super Rod (the best Kanto rod)", ()), "bike": ("the Bicycle (twice the speed; the Cycling Road)", ()),
     "snorlax_16": ("a second Snorlax to catch (Cycling Road)", ()), "itemfinder": ("the Itemfinder (hidden items)", (("owned", 30),)),
-    "exp_share": ("the Exp. Share", (("owned", 50),)), "zapdos": ("Zapdos, a legendary (appears once)", ()), "articuno": ("Articuno, a legendary (appears once)", ()),
+    "exp_share": ("the Exp. Share", (("owned", 50),)),
+    "national_dex": ("the National Pokédex (the Pokédex goes beyond Kanto)", (("gameclear",), ("owned", 60), ("flag", 0x89B))), "zapdos": ("Zapdos, a legendary (appears once)", ()), "articuno": ("Articuno, a legendary (appears once)", ()),
 }
 BEATS = tuple(replace(b, payoff=SIDE_INFO[b.key][0], gate=SIDE_INFO[b.key][1]) if b.key in SIDE_INFO else b for b in BEATS)
 BY_KEY = {b.key: b for b in BEATS}
@@ -269,6 +279,7 @@ class SideCtx(NamedTuple):
     badges: int = 0
     owned: int = 0            # species CAUGHT
     game_clear: bool = False  # the Hall of Fame (FLAG_SYS_GAME_CLEAR)
+    flags: tuple = ()         # the game flags the gates ask about that are SET (see FLAG_GATES)
 
 
 def gate_unmet(beat: Beat, ctx: SideCtx) -> str:
@@ -280,6 +291,8 @@ def gate_unmet(beat: Beat, ctx: SideCtx) -> str:
             return f"needs {arg[0]} badges (you have {ctx.badges})"
         if kind == "gameclear" and not ctx.game_clear:
             return "after the Hall of Fame"
+        if kind == "flag" and arg[0] not in ctx.flags:
+            return FLAG_GATES.get(arg[0], f"needs game flag {arg[0]:#x}")
     return ""
 
 
