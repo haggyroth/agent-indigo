@@ -34,6 +34,43 @@ class Prize:
 PRIZES: list[Prize] = [Prize(k, (x, y), i, pid, c, lv) for k, _b, _m, x, y, rows in PRIZE_CLERKS for i, pid, c, lv in rows]
 
 
+# The price of a prize in TIME, from the slot driver (not luck: it presses A on the frame that serves the machine's bias): about +16 coins net per spin, ~700 emulated frames a spin.
+SPIN_NET_COINS = 16
+SPIN_FRAMES = 700
+# what each held-item prize is for (the decomp's own item descriptions: src/data/items.json)
+ITEM_PURPOSE = {194: "held: the holder can always flee wild battles", 205: "held: boosts Grass-type moves", 215: "held: boosts Fire-type moves", 209: "held: boosts Water-type moves",
+                40: "snaps one Pokémon out of confusion"}
+
+
+def spin_cost(missing_coins: int) -> tuple[int, int]:
+    """(slot spins, minutes of game time) to win `missing_coins` at the measured rate."""
+    spins = -(-max(0, missing_coins) // SPIN_NET_COINS)
+    return spins, round(spins * SPIN_FRAMES / 3600)
+
+
+def prize_lines(coins: int, owned, party) -> list[str]:
+    """The Prize Corner as information, cheapest first: price, what is missing, what that costs in slot time, and what the prize is FOR. Never a recommendation.
+    `owned(species_id) -> bool | None` (the Pokédex), `party` = [(species_id, name)] of the team (who could learn each TM)."""
+    from knowledge.tmhm_learnsets import can_learn
+    out = []
+    for p in sorted(PRIZES, key=lambda p: p.coins):
+        if coins >= p.coins:
+            cost = "you can afford it"
+        else:
+            spins, mins = spin_cost(p.coins - coins)
+            cost = f"{p.coins - coins} more coins ≈ {spins} slot spins (~{mins} min of game time)"
+        if p.kind == "mon":
+            got = owned(p.id)
+            purpose = f"Lv{p.level}; " + ("already in your Pokédex" if got else "a NEW Pokédex entry" if got is not None else "Pokédex entry unknown")
+        elif p.kind == "tm":
+            who = [n for sid, n in party if can_learn(sid, p.id)]
+            purpose = ("your team's " + ", ".join(who) + " can learn it") if who else "nobody in your party can learn it"
+        else:
+            purpose = ITEM_PURPOSE.get(p.id, "an item")
+        out.append(f"  {p.name} — {p.coins} coins — {cost} · {purpose}")
+    return out
+
+
 def resolve_prize(text: str) -> tuple[Prize | None, list[str]]:
     """(prize, []) for 'TM24', 'Thunderbolt', 'Abra', 'Smoke Ball'…, else (None, close names)."""
     key = str(text or "").strip().lower()
