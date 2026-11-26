@@ -12,6 +12,7 @@ class Live:
     def __init__(self, rt, live_dir):
         self.rt, self.dir = rt, live_dir
         self.c, self.r, self.m = rt.client, rt.reader, rt.mgba
+        self.m.unrestricted_writes = True               # fixtures stage memory on purpose; the agent itself never does (game/write_guard.py)
 
     def load(self, name: str) -> None:
         path = self.dir / f"{name}.ss1"

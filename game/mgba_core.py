@@ -8,6 +8,8 @@ Build the binding first if needed:  python -m game._mgba_build
 """
 from pathlib import Path
 from config import ROM_PATH, SAVE_DIR, SHOW_WINDOW
+from game import write_guard
+from game.constants import Addr
 
 try:
     from game._mgba_native import ffi, lib
@@ -184,13 +186,24 @@ class NativeMGBAClient:
 
     # ── Memory writes ────────────────────────────────────────────────────────
 
+    # Writes are restricted to the allow-list in game/write_guard.py (menu cursors + the battle-style option). tests/live stages memory on
+    # purpose and sets this True; nothing in the agent does.
+    unrestricted_writes = False
+
+    def _check_write(self, address: int, width: int) -> None:
+        if not self.unrestricted_writes:
+            write_guard.check(address, width, self.read32(Addr.SAVEBLOCK2_PTR))
+
     def write8(self, address: int, value: int) -> None:
+        self._check_write(address, 1)
         lib.pycore_write8(self._h, address, value & 0xFF)
 
     def write16(self, address: int, value: int) -> None:
+        self._check_write(address, 2)
         lib.pycore_write16(self._h, address, value & 0xFFFF)
 
     def write32(self, address: int, value: int) -> None:
+        self._check_write(address, 4)
         lib.pycore_write32(self._h, address, value & 0xFFFFFFFF)
 
     # ── State management ─────────────────────────────────────────────────────
