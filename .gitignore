@@ -30,6 +30,7 @@ saves/*
 
 # Screenshots captured during agent runs
 *.png
+!docs/assets/*.png
 
 # Claude Code local settings
 .claude/settings.local.json

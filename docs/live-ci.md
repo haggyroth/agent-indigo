@@ -39,7 +39,7 @@ pending `live-suite` on a PR means "run the live suite before merging". To make 
 Evidence gathered:
 
 * The decomp's expected hash for the US LeafGreen build is `574fa542ffebb14be69902d1d36f1ec0a4afd71e` (`leafgreen.sha1`). The retail ROM this project is developed against
-  (`~/mgba-http/Pokemon_LeafGreen.gba`) has **exactly that SHA-1**, so `make` with `GAME_VERSION=LEAFGREEN COMPARE=1` yields a byte-identical ROM: every address in `game/constants.py`
+  (the maintainer's ROM) has **exactly that SHA-1**, so `make` with `GAME_VERSION=LEAFGREEN COMPARE=1` yields a byte-identical ROM: every address in `game/constants.py`
   (derived on that ROM) holds.
 * pret's own CI does this on every push (`.github/workflows/build.yml`): checkout `pret/pokefirered` + `pret/agbcc`, `apt install binutils-arm-none-eabi libpng-dev`, build agbcc,
   `make -j all` with `COMPARE=1`. `COMPARE=1` fails the build unless the SHA-1 matches the retail ROM — i.e. a CI job could *prove* it is testing the real game.

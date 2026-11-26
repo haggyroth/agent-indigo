@@ -1,9 +1,18 @@
 # Changelog
 
-All notable changes to this project are documented here. Format loosely follows
+All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions use [SemVer](https://semver.org/).
 
 ## [Unreleased]
+
+### Changed — the project is now Agent Indigo
+The repository is renamed **Agent Indigo** (`agent-indigo`; it was `pokemon-agent`) and the documentation is rebuilt from the ground up.
+- New README with the project banner (`docs/assets/agent-indigo.png`): what it is, why the model/skill split exists, a quickstart, the tool areas, how to watch / resume / measure runs, responsible use and acknowledgements.
+- New `docs/`: getting started, architecture, configuration (every environment variable), tools (generated; a test keeps it current alongside `CLAUDE.md`), models, memory/journals/logs, testing, plus a docs index.
+  `HISTORY.md` is split into `docs/reference/` (Gen III data structures, game knowledge, the community RAM map) and `docs/archive/mgba-http.md` (the retired backend).
+- `CONTRIBUTING.md`; `CLAUDE.md` retitled and its machine-specific paths and links updated; `pyproject.toml`, the viewer caption, the startup banner and the screenshot temp-dir prefix use the new name.
+- `python tools/gen_tool_docs.py` now regenerates both `CLAUDE.md` and `docs/tools.md`.
+- The GitHub repository was renamed (old URLs redirect); the local checkout directory is independent of the name.
 
 ### Removed — the legacy mGBA-http backend
 The agent has run on the in-process libmgba binding since v0.x; the HTTP transport (mGBA GUI + Lua socket + mGBA-http .NET server) had no tests, no CI job and no support for checkpoints, screenshots,

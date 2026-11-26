@@ -218,7 +218,7 @@ class _ScreenshotPath:
         if self._explicit:
             return self._explicit
         if _SCREENSHOT_DIR is None:
-            _SCREENSHOT_DIR = tempfile.mkdtemp(prefix="pokemon-agent-")
+            _SCREENSHOT_DIR = tempfile.mkdtemp(prefix="agent-indigo-")
             atexit.register(shutil.rmtree, _SCREENSHOT_DIR, ignore_errors=True)
         return str(Path(_SCREENSHOT_DIR) / "frame.png")
 

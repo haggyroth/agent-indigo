@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from agent.tool_docs import END, START, render_markdown
 from agent.tools import BATTLE_TOOLS, SAFARI_CONTEXT, SAFARI_TOOLS, TOOLS, tools_for
 from game.state import GameContext
@@ -82,10 +84,11 @@ def test_the_tool_context_falls_back_to_everything_when_the_screen_cannot_be_rea
     assert c._tool_context() == GameContext.IN_BATTLE
 
 
-def test_claude_md_tool_table_is_current():
-    text = (ROOT / "CLAUDE.md").read_text()
+@pytest.mark.parametrize("doc", ["CLAUDE.md", "docs/tools.md"])
+def test_generated_tool_tables_are_current(doc):
+    text = (ROOT / doc).read_text()
     block = text[text.index(START):text.index(END) + len(END)]
-    assert block == render_markdown(), "CLAUDE.md's tool table is stale — run: python tools/gen_tool_docs.py"
+    assert block == render_markdown(), f"{doc}'s tool table is stale — run: python tools/gen_tool_docs.py"
 
 
 def test_a_safari_battle_offers_its_own_menu_and_nothing_that_needs_a_bag_or_party():
