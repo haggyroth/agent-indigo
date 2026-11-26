@@ -24,9 +24,9 @@ EVAL_DIR = Path(PROGRESS_PATH).parent / "eval"
 DEFAULT_EVAL_WALL_S = 7200.0   # 2h hard ceiling for any scenario without its own cap
 
 
-def run_scenario(sc: Scenario, *, verbose: bool = False) -> dict | None:
-    """Run one scenario end-to-end. Returns a result dict (EpisodeResult + meta),
-    or None if the emulator couldn't be brought up."""
+def run_scenario(sc: Scenario, *, verbose: bool = False, trial: int = 1) -> dict:
+    """Run one scenario end-to-end. Returns a result dict (EpisodeResult + meta + provenance). A scenario that cannot start where it says
+    (fixture missing, start point unloadable, emulator down, goal already met at the start) is returned as status SKIPPED — never run, never FAIL."""
     import main as agent  # heavy import kept local so `evals` stays importable
 
     missing = sc.missing_fixtures()
@@ -49,8 +49,16 @@ def run_scenario(sc: Scenario, *, verbose: bool = False) -> dict | None:
     except agent.StartPointError as e:
         return _skipped(sc, f"start_point_failed: {e}")
     if rt is None:
-        console.print(f"[red]  could not start emulator for {sc.name} — skipping[/]")
-        return None
+        return _skipped(sc, "emulator_unavailable")
+    try:
+        if sc.goal(rt.reader.read_state(), rt.ltm):          # a goal that is already true at the start would "pass" at step 0 and measure nothing
+            return _skipped(sc, "goal_met_at_start")
+        return _run(sc, rt, agent, verbose, trial)
+    finally:
+        rt.mgba.close()                                      # one core per scenario: free it now, not whenever the GC gets to it
+
+
+def _run(sc: Scenario, rt, agent, verbose: bool, trial: int) -> dict:
 
     # Always bound the wall-clock so an unattended eval can't run away (an 11-hour
     # run happened when a local model degraded). Scenarios may set a tighter cap.
@@ -61,7 +69,8 @@ def run_scenario(sc: Scenario, *, verbose: bool = False) -> dict | None:
     elapsed = round(time.time() - t0, 1)
 
     out = result.to_dict()
-    out.update(scenario=sc.name, elapsed_s=elapsed, xfail=sc.xfail)
+    from evals.provenance import provenance
+    out.update(scenario=sc.name, elapsed_s=elapsed, xfail=sc.xfail, trial=trial, meta=provenance(sc))
     # An xfail scenario that fails is "expected"; if it unexpectedly passes, flag it.
     out["status"] = _status(result.passed, sc.xfail)
     console.print(f"  {result.summary()}  [{out['status']}]  ({elapsed}s)")
@@ -82,11 +91,33 @@ def _status(passed: bool, xfail: str) -> str:
     return "PASS" if passed else "FAIL"
 
 
-def run_all(scenarios: list[Scenario] | None = None, *, verbose: bool = False) -> list[dict]:
+def run_all(scenarios: list[Scenario] | None = None, *, verbose: bool = False, trials: int = 1) -> list[dict]:
+    """Every scenario, `trials` times each (the model samples at TEMPERATURE > 0, so one run is one noisy sample)."""
     scenarios = scenarios if scenarios is not None else SCENARIOS
-    results = [r for sc in scenarios if (r := run_scenario(sc, verbose=verbose)) is not None]
+    results = [run_scenario(sc, verbose=verbose, trial=t) for sc in scenarios for t in range(1, max(1, trials) + 1)]
     _report(results)
     return results
+
+
+def exit_code(results: list[dict], strict: bool = False) -> int:
+    """Process exit status of an eval run: 1 any FAIL (an xfail that fails is expected, an XPASS is not an error); 3 under `strict` when anything was SKIPPED
+    or nothing ran; else 0. (2 = usage error, decided by the CLI.)"""
+    if any(r["status"] == "FAIL" for r in results):
+        return 1
+    if strict and (not results or any(r["status"] == "SKIPPED" for r in results)):
+        return 3
+    return 0
+
+
+def pass_rates(results: list[dict]) -> dict[str, tuple[int, int]]:
+    """{scenario: (trials that met the goal, trials that ran)} — SKIPPED trials did not run, so they do not count."""
+    out: dict[str, list[int]] = {}
+    for r in results:
+        if r["status"] == "SKIPPED":
+            continue
+        k, n = out.setdefault(r["scenario"], [0, 0])
+        out[r["scenario"]] = [k + (r["status"] in ("PASS", "XPASS")), n + 1]
+    return {name: (k, n) for name, (k, n) in out.items()}
 
 
 def _event_cell(stats: dict) -> str:
@@ -121,6 +152,10 @@ def _report(results: list[dict]) -> None:
     path.write_text(json.dumps({"timestamp": stamp, "results": results}, indent=2))
     console.print(f"[dim]Wrote {path}[/]")
 
+    rates = pass_rates(results)
+    if any(n > 1 for _k, n in rates.values()):
+        for name, (k, n) in rates.items():
+            console.print(f"  {name}: {k}/{n} trials met the goal ({k / n:.0%})")
     passed = sum(r["status"] in ("PASS", "XPASS") for r in results)
     skipped = sum(r["status"] == "SKIPPED" for r in results)
     console.print(f"\n[bold]{passed}/{len(results) - skipped} scenarios met their goal.[/]"

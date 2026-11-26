@@ -137,13 +137,13 @@ def test_report_handles_skipped_rows(monkeypatch, tmp_path):
     runner._report([runner._skipped(_scenario(), "fixture_missing: x")])      # must not raise on the placeholder row
 
 
-def test_strict_flag_exits_nonzero_on_a_skip(monkeypatch):
+def test_strict_flag_exits_3_on_a_skip(monkeypatch):
     from evals import __main__ as cli
-    monkeypatch.setattr(sys, "argv", ["evals", "--strict"])
     import evals.runner as r
-    monkeypatch.setattr(r, "run_all", lambda verbose=False: [{"status": "SKIPPED"}])
+    monkeypatch.setattr(sys, "argv", ["evals", "--strict"])
+    monkeypatch.setattr(r, "run_all", lambda *a, **k: [{"status": "SKIPPED"}])
     with pytest.raises(SystemExit) as e:
         cli.main()
-    assert e.value.code == 1
-    monkeypatch.setattr(r, "run_all", lambda verbose=False: [{"status": "PASS"}])
+    assert e.value.code == 3
+    monkeypatch.setattr(r, "run_all", lambda *a, **k: [{"status": "PASS"}])
     cli.main()                                                                   # no exit when nothing was skipped

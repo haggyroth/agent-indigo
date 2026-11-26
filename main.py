@@ -104,7 +104,7 @@ class EpisodeResult:
     badges:            int
     stats:             dict = field(default_factory=dict)    # events.run_stats(): battles by outcome, catches, level-ups, faints…
     milestones:        list[str] = field(default_factory=list)
-    stuck_ratio:       float = 0.0    # fraction of overworld decision ticks with no movement
+    stuck_ratio:       float = 0.0    # of the overworld ticks that follow a movement tool, the fraction where the player (map + tile) has not moved
     goal_desc:         str = ""
     cached_tokens:     int = 0        # prompt tokens served from the server's prompt cache (0 when the endpoint doesn't report it)
 
@@ -123,6 +123,15 @@ class EpisodeResult:
         d = dict(self.__dict__)
         d["total_tokens"] = self.total_tokens
         return d
+
+
+# Tools / presses that are meant to move the player: a decision tick is only "stuck" when one of these ran and the player is still where the tick before began.
+_NAV_ACTIONS = frozenset({"go_to", "walk_to", "go_to_map", "fly_to", "quest", "pick_up_items", "use_hm", "fish",
+                          "press:Up", "press:Down", "press:Left", "press:Right"})
+
+
+def _is_nav(actions) -> bool:
+    return any(a in _NAV_ACTIONS for a in actions or ())
 
 
 def _status_line(state, ltm, client, reader, step: int, t_start: float) -> str:
@@ -373,6 +382,7 @@ class _RunState:
     pending_map_b64: Optional[str] = None
     pending_map_name: str = ""
     blackout_active: bool = False
+    prev_was_nav: bool = False            # the previous decision tick ran a movement tool (what 'stuck' is measured against)
     decision_ticks: int = 0
     stuck_ticks: int = 0
     step_count: int = 0
@@ -535,6 +545,8 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
     observation, blackout recovery, and the LLM decision — each a helper above.
     Only the per-tick locals (state/diff/in_battle) and loop accounting live here.
     """
+    global _last_ltm_save
+    _last_ltm_save = 0.0                         # the save throttle belongs to ONE episode: a previous scenario's timestamp must not delay this one's first save
     mgba, reader, client = rt.mgba, rt.reader, rt.client
     ltm, stm, journal, tilemap = rt.ltm, rt.stm, rt.journal, rt.tilemap
 
@@ -742,14 +754,14 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             # simply holds; only a real exception grows it.)
             run.consecutive_errors = 0
 
-            # Stuck tracking: an overworld decision tick that didn't move the
-            # player. A high ratio is the signature of the Route-2 "can't cross"
-            # thrash — surfaced as EpisodeResult.stuck_ratio for the eval harness.
-            if state.context == GameContext.OVERWORLD:
+            # Stuck tracking: the previous decision tick ran a movement tool and the player (map AND tile) is still where that tick began. Dialogue, menus, shopping and
+            # healing are not movement, and a warp that lands on the same coordinates is still a change of map. Surfaced as EpisodeResult.stuck_ratio for the eval harness.
+            if state.context == GameContext.OVERWORLD and run.prev_state is not None and run.prev_was_nav:
                 run.decision_ticks += 1
-                if run.prev_state is not None and \
-                        (state.player_x, state.player_y) == (run.prev_state.player_x, run.prev_state.player_y):
+                if (state.map_bank, state.map_id, state.player_x, state.player_y) == \
+                        (run.prev_state.map_bank, run.prev_state.map_id, run.prev_state.player_x, run.prev_state.player_y):
                     run.stuck_ticks += 1
+            run.prev_was_nav = _is_nav(actions)
 
             run.prev_state = state
             mgba.tick()
