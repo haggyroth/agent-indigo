@@ -47,8 +47,8 @@ def test_good_read_is_returned_and_cached():
 def test_garbage_read_falls_back_to_last_good():
     r = _reader([_mon(1), _mon(34671, move_ids=(34639, 13699, 0, 0))])
     good = r.read_party()                     # first read: good, cached
-    party = r.read_party()                    # second read: garbage → last good
-    assert party is good and party[0].species_id == 1
+    party = r.read_party()                    # second read: garbage → that slot's last good read, flagged stale
+    assert party[0].species_id == 1 and party[0].stale and not good[0].stale
 
 
 def test_garbage_with_no_prior_good_returns_as_is():

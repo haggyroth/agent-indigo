@@ -41,6 +41,9 @@ class PokemonStatus:
     ability_slot: int = 0
     held_item: int = 0    # item id the Pokémon is holding (0 = none)
     stats: tuple = ()     # the game's own computed (maxHP, Atk, Def, Spe, SpA, SpD) — party Pokémon only
+    valid: bool = True    # the struct passed the game's own integrity check (Gen III checksum, not a Bad Egg); False = decoded garbage (a mid-write frame)
+    is_egg: bool = False  # the Egg flag (Gen III FRLG has no eggs to obtain; set by the game's own bitfield)
+    stale: bool = False   # this slot's data is the previous good read, served because the current one was invalid (see LeafGreenReader.read_party)
 
     @property
     def is_shiny(self) -> bool:
