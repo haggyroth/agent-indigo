@@ -65,8 +65,11 @@ ffi.set_source(
 
     /* Save/load state flag masks (match project's documented defaults):
        SCREENSHOT=1 SAVEDATA=2 CHEATS=4 RTC=8 METADATA=16 */
-    static const int SAVE_FLAGS = 31;   /* everything */
-    static const int LOAD_FLAGS = 29;   /* everything except screenshot */
+    static const int SAVE_FLAGS = 31;   /* everything: a state file carries the cartridge save too */
+    /* 29 = SCREENSHOT|CHEATS|RTC|METADATA — SAVEDATA (2) is deliberately NOT restored on load. Verified live (#380): with a battery save
+       loaded (load_save), loading a state from a later point rewinds RAM only, and after a power cycle "Continue" still loads the cartridge's OWN
+       save; with NO battery save loaded the core takes the save from the state instead. So a catch retry / checkpoint resume never rewinds a real save. */
+    static const int LOAD_FLAGS = 29;
 
     void* pycore_load(const char* path) {
         mLogSetDefaultLogger(&_silent);

@@ -71,3 +71,16 @@ def test_load_save_returns_bool(tmp_path):
     m.reset()  # load-then-reset is the intended "Continue" sequence; must not crash
     m.tick(2)
     assert m.get_game_code() == "AGB-BPGE"
+
+
+def test_load_flags_keep_the_cartridge_save():
+    """#380: SAVE_FLAGS carries everything, LOAD_FLAGS leaves SAVEDATA (2) out on purpose — and the comment must say so, not 'everything except screenshot'."""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "game" / "_mgba_build.py").read_text()
+    save = int(re.search(r"SAVE_FLAGS = (\d+)", src).group(1))
+    load = int(re.search(r"LOAD_FLAGS = (\d+)", src).group(1))
+    SAVEDATA = 2
+    assert save == 31
+    assert not load & SAVEDATA and load & ~SAVEDATA & 31 == load            # nothing but known flags, SAVEDATA excluded
+    assert "deliberately NOT restored" in src and "everything except screenshot" not in src
