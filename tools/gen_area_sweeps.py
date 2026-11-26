@@ -126,14 +126,14 @@ def build(pf: str):
             if o.get("trainer_type", "TRAINER_TYPE_NONE") not in ("TRAINER_TYPE_NONE",) and o.get("script") and o["trainer_type"].startswith("TRAINER_TYPE_"):
                 const = tindex.get(o["script"])
                 if const and const in trainers:
-                    tr.append((trainer_start + trainers[const], const))
+                    tr.append((trainer_start + trainers[const], const, o["x"], o["y"]))
                 else:
                     unresolved.append((folder, o["script"]))
             elif o.get("graphics_id") == "OBJ_EVENT_GFX_ITEM_BALL" and o.get("flag") in flags and flags[o["flag"]] not in preset:
-                items.append((flags[o["flag"]], o["flag"]))
+                items.append((flags[o["flag"]], o["flag"], o["x"], o["y"]))
         for b in d.get("bg_events", []):
             if b.get("type") == "hidden_item" and b.get("flag") in flags and b["flag"] not in renewable:
-                hidden.append((flags[b["flag"]], b["flag"]))
+                hidden.append((flags[b["flag"]], b["flag"], b["x"], b["y"]))
         if tr or items or hidden:
             per_map[folder] = {"map": gn[folder], "trainers": tr, "items": items, "hidden": hidden}
     return per_map, unresolved
@@ -158,14 +158,25 @@ def main():
     for area, pats in AREAS.items():
         fs = folders_for(pats, per_map)
         maps = [per_map[f]["map"] for f in fs]
-        tr = sorted({(fl, c) for f in fs for fl, c in per_map[f]["trainers"]})
-        it = sorted({(fl, c) for f in fs for fl, c in per_map[f]["items"]})
-        hd = sorted({(fl, c) for f in fs for fl, c in per_map[f]["hidden"]})
+        tr = sorted({(fl, c) for f in fs for fl, c, *_ in per_map[f]["trainers"]})
+        it = sorted({(fl, c) for f in fs for fl, c, *_ in per_map[f]["items"]})
+        hd = sorted({(fl, c) for f in fs for fl, c, *_ in per_map[f]["hidden"]})
+
+        def pos(kind):
+            seen, rows = set(), []
+            for f in fs:
+                for fl, _c, x, y in per_map[f][kind]:
+                    if fl not in seen and (kind != "hidden" or True):
+                        seen.add(fl)
+                        rows.append((fl, per_map[f]["map"], x, y))
+            return sorted(rows)
         out.append(f"    {area!r}: {{")
         out.append(f"        'maps': {sorted(maps)!r},")
         out.append(f"        'trainers': {[fl for fl, _ in tr]!r},")
         out.append(f"        'items': {[fl for fl, _ in it]!r},")
         out.append(f"        'hidden': {[fl for fl, _ in hd]!r},")
+        out.append(f"        'trainer_pos': {pos('trainers')!r},")
+        out.append(f"        'item_pos': {pos('items')!r},")
         out.append("    },")
     out.append("}")
     sys.stdout.write("\n".join(out) + "\n")
