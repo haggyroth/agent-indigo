@@ -85,3 +85,13 @@ START_NEW_GAME=true STARTER=squirtle PLAYER_NAME=ASH RIVAL_NAME=GARY python main
 # Pick up a stopped run
 RESUME=latest python main.py
 ```
+
+## Exit status of `python main.py`
+
+| code | meaning (`EpisodeResult.reason`) |
+|---|---|
+| `0` | the goal (`goal`), or a bound you asked for was reached: `max_steps`, `max_llm_calls`, `token_budget`, `max_wall` |
+| `1` | the run broke: `stalled`, `error_budget`, `llm_error` (credentials / quota / unknown model) |
+| `130` | interrupted (Ctrl-C) |
+
+The stop reason is also in the run's `meta.json` and `run.jsonl` `end` record.

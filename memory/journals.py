@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import hashlib
 import re
-import shutil
 from pathlib import Path
 
 from config import PROJECT_ROOT
+from memory.atomic import atomic_copy
 
 JOURNALS_DIR = PROJECT_ROOT / "logs" / "journals"
 SNAPSHOT_MAX_BYTES = 5_000_000          # a battle journal larger than this is not copied beside every checkpoint
@@ -55,10 +55,10 @@ def snapshot(state, ltm_path, journal_path) -> None:
     try:
         ltm_side, bat_side = _sidecars(state)
         if Path(ltm_path).exists():
-            shutil.copyfile(ltm_path, ltm_side)
+            atomic_copy(ltm_path, ltm_side)
         jp = Path(journal_path)
         if jp.exists() and jp.stat().st_size <= SNAPSHOT_MAX_BYTES:
-            shutil.copyfile(jp, bat_side)
+            atomic_copy(jp, bat_side)
     except OSError:
         pass
 
@@ -76,9 +76,9 @@ def select(source, root: Path | None = None) -> tuple[Path, Path, str]:
     if ltm_side.exists():                                     # a checkpoint: the snapshot is the truth for THIS state, even over a later session of the same run
         try:
             ltm_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(ltm_side, ltm_path)
+            atomic_copy(ltm_side, ltm_path)
             if bat_side.exists():
-                shutil.copyfile(bat_side, journal_path)
+                atomic_copy(bat_side, journal_path)
             else:
                 journal_path.unlink(missing_ok=True)
             return ltm_path, journal_path, "checkpoint"

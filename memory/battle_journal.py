@@ -26,8 +26,10 @@ class BattleJournal:
         self._cache_key: tuple | None = None
 
     def log(self, record: BattleRecord):
+        line = json.dumps(asdict(record)) + "\n"
         with open(self.path, "a") as f:
-            f.write(json.dumps(asdict(record)) + "\n")
+            f.write(line)                  # ONE write of the whole line: appends from two runs sharing a journal cannot interleave mid-line
+            f.flush()
         self._cache = None          # invalidate — next _all() reparses
 
     def _file_key(self):
