@@ -6,9 +6,6 @@ All notable changes to Agent Indigo (formerly *pokemon-agent*) are documented he
 ## [Unreleased]
 
 ### Fixed
-- **"Unreadable" no longer reads as zero (#376).** While the SaveBlock pointers are invalid (title screen, reset, a transition frame) `read_flag`, `read_var`, `read_money`, `read_coins`, `read_bag`, the item/TM pockets, the key-item readers and the Pokédex readers
-  return their last good value (like `read_badges` always did) instead of `False` / `0` / `{}` — which had produced phantom "key item obtained" events and "restock" nags. A failed money/coin decrypt is no longer "no money". `LeafGreenReader.reset_caches()`
-  forgets every last-good value and is called by the `load_state` tool and after a power cycle, so a value from the old timeline never answers for the new one.
 - **Long-term memory no longer forgets four of its own keys on reload (#371).** `gym_losses` (a loss inside a gym blocks `challenge_leader` until the team grows), `hidden_taken`, `pc_visited` and
   `shop_broke_at` were written to `progress.json` but dropped by `LongTermMemory._load` because they were missing from `DEFAULTS`. They are declared now, and `_load` keeps any undeclared key
   (only `RETIRED_KEYS` are dropped). A test scans the source for every `ltm.data` key and fails if one is not in `DEFAULTS`.
