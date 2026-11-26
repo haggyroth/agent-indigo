@@ -1,7 +1,6 @@
 from agent.skills.base import log_once
 import base64
 import json
-import re
 import time
 from pathlib import Path
 from openai import OpenAI
@@ -9,7 +8,7 @@ from agent.usage import cached_prompt_tokens
 from agent.llm_retry import call_with_retry, fatal_reason, is_context_overflow, LLMFatalError
 from agent.tool_args import repair_args, signature
 from agent.tools import SAFARI_CONTEXT, tool_schema, tools_for, normalize_button
-from agent.history import (trim_messages, strip_control_tokens, estimate_tokens, strip_images, last_user_group, fit_to_budget)
+from agent.history import (trim_messages, strip_control_tokens, split_think, estimate_tokens, strip_images, last_user_group, fit_to_budget)
 from game.memory_reader import LeafGreenReader
 from typing import TYPE_CHECKING
 from memory.long_term import LongTermMemory
@@ -154,43 +153,30 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
             cls._map_b64_cache[path] = cached
         return cached, name
 
-    # Matches a Qwen3-style <think>...</think> block (possibly multi-line)
-    _THINK_RE = re.compile(r"<think>(.*?)</think>\s*", re.DOTALL)
-
     def _extract_response(self, msg) -> tuple[str, str]:
         """Parse a model reply into (reasoning_for_display, content_for_history).
 
-        Qwen3 thinking models embed reasoning inside <think>...</think> tags
-        in msg.content.  Storing those tags in history and replaying them to
-        the API on the next turn causes a parse error (the garbage characters
-        seen in the 400 error).  This method always strips the think block from
-        the stored content.
+        Reasoning NEVER reaches history, whatever ENABLE_THINKING says: replaying <think> text costs thousands of tokens a turn and LM Studio
+        rejects it with a 400. Inline <think>…</think> blocks (also an unclosed one from a reply cut off by MAX_TOKENS) and the separate
+        `reasoning_content` / `reasoning` fields (LM Studio, DeepSeek, OpenRouter) are all taken out of the stored content. ENABLE_THINKING only
+        decides whether the reasoning is returned for display / the run log.
 
         Returns
         -------
         reasoning : str
-            The thinking text (for console display).  Empty string for
-            non-thinking models or when no think block is present.
+            The thinking text (display / log only). Empty when ENABLE_THINKING is off or the model did not think.
         clean_content : str
-            msg.content with all <think>…</think> blocks removed — safe to
-            store in message history and replay to the API.
+            msg.content with all reasoning removed — safe to store in message history and replay to the API.
         """
-        raw = strip_control_tokens(msg.content or "")
-
-        if ENABLE_THINKING:
-            m = self._THINK_RE.search(raw)
-            if m:
-                thinking    = m.group(1).strip()
-                clean       = self._THINK_RE.sub("", raw).strip()
-                return thinking, clean
-            # No inline tags — some LM Studio builds surface reasoning_content
-            # as a separate field instead.
+        thinking, clean = split_think(strip_control_tokens(msg.content or ""))
+        if not thinking:
             extra = getattr(msg, "model_extra", {}) or {}
-            reasoning = (extra.get("reasoning_content") or "").strip()
-            if reasoning:
-                return reasoning, raw   # raw has no tags to strip here
-
-        return "", raw
+            for field in ("reasoning_content", "reasoning"):
+                v = extra.get(field) or getattr(msg, field, None)
+                if isinstance(v, str) and v.strip():
+                    thinking = v.strip()
+                    break
+        return (thinking if ENABLE_THINKING else ""), clean
 
     def step(self, observation: str, screenshot_b64: str | None = None,
              area_map_b64: str | None = None, area_map_name: str = "") -> tuple[str, list[str]]:
@@ -267,6 +253,10 @@ class AgentClient(SkillBase, SkillState, SellMixin, MoveDeleterMixin, LeagueMixi
                 reasoning=(reasoning or "")[:1500], content=(clean_content or "")[:500],
                 tool_calls=[[tc.function.name, tc.function.arguments]
                             for tc in (msg.tool_calls or [])])
+            if getattr(resp.choices[0], "finish_reason", None) == "length":
+                events.emit("note", f"the reply was cut off by MAX_TOKENS={MAX_TOKENS} — raise it (or turn thinking off) if this repeats", log=False)
+                if not clean_content and not msg.tool_calls:
+                    clean_content = "(my reply was cut off by the token limit before I acted)"    # the reasoning was dropped; keep the turn well-formed
             history_entry: dict = {"role": "assistant", "content": clean_content}
             if msg.tool_calls:
                 history_entry["tool_calls"] = [tc.model_dump() for tc in msg.tool_calls]
