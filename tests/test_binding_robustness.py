@@ -72,27 +72,19 @@ def test_keys_are_released_when_the_watchdog_trips_mid_press(monkeypatch, method
     assert keys and keys[-1] == 0                                            # released, not still held
 
 
-# ── idle detection looks at the whole frame ──────────────────────────────────────────────────────
+# ── idle detection ───────────────────────────────────────────────────────────────────────────────
 
-def test_idle_detection_sees_a_change_the_old_sparse_sample_never_looked_at(monkeypatch):
-    """A single byte that flips every frame (a blinking arrow) at an offset the old stride-311 sample skipped: the screen is NOT idle."""
+def test_a_truly_still_screen_is_idle_and_a_busy_one_is_not(monkeypatch):
     n = 240 * 160 * 4
-    assert 1000 % 311 != 0
-    frames = [bytearray(n) for _ in range(2)]
-    frames[1][1000] = 255
+    still = bytes(n)
+    changing = [bytes([i % 251]) * n for i in range(64)]                  # a screen-wide change every frame (text printing)
     tick = {"i": 0}
-    c, lib = _client(monkeypatch, pycore_set_keys=lambda h, k: None, pycore_run_frame=lambda h: tick.__setitem__("i", tick["i"] + 1))
+    c, _ = _client(monkeypatch, pycore_set_keys=lambda h, k: None, pycore_run_frame=lambda h: tick.__setitem__("i", tick["i"] + 1))
     c._video_bytes, c._video = n, NULL
-    monkeypatch.setattr(core, "ffi", types.SimpleNamespace(buffer=lambda ptr, size: bytes(frames[tick["i"] % 2]), NULL=NULL))
-    assert c.wait_until_idle(max_frames=60, stable=8) is False
-
-
-def test_a_truly_still_screen_is_idle(monkeypatch):
-    n = 240 * 160 * 4
-    c, _ = _client(monkeypatch, pycore_set_keys=lambda h, k: None, pycore_run_frame=lambda h: None)
-    c._video_bytes, c._video = n, NULL
-    monkeypatch.setattr(core, "ffi", types.SimpleNamespace(buffer=lambda ptr, size: bytes(n), NULL=NULL))
+    monkeypatch.setattr(core, "ffi", types.SimpleNamespace(buffer=lambda ptr, size: still, NULL=NULL))
     assert c.wait_until_idle(max_frames=60, stable=8) is True
+    monkeypatch.setattr(core, "ffi", types.SimpleNamespace(buffer=lambda ptr, size: changing[tick["i"] % 64], NULL=NULL))
+    assert c.wait_until_idle(max_frames=60, stable=8) is False
 
 
 # ── state files are all-or-nothing ───────────────────────────────────────────────────────────────

@@ -142,7 +142,10 @@ class NativeMGBAClient:
             buf = ffi.buffer(self._video, self._video_bytes)
             if v is not None:
                 v.render(buf)
-            h = zlib.crc32(buf)                       # the WHOLE frame (a sparse sample could skip the small blinking text-advance arrow)
+            # Deliberately a SPARSE fingerprint (and not the whole frame): in battle the Pokémon sprites bob and the HP bars tick even while the game is waiting
+            # for input, so a whole-frame hash is never "idle" there. The sample ignores those small animations and sees the screen-wide changes (text printing,
+            # menu transitions). Tried the whole frame in #381: three live battle tests (Ether, the status-spam watchdog, Victory Road) regressed.
+            h = hash(tuple(buf[i] for i in range(0, self._video_bytes, 311)))
             streak = streak + 1 if h == last else 0
             last = h
             if streak >= stable:
