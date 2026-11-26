@@ -37,8 +37,9 @@ Decision logic:
 GYM_PREP = """## Preparing for a Gym — level up first if you're weak
 A Gym Leader will beat an under-levelled team. BEFORE challenging one, make sure
 your lead is strong enough and has the right move:
-- **Brock (Pewter, Rock): you want Bulbasaur at ~L13+ so it has Vine Whip** (Grass,
-  2× vs Rock/Ground — it 2HKOs Geodude L12 and Onix L14). Tackle barely dents them.
+- **Brock (Pewter, Rock/Ground): his Geodude is L12 and his Onix L14.** Grass, Water and Fighting moves hit Rock and
+  Ground for double; Normal moves like Tackle barely dent them. Make sure one of your Pokémon has a move of those types
+  (and the level to use it) before you challenge him.
 - **If you are under that level, GRIND to level up: stand in TALL GRASS (Route 1/
   Route 2 or Viridian Forest) and call `grind(13)`.** It paces on grass until a wild Pokémon
   appears, then hands you the battle: fight it with `use_move`, then call `grind(13)` again (with
@@ -49,7 +50,7 @@ your lead is strong enough and has the right move:
 - **Inside the gym, `go_to` does nothing — to fight the Leader, call
   `challenge_leader()`.** It walks up to the Leader and talks to them to start the
   battle (don't just press Up — you have to talk to them). Then attack with
-  `use_move` (Vine Whip vs Brock). If you faint you black out, wake up healed at the last
+  `use_move` (a Grass or Water move vs Brock). If you faint you black out, wake up healed at the last
   Pokémon Center and keep every level and Exp the fight gave you: grind a bit more.
 - After a loss, do NOT `load_state` — that rewinds the Exp the loss earned. Either grind more or
   try again.
@@ -285,16 +286,16 @@ and Hidden Power; `pc('list', detail=true)` grades the boxed ones; a "better spe
 Keep the better individual of a species (weigh the levels you would lose), and don't judge by species alone.
 
 **Team gaps.** The readiness block names what the TEAM is missing — "team gap — Lt. Surge's gym (Electric): your team hits
-only 0/3 of his Pokémon … catch a counter: Diglett — Diglett's Cave B1F …" or "nobody on the team can learn Surf … catch one
-that can: …" (with the exact LeafGreen locations, or the box:slot of one you already own in the PC). A catch that fills such a gap
-is worth a ball whatever its stats, and `team_report()` gives the full picture (coverage, shared weaknesses, HM carriers, the
-next gym's fit) — use it before a gym and when deciding what to catch or swap.
+only 0/3 of his Pokémon super effectively …" or "nobody on the team can learn Surf …" (with the box:slot of any Pokémon you
+already own in the PC that can). It states the NEED, never which Pokémon to get: what to catch, bring from the PC or leave
+behind is your decision. `team_report()` gives the full picture (coverage, shared weaknesses, HM carriers, the next gym's
+fit and what the leader is weak to) — use it before a gym and when deciding what to catch or swap.
 
 **Party composition — quality over slots.** Six is a ceiling, not a target. A strong 4-5 beats six diluted ones: the XP is
 split between everyone who fights, so extra mediocre members leave the whole team under-levelled for the Elite Four. Prefer
 strong evolution lines (a final form with real attacking stats and moves), cover many types, and keep the members that
-actually win fights. A Pokémon whose best form is weak (high-HP/low-attack normals, a Rattata, a Pidgey you won't evolve into
-something useful) is filler: don't keep it just because a slot is open. Early placeholders are fine to start with — when you find a clearly better
+actually win fights. A Pokémon whose best form is weak (low attack, few useful moves, nothing it will evolve
+into that helps) is filler: don't keep it just because a slot is open. Early placeholders are fine to start with — when you find a clearly better
 species, or a type the team lacks, catch it (when `grind()` or `go_to` hands you a worthwhile wild Pokémon, `catch()` it
 yourself) and swap the weakest member out. You are FREE to restructure the party whenever you like: `pc('swap')`, `pc('deposit')`
 and `pc('withdraw')` change who travels with you (leaving a slot EMPTY is fine), `team_report()` tells you what the

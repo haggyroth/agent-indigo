@@ -703,7 +703,7 @@ class NavMixin:
                     from knowledge.catch_policy import evaluate
                     v = evaluate(party, foe.species_id, foe.level or 0,
                                  dex_owned=self.reader.read_dex_owned(foe.species_id),
-                                 wanted=self._wanted_species(party), stored=self._stored_species())
+                                 stored=self._stored_species())
                     verdict = (f" Worth a ball: {v.reason}." if v.catch else f" Not worth a ball: {v.reason}.") \
                         + f" ({balls} Poké Balls.)"
         except Exception:
@@ -1354,8 +1354,8 @@ class NavMixin:
         if capable:
             return (f"Nobody knows Fly yet ({', '.join(capable)} could learn it) — teach it, or load an earlier save. "
                     "Plan trips so you don't need to go back west on foot.")
-        return ("Nobody on the team can learn Fly — load an earlier save, or catch a Fly-capable bird "
-                "(Pidgey / Spearow lines) before you head east again.")
+        return ("Nobody on the team can learn Fly — load an earlier save, or find a Pokémon that can learn it "
+                "(inspect_pokemon / pc('list', detail=true) show who can) before you head east again.")
 
     def _press_on_warp(self, tile: tuple[int, int]) -> bool:
         """Standing on a staircase / arrow-mat tile the walk just stepped onto: press the direction that fires it (East / West for the directional stairs — the Celadon Dept.

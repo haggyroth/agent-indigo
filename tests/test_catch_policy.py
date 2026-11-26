@@ -91,8 +91,7 @@ def test_a_core_of_four_does_not_take_filler_that_merely_adds_a_type_or_sits_nea
     assert evaluate(FOUR[:3], GEODUDE, 29).catch              # a team of three still needs bodies: unchanged
 
 
-def test_a_core_of_four_still_takes_a_premium_line_an_upgrade_a_team_gap_or_a_new_dex_entry():
-    assert evaluate(FOUR, MAGIKARP + 1, 29).catch or evaluate(FOUR, ABRA - 1, 29, wanted={ABRA - 1: "a Psychic counter"}).catch
-    assert evaluate(FOUR, GEODUDE, 29, wanted={GEODUDE: "counter to the next gym"}).catch              # a team gap
+def test_a_core_of_four_still_takes_a_premium_line_or_a_new_dex_entry():
+    assert evaluate(FOUR, 81, 29).catch                                                              # Magnemite: a premium line (best form BST 465)
     v = evaluate(FOUR, GEODUDE, 29, dex_owned=False)
     assert v.catch and "pc('deposit')" in v.reason                                                      # Pokédex is secondary but still allowed

@@ -1,10 +1,9 @@
 """Team composition (pure): what the party can hit, what it is weak to, which HMs it can carry, whether it answers the
-next gym — and what to go and catch if it does not.
+next gym — and what it lacks, stated as a NEED, never as a species to go and get: which Pokémon to catch, bring or box is the
+model's decision, not a table's (an earlier version named a counter per gym and where to find it).
 
-Catching used to be a filter (`catch_policy.evaluate`: BST, "adds a new type"). Nothing asked what the TEAM needs. This is
-that question: coverage from the moves actually known, shared weaknesses, HM carriers against what the story is about to
-demand, and a fit check against the next Gym Leader's real party (generated from the decomp), with a short list of
-Pokémon that fix a gap and WHERE they live in LeafGreen (generated wild-encounter data, not memory of another version).
+The questions answered: coverage from the moves actually known, shared weaknesses, HM carriers against what the story is about
+to demand, and a fit check against the next Gym Leader's real party (generated from the decomp).
 """
 from collections import Counter
 from dataclasses import dataclass, field
@@ -13,28 +12,13 @@ from game.constants import SPECIES_NAMES
 from knowledge.gym_teams import TRAINER_TEAMS
 from knowledge.species_data import SPECIES_DATA
 from knowledge.type_chart import get_effectiveness
-from knowledge.wild_locations import MAP_LABELS, WILD_LOCATIONS
 
-_NAME_TO_ID = {v: k for k, v in SPECIES_NAMES.items()}
 TYPES = ("NOR", "FIR", "WAT", "ELE", "GRS", "ICE", "FIG", "POI", "GRD", "FLY", "PSY", "BUG", "ROC", "GHO", "DRG", "DRK", "STL")
 TYPE_WORD = {"NOR": "Normal", "FIR": "Fire", "WAT": "Water", "ELE": "Electric", "GRS": "Grass", "ICE": "Ice",
              "FIG": "Fighting", "POI": "Poison", "GRD": "Ground", "FLY": "Flying", "PSY": "Psychic", "BUG": "Bug",
              "ROC": "Rock", "GHO": "Ghost", "DRG": "Dragon", "DRK": "Dark", "STL": "Steel"}
 SHARED_WEAKNESS = 3         # this many members weak to one type = a shared weakness
 ANSWERS_FRACTION = 0.6      # the team "answers" a leader if it can hit this share of his Pokémon super effectively
-
-# Pokémon worth hunting for each upcoming Gym (a counter to its type that the LeafGreen wild data says can be caught
-# around that point of the story). Validated against WILD_LOCATIONS by the tests — a name with no location fails.
-GYM_COUNTERS: dict[str, tuple[str, ...]] = {
-    "Brock": ("Mankey", "Bellsprout"),
-    "Misty": ("Pikachu", "Bellsprout"),
-    "Lt. Surge": ("Diglett", "Sandshrew", "Geodude"),
-    "Erika": ("Vulpix", "Spearow", "Pidgey"),
-    "Koga": ("Abra", "Sandshrew", "Drowzee"),
-    "Sabrina": ("Venonat", "Paras", "Gastly"),
-    "Blaine": ("Krabby", "Staryu", "Geodude"),
-    "Giovanni": ("Poliwag", "Staryu", "Bellsprout"),
-}
 
 # HM -> (badges at which it starts to matter, why). Flash is optional and left out.
 HM_NEEDS: dict[str, tuple[int, str]] = {
@@ -43,27 +27,6 @@ HM_NEEDS: dict[str, tuple[int, str]] = {
     "Surf": (4, "Cinnabar and every water route — Fuchsia itself does NOT need it: walk there by land (Routes 12-15) and the HM comes from its Safari Zone"),
     "Strength": (6, "Victory Road's boulders"),
 }
-
-
-def place(bank: int, mid: int) -> str:
-    from knowledge.navigation import MAP_NAMES
-    return MAP_NAMES.get((bank, mid)) or MAP_LABELS.get((bank, mid)) or f"map {bank}/{mid}"
-
-
-def where_to_find(species_id: int, limit: int = 2) -> str:
-    """'Route 4 (grass L10-12), Diglett's Cave B1F (grass L15-31)' — straight from the encounter tables."""
-    rows = WILD_LOCATIONS.get(species_id, [])
-    rows = sorted(rows, key=lambda r: ({"grass": 0, "surf": 1, "rock smash": 2, "old rod": 3, "good rod": 4, "super rod": 5}.get(r[2], 6), r[3]))
-    seen, out = set(), []
-    for b, i, method, lo, hi in rows:
-        name = place(b, i)
-        if name in seen:
-            continue
-        seen.add(name)
-        out.append(f"{name} ({method} L{lo}" + (f"-{hi}" if hi != lo else "") + ")")
-        if len(out) >= limit:
-            break
-    return ", ".join(out)
 
 
 def _types(species_id: int) -> tuple:
@@ -153,55 +116,26 @@ def hm_status(party, hm: str):
     return knower, [p.species_name for p in party if can_learn(p.species_id, iid)]
 
 
-def hm_candidates(hm: str, limit: int = 3) -> list[int]:
-    """Wild-catchable species that can learn `hm`, strongest evolution line first, one per line."""
-    from knowledge.tmhm import HM_MOVES, ITEM_HM01
-    from knowledge.tmhm_learnsets import LEARNSETS
-    iid = ITEM_HM01 + HM_MOVES.index(hm)
-    cands = [(SPECIES_DATA[s][2], s) for s in WILD_LOCATIONS
-             if s in SPECIES_DATA and LEARNSETS.get(s) is not None and LEARNSETS[s] >> (iid - 289) & 1]
-    out, lines = [], set()
-    for line_best, sid in sorted(cands, reverse=True):
-        if (line_best, SPECIES_DATA[sid][1]) in lines:
-            continue
-        lines.add((line_best, SPECIES_DATA[sid][1]))
-        out.append(sid)
-        if len(out) >= limit:
-            break
-    return out
-
-
 @dataclass
 class Gap:
     code: str                    # "gym" | "hm"
     text: str
-    species: list = field(default_factory=list)      # species ids that would fix it
 
 
 def gaps(party, boxes=None, gyms_beaten=()) -> list[Gap]:
-    """What the team is missing right now, most urgent first: the next gym, then the HMs the story is about to
-    demand. `boxes` (PC contents) lets a hint say 'you already own one — pc('swap') it in'."""
+    """What the team is missing right now, most urgent first: the next gym, then the HMs the story is about to demand. It states the NEED (types the leader is
+    weak to are in the gym brief; which HM nobody can learn) and what the model already OWNS that meets it — never which species to go and get: that is the model's call.
+    `boxes` (PC contents) lets a hint name the stored Pokémon that can already do it."""
     out: list[Gap] = []
-    owned = {p.species_id for p in party}
     boxed = {m["species_id"]: m for m in (boxes or [])}
     fit = next_gym_fit(party, gyms_beaten)
     if fit is not None and not fit.answers:
-        wanted = [_NAME_TO_ID[n] for n in GYM_COUNTERS.get(fit.leader, ()) if n in _NAME_TO_ID]
-        wanted = [s for s in wanted if s not in owned]
-        in_box = [s for s in wanted if s in boxed]
         bits = [f"{fit.leader}'s gym ({TYPE_WORD.get(fit.gym_type, fit.gym_type)}): your team hits only "
                 f"{fit.covered}/{fit.total} of his Pokémon super effectively"]
         if fit.safe_members < max(1, len(party) // 2):
             bits.append(f"just {fit.safe_members}/{len(party)} of you can take his types")
-        if in_box:
-            m = boxed[in_box[0]]
-            bits.append(f"you already own a {m['species_name']} in the PC ({m['box'] + 1}:{m['slot']}) — pc('swap') it in")
-            out.append(Gap("gym", "; ".join(bits), in_box))
-        elif wanted:
-            pick = wanted[:2]
-            where = "; ".join(f"{SPECIES_NAMES[s]} — {where_to_find(s)}" for s in pick if where_to_find(s))
-            bits.append("catch a counter: " + where if where else "catch a type counter")
-            out.append(Gap("gym", "; ".join(bits), pick))
+        bits.append("the brief below lists the types he is weak to; pc('list', detail=true) shows what you have stored — who you bring is your decision")
+        out.append(Gap("gym", "; ".join(bits)))
     badges = len(set(gyms_beaten or []))
     for hm, (need_at, why) in HM_NEEDS.items():
         if badges < need_at:
@@ -209,21 +143,20 @@ def gaps(party, boxes=None, gyms_beaten=()) -> list[Gap]:
         knower, capable = hm_status(party, hm)
         if knower or capable:
             continue
-        cands = hm_candidates(hm)
-        have_boxed = [m for sid, m in boxed.items() if sid in set(hm_candidates(hm, 40))]
+        have_boxed = [m for sid, m in boxed.items() if _can_learn_hm(sid, hm)]
         if have_boxed:
-            m = have_boxed[0]
-            out.append(Gap("hm", f"nobody on the team can learn {hm} ({why}) — your {m['species_name']} in the PC "
-                                 f"({m['box'] + 1}:{m['slot']}) can: pc('swap') it in", [m["species_id"]]))
-        elif cands:
-            names = "; ".join(f"{SPECIES_NAMES[s]} — {where_to_find(s, 1)}" for s in cands[:2] if where_to_find(s, 1))
-            out.append(Gap("hm", f"nobody on the team can learn {hm} ({why}); catch one that can: {names}", cands[:2]))
+            names = ", ".join(f"{m['species_name']} ({m['box'] + 1}:{m['slot']})" for m in have_boxed[:4])
+            out.append(Gap("hm", f"nobody on the team can learn {hm} ({why}); in the PC that can: {names} — pc('swap') brings one into the team"))
+        else:
+            out.append(Gap("hm", f"nobody on the team can learn {hm} ({why}); a Pokémon that can must join the team (inspect_pokemon / pc('list', detail=true) show who can learn what)"))
     return out
 
 
-def wanted_species(party, boxes=None, gyms_beaten=()) -> dict[int, str]:
-    """{species id: short reason} for catch_policy: catching these fills a gap, whatever their BST."""
-    return {s: g.text.split(":")[0] for g in gaps(party, boxes, gyms_beaten) for s in g.species}
+def _can_learn_hm(species_id: int, hm: str) -> bool:
+    from knowledge.tmhm import HM_MOVES, ITEM_HM01
+    from knowledge.tmhm_learnsets import LEARNSETS
+    iid = ITEM_HM01 + HM_MOVES.index(hm)
+    return bool(LEARNSETS.get(species_id) is not None and LEARNSETS[species_id] >> (iid - 289) & 1)
 
 
 def team_report(party, boxes=None, gyms_beaten=(), money_note: str = "") -> str:

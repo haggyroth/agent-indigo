@@ -41,7 +41,7 @@ AREAS: tuple[Area, ...] = (
     Area("diglett_cave", "Diglett's Cave", ("DiglettsCave_B1F", "DiglettsCave_NorthEntrance", "DiglettsCave_SouthEntrance"),
          "A tunnel between Route 2 (north of Viridian) and Route 11 (east of Vermilion) — a shortcut, no trainers.",
          "Only Diglett and Dugtrio live here.",
-         "Catch a Diglett for a cheap Ground-type before Lt. Surge; skip it otherwise."),
+         "Nothing here is required: it is only a shortcut."),
     Area("power_plant", "Power Plant", ("PowerPlant",),
          "Optional: Zapdos (L50) waits at the far end. Reached from Route 10 across the water (needs Surf).",
          "Some 'item balls' are Voltorb / Electrode and explode; Electric wilds paralyse.",

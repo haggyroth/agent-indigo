@@ -63,7 +63,7 @@ By default the agent boots the ROM as-is. Choose how a run starts:
 
 | You want | Set |
 |---|---|
-| **A brand-new game** (the model starts it with `quest('new_game')` — names, starter, Oak's parcel) | `START_NEW_GAME=true` (optionally `STARTER`, `PLAYER_NAME`, `RIVAL_NAME`) |
+| **A brand-new game** (the model starts it with `quest('new_game')` and **chooses its own name, its rival's name, its starter and the starter's nickname** — and later its Lapras's) | `START_NEW_GAME=true`; leave `STARTER` / `PLAYER_NAME` / `RIVAL_NAME` blank (set them only if *you* want to choose for it) |
 | **Continue a cartridge save** (`.sav`) | `START_FROM_SAVE=path/to/game.sav` |
 | **Load an emulator state** (`.ss*`) straight into a scene | `START_FROM_STATE=path/to/state.ss1` |
 | **Resume a stopped run** from its last checkpoint | `RESUME=latest` (or a `.ss1` path) |

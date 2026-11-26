@@ -131,7 +131,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "N"),
 
     (0, "Defeat Brock (Rock type) at Pewter City Gym — use Grass or Water moves",
-     "Pewter City Gym is in the north-west of Pewter City. Bulbasaur's Vine Whip is 2× effective.",
+     "Pewter City Gym is in the north-west of Pewter City. Grass, Water and Fighting moves hit Rock and Ground for double.",
      "N"),
 
     (1, "Head to Cerulean City and defeat Misty (Water type) — use Grass or Electric moves",
@@ -139,7 +139,7 @@ STORY_PATH: list[tuple[int, str, str, str | None]] = [
      "E"),
 
     (2, "Get HM01 Cut from the S.S. Anne in Vermilion City, then defeat Lt. Surge (Electric)",
-     "From Cerulean, go south on Route 5/6 to Vermilion City. Board S.S. Anne for Cut. Gym: use Ground moves — Diglett's Cave is Route 2 south of Pewter.",
+     "From Cerulean, go south on Route 5/6 to Vermilion City. Board S.S. Anne for Cut.",
      "S"),
 
     (3, "Reach Lavender Town via Rock Tunnel, then go to Celadon City for Gym 4",
@@ -244,7 +244,7 @@ def derive_phase(state: GameState, milestones: list[str]) -> str:
 
 ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
     (3, 0): {  # Pallet Town
-        "start_choose_starter": "You're home in Pallet. Walk NORTH into the tall grass — Prof. Oak stops you and leads you to his lab. Choose Bulbasaur (leftmost ball). Gary will battle you right after.",
+        "start_choose_starter": "You're home in Pallet. Walk NORTH into the tall grass — Prof. Oak stops you and leads you to his lab. Choose your starter from the three balls on the table (quest('new_game') does it). Your rival will battle you right after.",
         "deliver_oaks_parcel":  "Head NORTH to Route 1, through Viridian City Pokemart. Talk to the clerk to receive Oak's Parcel, then return SOUTH to Pallet and give it to Oak.",
     },
     (3, 19): {  # Route 1
@@ -262,14 +262,14 @@ ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
         "pre_brock": "Go NORTH. The Viridian Forest entrance is on the west side — enter and navigate north through the maze to reach Pewter City.",
     },
     (1, 0): {  # Viridian Forest
-        "pre_brock": "Navigate NORTH through the maze. Fight bug trainers for easy XP. Catch a Pikachu if you see one (rare). Exit at the north gate onto Route 2 north → Pewter.",
+        "pre_brock": "Navigate NORTH through the maze. Fight bug trainers for easy XP. Exit at the north gate onto Route 2 north → Pewter.",
     },
     (3, 2): {  # Pewter City
-        "pre_brock":             "Gym is NORTH-WEST (gray building with spikes). Brock uses Geodude L12 and Onix L14 — Vine Whip 2HKOs both. Heal at the Pokemon Center (SE) and stock Potions at the Mart before entering. NOTE: the EAST exit to Route 3 is BLOCKED by a guard until you beat Brock — don't try to leave east yet; beat Brock first.",
+        "pre_brock":             "Gym is NORTH-WEST (gray building with spikes). Brock uses Geodude L12 and Onix L14 — Grass, Water and Fighting moves hit both for double. Heal at the Pokemon Center (SE) and stock Potions at the Mart before entering. NOTE: the EAST exit to Route 3 is BLOCKED by a guard until you beat Brock — don't try to leave east yet; beat Brock first.",
         "post_brock_heading_east": "Exit Pewter EAST through the gate onto Route 3. Mt. Moon is at the east end of Route 3.",
     },
     (3, 21): {  # Route 3
-        "post_brock_heading_east": "Travel EAST. Fight trainers (lots of easy XP here). Pokemon Center at the east end before Mt. Moon. A salesman sells Magikarp — skip it.",
+        "post_brock_heading_east": "Travel EAST. Fight trainers (lots of easy XP here). Pokemon Center at the east end before Mt. Moon. A salesman sells a Magikarp (optional: quest('magikarp')).",
     },
     (1, 1): {  # Mt. Moon 1F
         "post_brock_heading_east": "Navigate through the cave. Staircase down to B1F is in the NW. On B1F/B2F fight Rocket grunts and exit on the far side. Grab Moon Stones if you see them. Exit leads to Route 4 near Cerulean.",
@@ -278,7 +278,7 @@ ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
         "post_brock_heading_east": "Short route. Go EAST into Cerulean City. Pokemon Center is right at the entrance.",
     },
     (3, 3): {  # Cerulean City
-        "post_brock_heading_east": "Gym is in the CENTER (blue roof). Misty's Starmie L21 is dangerous — use Bulbasaur's Vine Whip. Heal and stock Super Potions first. There's also a Rocket near the house NW with a TM — talk to the kid afterward for Dig TM.",
+        "post_brock_heading_east": "Gym is in the CENTER (blue roof). Misty's Starmie L21 is dangerous — Grass and Electric moves hit it for double. Heal and stock Super Potions first. There's also a Rocket near the house NW with a TM — talk to the kid afterward for Dig TM.",
         "post_misty_heading_south": "Exit SOUTH onto Route 5 toward Vermilion City. Underground Path links to Route 6.",
     },
     (3, 23): {  # Route 5
@@ -288,7 +288,7 @@ ROUTE_GUIDE: dict[tuple[int, int], dict[str, str]] = {
         "post_misty_heading_south": "Continue SOUTH into Vermilion City.",
     },
     (3, 5): {  # Vermilion City
-        "post_misty_heading_south": "Board the S.S. Anne (dock in SE) — fight through trainers to reach the Captain's cabin, he gives you HM01 Cut. Then challenge Lt. Surge's Gym (center-north). Surge uses Electric — catch Diglett from Diglett's Cave (Route 2 north of Pewter) if you need a Ground counter. Solve the trash-can switch puzzle to reach him.",
+        "post_misty_heading_south": "Board the S.S. Anne (dock in SE) — fight through trainers to reach the Captain's cabin, he gives you HM01 Cut. Then challenge Lt. Surge's Gym (center-north). Surge uses Electric (Ground-type Pokémon are immune to it). Solve the trash-can switch puzzle to reach him.",
         "post_surge_need_cut":     "If you didn't get Cut from S.S. Anne, the ship has left — you're stuck. Cut is needed to progress east via Route 9.",
         "post_surge_heading_east": "Exit NORTH back to Cerulean, then head EAST via Route 9 (a tree blocks the path — use Cut).",
     },
