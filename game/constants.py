@@ -151,6 +151,9 @@ class Addr:
     # build (as are all addresses here); re-derive if OVERWORLD is misdetected.
     GMAIN_CALLBACK2 = 0x030030F4   # u32: gMain.callback2 — live screen dispatcher
     CB2_OVERWORLD   = 0x080565B5   # callback2 value while the field system is active
+    # gMain.callback2 while the game LOADS a map after a warp (door, stairs, fly, hole): the run goes CB2_OVERWORLD -> 0x0805671D -> 0x080C9BD1 -> 0x0805674D -> CB2_OVERWORLD.
+    # Found by sampling callback2 on every frame across a Pokémon Center exit (#391); it appears once per warp-load and not on a plain step. The emulator client counts its edges.
+    CB2_MAP_LOAD    = 0x0805671D
     CB2_BATTLE      = 0x08011101   # callback2 value during battle
     # Post-battle evolution scene (CB2_EvolutionSceneUpdate). Present ONLY while a mon
     # is evolving — a normal battle end goes straight to CB2_OVERWORLD (verified live).

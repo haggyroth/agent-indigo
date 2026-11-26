@@ -2981,3 +2981,23 @@ def test_the_post_game_briefing_from_the_post_hof_fixture(live):
     assert text.startswith("POST-GAME") and f"Pokédex {ctx.owned}/151" in text and "Sevii Islands (One Island)" in text
     listing = live.c._quest_tool("")
     assert "POST-GAME" in listing and "national_dex" in listing and f"needs 60 species caught (you have {ctx.owned})" in listing
+
+
+def test_map_epoch_counts_warps_even_when_nobody_polls_the_map(live):
+    """#391: leave a building and walk back in with NO read_current_map call in between — the epoch still advances by two; plain steps add nothing."""
+    live.load("fullparty")                                   # inside a Pokémon Center, facing the door
+    r, m = live.r, live.m
+    before = r.map_epoch
+    for _ in range(3):
+        m.tap("Left")                                        # steps (and turns) on the Center's floor: no warp
+    assert r.map_epoch == before
+    live.load("fullparty")
+    before = r.map_epoch
+    for _ in range(6):
+        m.tap("Down")                                        # out through the door ...
+        m.tick(40)
+    assert r.map_epoch == before + 1                         # one warp, never polled
+    for _ in range(6):
+        m.tap("Up")                                          # ... and back in
+        m.tick(40)
+    assert r.map_epoch == before + 2

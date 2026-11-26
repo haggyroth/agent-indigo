@@ -91,7 +91,7 @@ class LeafGreenReader:
         self._last_badges: tuple[int, int] = (0, 0)
         self._last_pos:    tuple[int, int] = (0, 0)
         self._last_map:    tuple[int, int] = (0, 0)
-        self.map_epoch:    int = 0          # counts map changes seen by read_current_map: a floor that was left and entered again has been reloaded (its boulders reset)
+        self._epoch_extra: int = 0
         self._last_good_party: list | None = None
         # While the SaveBlock pointers are invalid (title screen, reset, a map transition frame) the SaveBlock readers return what they last read (self._cache,
         # #376) instead of a plausible-looking 0 / False / {} — "unreadable" must not look like "I have none".
@@ -106,6 +106,16 @@ class LeafGreenReader:
     def _cache(self) -> dict:
         """Last good value of every SaveBlock-dependent read (a property so a reader built without __init__, as several tests do, still works)."""
         return self.__dict__.setdefault("_cache_store", {})
+
+    @property
+    def map_epoch(self) -> int:
+        """How many times the game has (re)loaded a map: a floor that was left and entered again has been reloaded (its boulders reset). Taken from the emulator's own
+        count of warp-loads when it keeps one (independent of how often anyone polls the map, #391); otherwise from the map changes read_current_map has SEEN."""
+        return getattr(self, "_epoch_extra", 0) + getattr(self.client, "map_loads", 0)
+
+    @map_epoch.setter
+    def map_epoch(self, value: int) -> None:
+        self._epoch_extra = value - getattr(self.client, "map_loads", 0)
 
     def reset_caches(self) -> None:
         """Forget every last-good value. Call after anything that replaces RAM wholesale (load_state, a checkpoint resume, a reset): a cached value
@@ -434,15 +444,8 @@ class LeafGreenReader:
         return out
 
     def read_key_item_count(self) -> int:
-        """Number of occupied key-item slots in the bag. The key-item event fires when
-        this increases. Item IDs are cleartext; empty slots read id 0."""
-        sb = self.client.read32(Addr.SAVEBLOCK1_PTR)
-        if not self._valid_ewram_ptr(sb):
-            return self._cache.get("key_item_count", 0)
-        raw = self.client.read_range(sb + Addr.KEY_ITEMS_OFFSET, Addr.KEY_ITEMS_SLOTS * 4)
-        n = sum(1 for i in range(0, len(raw), 4) if (raw[i] | (raw[i + 1] << 8)) != 0)
-        self._cache["key_item_count"] = n
-        return n
+        """Number of occupied key-item slots in the bag. The key-item event fires when this increases."""
+        return len(self.read_key_items())
 
     def _encryption_key(self) -> int:
         """gSaveBlock2->encryptionKey (u32) — XORs money and item quantities."""
@@ -475,30 +478,11 @@ class LeafGreenReader:
         return self._cache.get("coins", 0)
 
     def read_bag(self) -> dict[int, int]:
-        """Return {item_id: quantity} across the Items and Poké Balls pockets.
-        Item IDs are cleartext; quantities are XOR'd with the low 16 bits of the
-        encryption key. Empty slots (id 0) are skipped. Key items are counted
-        separately (read_key_item_count) — they have no meaningful quantity."""
-        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
-        if not self._valid_ewram_ptr(sb1):
-            return dict(self._cache.get("bag", {}))
-        k16 = self._encryption_key() & 0xFFFF
+        """Return {item_id: quantity} across the Items and Poké Balls pockets (quantities are XOR'd with the low 16 bits of the encryption key; empty slots are
+        skipped). Key items are counted separately (read_key_item_count) — they have no meaningful quantity."""
         bag: dict[int, int] = {}
-        for off, slots in ((Addr.ITEMS_OFFSET, Addr.ITEMS_SLOTS),
-                           (Addr.BALLS_OFFSET, Addr.BALLS_SLOTS)):
-            try:
-                raw = self.client.read_range(sb1 + off, slots * 4)
-            except Exception:
-                logger.warning("bag read failed for pocket offset %s", off, exc_info=True)
-                continue
-            for i in range(0, len(raw) - 3, 4):
-                iid = raw[i] | (raw[i + 1] << 8)
-                if iid == 0:
-                    continue
-                qty = (raw[i + 2] | (raw[i + 3] << 8)) ^ k16
-                if 0 < qty <= 999:          # guard against a stale/garbage decrypt
-                    bag[iid] = qty
-        self._cache["bag"] = dict(bag)
+        for off, slots in ((Addr.ITEMS_OFFSET, Addr.ITEMS_SLOTS), (Addr.BALLS_OFFSET, Addr.BALLS_SLOTS)):
+            bag.update(self._read_pocket(off, slots))
         return bag
 
     def count_item(self, item_id: int) -> int:
@@ -507,53 +491,14 @@ class LeafGreenReader:
         return n or dict(self.read_tmhm_pocket()).get(item_id, 0)
 
     def read_items_pocket(self) -> list[tuple[int, int]]:
-        """The Items pocket as an ORDERED [(item_id, quantity)] list, in the same slot
-        order the in-game list displays (compacted — empties skipped). use_item needs
-        the order to navigate the bag list cursor to a specific item. Quantities are
-        XOR'd with the low 16 bits of the encryption key, like read_bag."""
-        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
-        if not self._valid_ewram_ptr(sb1):
-            return list(self._cache.get("items_pocket", []))
-        k16 = self._encryption_key() & 0xFFFF
-        out: list[tuple[int, int]] = []
-        try:
-            raw = self.client.read_range(sb1 + Addr.ITEMS_OFFSET, Addr.ITEMS_SLOTS * 4)
-        except Exception:
-            logger.warning("items pocket read failed", exc_info=True)
-            return []
-        for i in range(0, len(raw) - 3, 4):
-            iid = raw[i] | (raw[i + 1] << 8)
-            if iid == 0:
-                continue
-            qty = (raw[i + 2] | (raw[i + 3] << 8)) ^ k16
-            if 0 < qty <= 999:
-                out.append((iid, qty))
-        self._cache["items_pocket"] = list(out)
-        return out
+        """The Items pocket as an ORDERED [(item_id, quantity)] list, in the same slot order the in-game list displays (compacted — empties skipped).
+        use_item needs the order to navigate the bag list cursor to a specific item."""
+        return self._read_pocket(Addr.ITEMS_OFFSET, Addr.ITEMS_SLOTS)
 
     def read_item_ball_tiles(self) -> list[tuple[int, int]]:
-        """Grid coords of item balls currently on screen — loaded object events whose
-        graphicsId is the item-ball sprite. A collected ball's flag suppresses its
-        spawn, so this lists exactly the UNcollected balls nearby (the pickup skill
-        walks to each and presses A). currentCoords are grid coord + 7, like NPCs.
-        Empty on any read hiccup (never crashes the caller)."""
-        out: list[tuple[int, int]] = []
-        try:
-            for i in range(Addr.OBJECT_EVENT_COUNT):
-                b = Addr.OBJECT_EVENTS + i * Addr.OBJECT_EVENT_STRIDE
-                if not (self.client.read8(b) & 1):                 # not active
-                    continue
-                if self.client.read8(b + Addr.OBJECT_GFX_OFFSET) != Addr.OBJ_GFX_ITEM_BALL:
-                    continue
-                x = self.client.read16(b + 0x10)
-                y = self.client.read16(b + 0x12)
-                x = x - 65536 if x >= 32768 else x
-                y = y - 65536 if y >= 32768 else y
-                out.append((x - Addr.OBJECT_COORD_OFFSET, y - Addr.OBJECT_COORD_OFFSET))
-        except Exception:
-            logger.warning("item-ball tile read failed", exc_info=True)
-            return []
-        return out
+        """Grid coords of item balls currently on screen — loaded object events whose graphicsId is the item-ball sprite. A collected ball's flag suppresses
+        its spawn, so this lists exactly the UNcollected balls nearby (the pickup skill walks to each and presses A)."""
+        return self.read_objects_by_gfx((Addr.OBJ_GFX_ITEM_BALL,))
 
     def _read_pocket(self, offset: int, slots: int) -> list[tuple[int, int]]:
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
@@ -708,19 +653,21 @@ class LeafGreenReader:
         return out
 
     def read_objects_by_gfx(self, gfx_ids) -> list[tuple[int, int]]:
-        """Grid coords of loaded, active object events whose graphicsId is in gfx_ids
-        (Cut trees / Rock Smash rocks / Strength boulders / item balls)."""
+        """Grid coords of loaded, active object events whose graphicsId is in gfx_ids (Cut trees / Rock Smash rocks / Strength boulders / item balls).
+        currentCoords are grid coord + 7, like NPCs. The whole object table is read in ONE call. Empty on any read hiccup (never crashes the caller)."""
         ids = set(gfx_ids)
         out: list[tuple[int, int]] = []
+        stride = Addr.OBJECT_EVENT_STRIDE
         try:
+            raw = self.client.read_range(Addr.OBJECT_EVENTS, Addr.OBJECT_EVENT_COUNT * stride)
             for i in range(Addr.OBJECT_EVENT_COUNT):
-                b = Addr.OBJECT_EVENTS + i * Addr.OBJECT_EVENT_STRIDE
-                if not (self.client.read8(b) & 1):
+                o = raw[i * stride:(i + 1) * stride]
+                if len(o) < stride or not (o[0] & 1):                       # not active
                     continue
-                if self.client.read8(b + Addr.OBJECT_GFX_OFFSET) not in ids:
+                if o[Addr.OBJECT_GFX_OFFSET] not in ids:
                     continue
-                x = self.client.read16(b + 0x10)
-                y = self.client.read16(b + 0x12)
+                x = o[0x10] | (o[0x11] << 8)
+                y = o[0x12] | (o[0x13] << 8)
                 x = x - 65536 if x >= 32768 else x
                 y = y - 65536 if y >= 32768 else y
                 out.append((x - Addr.OBJECT_COORD_OFFSET, y - Addr.OBJECT_COORD_OFFSET))
@@ -766,8 +713,8 @@ class LeafGreenReader:
         if not self._valid_ewram_ptr(ptr):
             return self._last_map
         now = (self.client.read8(ptr + Addr.MAP_GROUP_OFFSET), self.client.read8(ptr + Addr.MAP_NUM_OFFSET))
-        if now != self._last_map:
-            self.map_epoch += 1
+        if now != self._last_map and not hasattr(self.client, "map_loads"):
+            self._epoch_extra = getattr(self, "_epoch_extra", 0) + 1              # no emulator-side count (a fake client): fall back to the map changes we have seen
         self._last_map = now
         return self._last_map
 

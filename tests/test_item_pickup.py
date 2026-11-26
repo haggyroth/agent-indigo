@@ -32,6 +32,16 @@ class _FakeClient:
             return gfx
         return 0
 
+    def read_range(self, addr, length):
+        """The reader pulls the whole object table in one call: serve it from the same per-field memory."""
+        return bytes(self.read8(addr + i) if not (i % Addr.OBJECT_EVENT_STRIDE in (0x10, 0x11, 0x12, 0x13)) else self._byte(addr + i) for i in range(length))
+
+    def _byte(self, addr):
+        slot, off = self._slot(addr)
+        if slot >= len(self.objs) or not self.objs[slot]:
+            return 0
+        return (self.read16(addr - (off & 1)) >> (8 * (off & 1))) & 0xFF
+
     def read16(self, addr):
         slot, off = self._slot(addr)
         _active, _gfx, gx, gy = self.objs[slot]
