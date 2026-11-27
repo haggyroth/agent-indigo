@@ -46,3 +46,20 @@ def test_the_whole_loop_buys_coins_spins_and_buys_an_abra(live):
     out = live.c._execute("shop", json.dumps({"item": "Abra"}))
     assert out.startswith("Exchanged 120 coins for Abra"), out
     assert live.r.read_coins() == coins - 120 and len(live.r.read_party()) == party + 1, out          # exactly the prize's price, and the Abra joined the party
+
+
+def test_the_stop_loss_ends_a_session_and_says_so(live, monkeypatch):
+    """#359: with the stop-loss pulled down to 0 coins the session ends as soon as it is behind its start, and the result names the stop-loss; an empty purse ends it too."""
+    import agent.skills.gamecorner as gc
+    _fly_to_celadon(live)
+    live.set_flag(0x243)
+    live.set_coins(300)
+    monkeypatch.setattr(gc, "MAX_SLOT_LOSS", 0)
+    start = live.r.read_coins()
+    out = live.c._execute("game_corner", json.dumps({"action": "slots", "amount": 60}))
+    print("SLOT_STOP", live.r.read_coins() - start, out[:200])
+    assert "stop-loss" in out, out
+    assert live.r.read_coins() < start + 14 * 60, out                      # it stopped early, well short of 60 spins' worth of winnings
+    live.set_coins(2)                                                      # less than one bet
+    out = live.c._execute("game_corner", json.dumps({"action": "slots", "amount": 5}))
+    assert live.r.detect_context().name == "OVERWORLD" and live.r.read_coins() == 2, out
