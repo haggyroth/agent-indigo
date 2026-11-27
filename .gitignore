@@ -12,6 +12,9 @@ __pycache__/
 game/_mgba_native.c
 game/_mgba_native*.o
 game/_mgba_native*.so
+game/_mgba_link.c
+game/_mgba_link*.o
+game/_mgba_link*.so
 
 # Environment variables (contains local paths and config)
 .env

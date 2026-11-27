@@ -84,3 +84,11 @@ def test_load_flags_keep_the_cartridge_save():
     assert save == 31
     assert not load & SAVEDATA and load & ~SAVEDATA & 31 == load            # nothing but known flags, SAVEDATA excluded
     assert "deliberately NOT restored" in src and "everything except screenshot" not in src
+
+
+def test_the_link_module_exports_the_lockstep_host_functions():
+    """#363: when game/_mgba_link is compiled (CI builds it), it exposes the two-core link API; skipped where only the main binding was built."""
+    import pytest
+    mod = pytest.importorskip("game._mgba_link")
+    for name in ("link_create", "link_attach", "link_run", "link_frame_counter", "link_destroy"):
+        assert hasattr(mod.lib, name), name
