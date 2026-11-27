@@ -12,7 +12,11 @@ def test_the_generated_table_matches_the_decomp_for_known_cases():
     assert TUTORS["substitute"] == ("Substitute", 14, (3, 7), (15, 11), 0x2C8, "Fuchsia City", "")
     assert TUTORS["thunder_wave"][2] == (1, 48) and TUTORS["double_edge"][2] == (1, 40) and TUTORS["rock_slide"][2] == (1, 82)
     assert TUTORS["mimic"][6] and "Poké Doll" in TUTORS["mimic"][6]
-    assert len(TUTORS) == 12 and all(row[4] >= 0x2C0 for row in TUTORS.values())    # FLAG_TUTOR_* range
+    assert len(TUTORS) == 15 and all(row[4] >= 0x2C0 for row in TUTORS.values())    # FLAG_TUTOR_* range
+    # the three Sevii tutors: the Hiker on Mt. Ember's exterior (One Island), Four Island's house, Seven Island
+    assert TUTORS["explosion"][:5] == ("Explosion", 12, (1, 97), (29, 45), 0x2C3)
+    assert TUTORS["body_slam"][:5] == ("Body Slam", 3, (35, 3), (8, 3), 0x2CE)
+    assert TUTORS["swords_dance"][:5] == ("Swords Dance", 1, (3, 17), (7, 18), 0x2C9)
 
 
 pytest.importorskip("openai")

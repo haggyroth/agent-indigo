@@ -24,6 +24,9 @@ TUTORS = [
     ("thunder_wave", "SilphCo_2F_EventScript_ThunderWaveTutor", "THUNDER_WAVE", "FLAG_TUTOR_THUNDER_WAVE", "Silph Co. 2F", ""),
     ("double_edge", "VictoryRoad_2F_EventScript_DoubleEdgeTutor", "DOUBLE_EDGE", "FLAG_TUTOR_DOUBLE_EDGE", "Victory Road 2F", ""),
     ("dream_eater", "ViridianCity_EventScript_DreamEaterTutor", "DREAM_EATER", "FLAG_TUTOR_DREAM_EATER", "Viridian City", ""),
+    ("explosion", "MtEmber_Exterior_EventScript_ExplosionTutor", "EXPLOSION", "FLAG_TUTOR_EXPLOSION", "Mt. Ember exterior (One Island)", "the Hiker beside the south entrance; needs the Tri-Pass or Rainbow Pass for the Seagallop"),
+    ("body_slam", "FourIsland_House1_EventScript_BodySlamTutor", "BODY_SLAM", "FLAG_TUTOR_BODY_SLAM", "Four Island (the house by the Day Care)", "needs the Rainbow Pass for the Seagallop"),
+    ("swords_dance", "SevenIsland_EventScript_SwordsDanceTutor", "SWORDS_DANCE", "FLAG_TUTOR_SWORDS_DANCE", "Seven Island", "needs the Rainbow Pass for the Seagallop"),
     ("mimic", "SaffronCity_CopycatsHouse_2F_EventScript_Copycat", "MIMIC", "FLAG_TUTOR_MIMIC", "Saffron Copycat's House 2F", "needs a Poké Doll in the bag"),
 ]
 
