@@ -3,6 +3,7 @@ class Addr:
     # Note: PARTY_DATA confirmed at 0x02024284 by live decryption (Bulbasaur L6, Tackle+Growl).
     # There is no reliable separate party-count address; use level>0 at slot offset 0x54 instead.
     PARTY_DATA   = 0x02024284   # gPlayerParty: 600 bytes, 6 × 100-byte structs
+    PARTY_COUNT  = 0x02024029   # gPlayerPartyCount (u8; verified live: 3 in the threemon fixture, 6 in fullparty) — fixtures that add a member write it
     # gEnemyParty — same struct as gPlayerParty, 600 bytes immediately before it.
     # Fixed global (NOT DMA-relocated). slot 0 = the wild mon / trainer's active
     # lead. Verified live: (0x02024284 - 600) decodes to the wild encounter.

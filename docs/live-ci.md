@@ -56,7 +56,7 @@ Caveats, honestly:
 3. **Cost.** The whole suite is long (see the measured baseline below); a per-PR run is unrealistic. A nightly or `workflow_dispatch` job on `main` is the realistic shape.
 4. **libmgba on ubuntu.** The cffi binding is built against Homebrew's libmgba; Ubuntu's `libmgba-dev` is a different minor version. Unverified — needs one trial run.
 
-Suggested phasing if the owner wants it: (1) `warp_to` + `tools/make_live_fixtures.py` working locally from `work.sav` (useful on its own: fixes "contributors are blocked on missing
+Suggested phasing if the owner wants it: (1) `tools/make_live_fixtures.py` working locally from `work.sav` (started: it rebuilds three fixtures from recipes with Fly / `add_mon` / `go_to` — no `warp_to` was needed for those; dungeon-interior states still do) (useful on its own: fixes "contributors are blocked on missing
 `.ss1` files"), (2) a manual `workflow_dispatch` job that builds the ROM, regenerates fixtures, builds the binding and runs a smoke subset, (3) nightly full run + status on `main`.
 
 ## The end-to-end regression (the fourth checkbox)
