@@ -39,6 +39,7 @@ class SkillState:
     last_trip_stop = None        # {"reason", "target", "map"} of the last outermost trip (also emitted as a `trip` event)
     _go_to_last_end = None       # map where the previous trip ended …
     _go_to_stalls = 0            # … and how many consecutive trips ended there without arriving (story-gated stall detection)
+    _strength_failed = None       # Strength push puzzles walk_to found unsolvable (keys; reset when a boulder moves)
     _in_puzzle = False           # a gym/cave puzzle solver is running (don't recurse into it)
     _in_town_visit = False       # first-visit town heal in progress
     _surf_active = False         # a _surf() attempt is running: a walk it starts must not start another (a shore with no walkable path recursed until the stack ended)

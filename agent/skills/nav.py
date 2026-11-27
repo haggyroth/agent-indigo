@@ -348,6 +348,7 @@ class NavMixin:
         surf_tried = False                      # already tried to start Surfing this call
         puzzle_tries = 0                        # card-key door / mansion switch uses this call
         cut_tries = 0                           # Cut trees opened this call
+        push_tries = 0                          # Strength pushes made this call to open a way
         for _attempt in range(16):
             self.tilemap.refresh()
             grid, w, h = self.tilemap.passable_grid(surf=self._surfing())
@@ -465,6 +466,9 @@ class NavMixin:
                         (px, py), (tx, ty), grid, w, h, npcs, blocked):
                     npc_tried = True
                     continue
+                if push_tries < 12 and not self._in_puzzle and self._strength_step((px, py), (tx, ty), grid, w, h, npcs, warps):
+                    push_tries += 1
+                    continue
                 self.mgba.tick(8)
                 continue
             saw_path = True
@@ -521,6 +525,48 @@ class NavMixin:
             return (f"No walkable path from ({px},{py}) to ({tx},{ty}) — "
                     f"the target may be blocked or off this map.{hint}")
         return f"Stopped at ({px},{py}) while heading to ({tx},{ty})."
+
+    def _strength_step(self, start, goal, grid, w, h, npcs, warps) -> bool:
+        """No walkable path, a Pokémon that knows Strength and loaded boulders: solve the floor as a push puzzle (knowledge.boulder_puzzle.solve, the Victory Road solver) and make the FIRST push,
+        then the caller replans from the new boulder positions — the way the cave drivers work. True once a push was made (the player stands where the boulder was)."""
+        from game.constants import Addr
+        from knowledge.boulder_puzzle import Floor, solve
+        if not self._party_knows(70):                                        # Strength
+            return False
+        boulders = {tuple(b) for b in self.reader.read_objects_by_gfx([Addr.OBJ_GFX_BOULDER]) if 0 <= b[0] < w and 0 <= b[1] < h}
+        if not boulders:
+            return False
+        solid = {tuple(n) for n in npcs if tuple(n) not in boulders}
+        rows = ["".join("." if grid[y][x] else "#" for x in range(w)) for y in range(h)]
+        floor = Floor(rows, solid=solid, warps=[t for t in warps if tuple(t) != tuple(goal)])
+        key = (tuple(self.reader.read_current_map()), tuple(start), tuple(goal), frozenset(boulders), frozenset(solid))
+        if self._strength_failed is None:
+            self._strength_failed = set()
+        failed = self._strength_failed
+        if key in failed:
+            return False
+        sol = solve(floor, start, boulders, goal=[goal], limit=60000)
+        if not sol or sol[0][0] != "push":
+            failed.add(key)                                                  # an unsolvable floor is not searched again until something moves
+            return False
+        _kind, stand, direction = sol[0]
+        self._in_puzzle = True
+        try:
+            self._walk_to(*stand)
+        finally:
+            self._in_puzzle = False
+        if tuple(self.reader.read_player_pos()) != tuple(stand):
+            return False
+        self.mgba.tap(direction)
+        self.mgba.tick(8)
+        self.mgba.tap("A")
+        self.mgba.tick(40)
+        self._answer_field_yes()                                             # "Do you want to use Strength?" the first time on a map
+        self._advance_to_control(tries=20)
+        if tuple(self.reader.read_player_pos()) == tuple(stand):
+            self.mgba.hold(direction, 12)                                    # one step is 16 frames: a longer press would push twice
+            self.mgba.tick(30)
+        return True
 
     @staticmethod
     def _facing_dir(px: int, py: int, tx: int, ty: int) -> str | None:

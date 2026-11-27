@@ -1,4 +1,4 @@
-"""quest('moltres') on the real game (#361): from Vermilion the driver rides the ferry to One Island and travels on to Mt. Ember (the summit's boulder / rock puzzle is a separate issue)."""
+"""quest('moltres') on the real game (#361): from Vermilion the driver rides the ferry to One Island and travels on to Mt. Ember (the boulder puzzle beyond it is covered by test_strength_walk_live)."""
 import json
 
 from game.constants import Addr

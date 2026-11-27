@@ -166,3 +166,11 @@ def test_the_pokemon_mansion_is_grind_ground_for_a_mid_level_trainee_in_cinnabar
     assert CAVE_GRIND_MAPS <= GRASS_MAPS
     goal, _ = best_grass((3, 8), 29)                      # a L29 trainee standing in Cinnabar
     assert goal in CAVE_GRIND_MAPS, goal
+
+
+def test_mt_ember_exterior_routes_the_south_arrival_over_the_boulder_puzzle_to_the_summit_path():
+    """#435: the south arrival and the Summit Path door are joined only by clearing both Strength boulders — a hop to the far side, then the cave's floors, then the summit."""
+    route = route_to((1, 97, "2"), (1, 101), coarse=False)
+    assert route and route[0] == ("cut", (16, 46), (1, 97, "1"))
+    assert [step[1] for step in route if step[0] == "warp"][0] == (14, 24)
+    assert route[-1] == ("warp", (29, 7), (1, 101))
