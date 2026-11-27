@@ -41,6 +41,7 @@ class SkillState:
     _go_to_stalls = 0            # … and how many consecutive trips ended there without arriving (story-gated stall detection)
     _in_puzzle = False           # a gym/cave puzzle solver is running (don't recurse into it)
     _in_town_visit = False       # first-visit town heal in progress
+    _surf_active = False         # a _surf() attempt is running: a walk it starts must not start another (a shore with no walkable path recursed until the stack ended)
     _surf_retry = False          # one Surf retry per trip
     _league_room = None          # the Elite Four room the last quest('elite_four') call was in (a later arrival at the Plateau's Center from it = a loss)
     _ready_warned = lazy(set)    # story beats whose 'party not ready' warning was already given (a 2nd quest() call proceeds)

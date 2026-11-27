@@ -22,4 +22,5 @@ def test_the_presses_to_a_destination_open_the_second_page_through_other():
 def test_the_tri_pass_lists_and_the_map_to_island_rule():
     assert fy.tri_pass_rows(0, False) == [1, 2, 3] and fy.tri_pass_rows(2, False) == [1, 3] and fy.tri_pass_rows(2, True) == [0, 1, 3]
     assert fy.island_of_map((3, 5)) == 0 and fy.island_of_map((36, 2)) == 5 and fy.island_of_map((3, 6)) is None
+    assert fy.island_of_map((3, 45)) == 1 and fy.island_of_map((1, 101)) == 1 and fy.island_of_map((3, 17)) == 7 and fy.on_sevii((1, 101)) and not fy.on_sevii((1, 95))   # Kindle Road, Mt. Ember's summit, Seven Island, the Power Plant
     assert set(fy.HARBORS) == {1, 2, 3, 4, 5, 6, 7} and "Four Island" in fy.route_text(0, 5) and "Four" not in fy.route_text(0, 1)

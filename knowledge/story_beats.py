@@ -202,7 +202,7 @@ BEATS: tuple[Beat, ...] = (
                 "A first detour then ends at Three Island's port (FLAG_SEVII_DETOUR_FINISHED). The Seagallop from Vermilion / Cinnabar then takes the Tri-Pass to One-Three Island.",
                 "Celio's real request waits for the National Pokédex (the National Dex beat): after the Hall of Fame, 60 species caught and this visit."),
          tip="Information only: the ferry scenes are not driven yet — go_to / fly_to work on the islands you have visited."),
-    Beat("moltres", "Moltres on Mt. Ember's summit (legendary, appears once)", "One Island -> Mt. Ember -> the Summit", needs=("sevii_one_island",), optional=True,
+    Beat("moltres", "Moltres on Mt. Ember's summit (legendary, appears once)", "One Island -> Mt. Ember -> the Summit", needs=("sevii_one_island",), driver="moltres", optional=True,
          done=(("flag", 0x2BD),),                                                            # FLAG_FOUGHT_MOLTRES
          steps=("A level 50 Fire / Flying static encounter at the top of Mt. Ember (Sevii). Talking to it starts the fight; it is gone for good once you win or catch it (FLAG_FOUGHT_MOLTRES), but if you run it stays.",
                 "Weaken it without fainting it (False Swipe, a status move), then throw Ultra / Master Balls; save_state first so a faint or a bad throw can be retried."),
@@ -232,7 +232,7 @@ BEATS: tuple[Beat, ...] = (
          done=(("flag", 0x844),),                                                            # FLAG_SYS_CAN_LINK_WITH_RS
          steps=("Give Celio the Sapphire. The Network Machine links with Hoenn: the Cerulean Cave guard leaves (Cerulean Cave opens), Lorelei's house is empty, the roaming beast starts roaming, and every trainer's later rematch teams open (the VS Seeker).",),
          tip="This is the gate for the post-game: Cerulean Cave (Mewtwo), the roamer, and the strongest rematch teams."),
-    Beat("mewtwo", "Mewtwo in Cerulean Cave (legendary, appears once)", "Cerulean City -> Cerulean Cave B1F", needs=("network_machine",), optional=True,
+    Beat("mewtwo", "Mewtwo in Cerulean Cave (legendary, appears once)", "Cerulean City -> Cerulean Cave B1F", needs=("network_machine",), driver="mewtwo", optional=True,
          done=(("flag", 0x2BC),),                                                            # FLAG_FOUGHT_MEWTWO
          steps=("The Network Machine (Celio, One Island) makes the Cerulean Cave guard leave: the cave north-west of Cerulean City opens. Mewtwo, level 70, waits on B1F; it is gone for good once you win or catch it (FLAG_FOUGHT_MEWTWO).",
                 "Bring a full team, plenty of Hyper Potions / Revives and the Master Ball (Silph Co.) or a stack of Ultra Balls; save_state before the fight."),

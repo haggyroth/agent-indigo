@@ -13,6 +13,9 @@ from knowledge import seafoam_data as sd
 from knowledge import seafoam_route as sr
 
 POWER_PLANT = (1, 95)
+MT_EMBER_SUMMIT, MOLTRES_TILE, FLAG_FOUGHT_MOLTRES, FLAG_HIDE_MOLTRES, MOLTRES = (1, 101), (9, 6), 0x2BD, 0x052, 146
+CERULEAN_CAVE_B1F, MEWTWO_TILE, FLAG_FOUGHT_MEWTWO, FLAG_HIDE_MEWTWO, MEWTWO = (1, 74), (7, 12), 0x2BC, 0x081, 150
+FLAG_NETWORK_MACHINE, FLAG_WORLD_MAP_ONE_ISLAND = 0x844, 0x89B
 ZAPDOS_TILE = (5, 11)
 FLAG_FOUGHT_ZAPDOS, FLAG_HIDE_ZAPDOS = 0x2BF, 0x05D
 ZAPDOS, ARTICUNO = 145, 144
@@ -84,6 +87,34 @@ class LegendsMixin:
         if tuple(self.reader.read_current_map()) != POWER_PLANT:
             return f"Didn't reach the Power Plant yet — call {call} again to continue (it resumes)."
         return self._engage_legend(call, "Zapdos", ZAPDOS, ZAPDOS_TILE, "Power Plant")
+
+    # ── Moltres (Sevii) and Mewtwo (Cerulean Cave) ─────────────────────────────────────────────────────────────────────
+    def _get_moltres(self, auto_trainers: bool = False) -> str:
+        """quest('moltres'): Mt. Ember's summit (1,101) at (9,6): ferry to One Island when you are on the mainland, travel in, walk up and hand the one-shot L50 fight over."""
+        from knowledge.ferry import on_sevii
+        call = "quest('moltres')"
+        if (msg := self._legend_gate("Moltres", MOLTRES, FLAG_FOUGHT_MOLTRES, FLAG_HIDE_MOLTRES)):
+            return msg
+        if not self.reader.read_flag(FLAG_WORLD_MAP_ONE_ISLAND):
+            return "Moltres lives on Mt. Ember (One Island, the Sevii Islands): quest('sevii_one_island') first (Bill's sail after Blaine, then Celio)."
+        if not on_sevii(self.reader.read_current_map()):
+            out = self._ferry("one")
+            if not out.startswith("Sailed"):
+                return f"Can't get to One Island: {out}"
+        if (msg := self._go_to_map_tuple(MT_EMBER_SUMMIT, "map:1,101", call)):
+            return msg
+        return self._engage_legend(call, "Moltres", MOLTRES, MOLTRES_TILE, "Mt. Ember")
+
+    def _get_mewtwo(self, auto_trainers: bool = False) -> str:
+        """quest('mewtwo'): Cerulean Cave B1F (1,74) at (7,12) — open once the Network Machine is linked (the guard leaves): travel in, walk up and hand the one-shot L70 fight over."""
+        call = "quest('mewtwo')"
+        if (msg := self._legend_gate("Mewtwo", MEWTWO, FLAG_FOUGHT_MEWTWO, FLAG_HIDE_MEWTWO)):
+            return msg
+        if not self.reader.read_flag(FLAG_NETWORK_MACHINE):
+            return "The Cerulean Cave guard still blocks the way: link the Network Machine first (quest('network_machine'))."
+        if (msg := self._go_to_map_tuple(CERULEAN_CAVE_B1F, "map:1,74", call)):
+            return msg
+        return self._engage_legend(call, "Mewtwo", MEWTWO, MEWTWO_TILE, "Cerulean Cave")
 
     # ── Articuno ───────────────────────────────────────────────────────────────────────────────────────────────────────
     def _sf_boulders(self, here) -> list:
