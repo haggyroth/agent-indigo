@@ -40,3 +40,10 @@ def test_quest_moltres_pushes_through_the_mt_ember_boulders(live):
         if live.r.detect_context().name == "IN_BATTLE":
             _end_battle(live)
     assert tuple(live.r.read_current_map()) == (1, 101), out                    # the walker pushed the boulders aside, went up the Summit Path and came out at the summit
+    for _ in range(4):                                                           # …and the next call walks up to Moltres and hands the one-shot fight over
+        if live.r.detect_context().name == "IN_BATTLE":
+            break
+        out = c._execute("quest", json.dumps({"name": "moltres", "auto_trainers": False}))
+    assert live.r.detect_context().name == "IN_BATTLE", out
+    foe = live.r.read_enemy_lead()
+    assert (foe.species_name, foe.level) == ("Moltres", 50), foe
