@@ -707,6 +707,15 @@ CERULEAN, ROUTE_24 = (3, 3), (3, 43)
 _LAKE_24, _LAKE_CERULEAN = (3, 43, "~"), (3, 3, "~")
 
 
+# Mt. Ember's exterior: the south arrival (region '2', Kindle Road's door) and the west pocket with the Summit Path door (14,24) (region '1') are joined only by clearing BOTH Strength boulders
+# (22,45) and (17,46) — a push puzzle nav._strength_step solves from the live map. The hop's tile is the far (west) side of the boulders (#435).
+MT_EMBER_EXTERIOR = (1, 97)
+
+
+def _patch_mt_ember() -> None:
+    _R_BLK.setdefault(MT_EMBER_EXTERIOR + ("2",), []).append((16, 46, MT_EMBER_EXTERIOR + ("1",)))
+
+
 def _patch_cerulean_lake() -> None:
     _R_SRF.setdefault((3, 43, "0"), []).append((6, 39, _LAKE_24))                # walk_to a river tile at Route 24's south edge from the west bank: it surfs on the way
     _R_CONN[_LAKE_24] = [("South", _LAKE_CERULEAN)]                                  # across the map seam on the water (the same connection the land path uses)
@@ -714,6 +723,7 @@ def _patch_cerulean_lake() -> None:
 
 
 _patch_cerulean_lake()
+_patch_mt_ember()
 
 # A sleeping Snorlax is an object, not a tile, so the generated region grids see its square as a wall and split the map in two (Route 12's pier at (14,70): the region
 # above it and the one below were joined only by the water beside the pier, i.e. "needs Surf"). Hand data, because it is a fact of the story, not of the tiles:
