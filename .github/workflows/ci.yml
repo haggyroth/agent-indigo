@@ -41,6 +41,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install libmgba
+        # NOTE (#446): Homebrew's mgba bottle (0.10.5_2) was built against ffmpeg 8 (libavcodec.62) while the runner installs ffmpeg 9.1, so the compiled extensions cannot be imported here
+        # and the binding tests below skip (-rs prints why). Building libmgba from source without Qt/ffmpeg would fix it; until then this job proves only that the extensions COMPILE.
         run: brew install mgba
       - name: Install build + test dependencies
         run: pip install cffi setuptools -r requirements-test.txt
@@ -53,4 +55,4 @@ jobs:
       - name: Pytest (binding symbol checks; ROM tests skip)
         # ROM is copyrighted and never present in CI, so load/framebuffer tests
         # skip; the symbol test confirms the binding compiled and imports.
-        run: python -m pytest tests/test_binding.py -v
+        run: python -m pytest tests/test_binding.py -v -rs
