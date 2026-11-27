@@ -77,7 +77,15 @@ class HMMixin:
             return "Use fly_to('<town>') — Fly needs a destination."
         if label in ("Dig", "Teleport"):
             return self._leave_by_move(label, move_id)
-        return self._surf() if label == "Surf" else self._use_on_object(label)
+        if label == "Surf":
+            if self._surf_active:
+                return "Already looking for a shore to Surf from — no walkable way to one from here."
+            self._surf_active = True
+            try:
+                return self._surf()
+            finally:
+                self._surf_active = False
+        return self._use_on_object(label)
 
     # ── party sub-menu field moves (Flash, Fly) ─────────────────────────────
     def _party_field_move(self, move_id: int, who: str = "") -> str | None:
