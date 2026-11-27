@@ -57,7 +57,8 @@ class LegendsMixin:
                 if foe and foe.species_id == species:
                     break
                 self.mgba.tick(30)
-            return f"{name} (L50) is in front of you — ONE-SHOT: catch it, never knock it out. " + (self._quest_battle(call, name) or "")
+            lvl = f" (L{foe.level})" if foe else ""
+            return f"{name}{lvl} is in front of you — ONE-SHOT: catch it, never knock it out. " + (self._quest_battle(call, name) or "")
         return f"Stood next to {name} but the battle didn't start — face it at {tile} and press A, then call {call} again."
 
     def _legend_gate(self, name: str, species: int, fought: int, hidden: int):

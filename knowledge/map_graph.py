@@ -699,6 +699,22 @@ def _build_surf_graph():
 
 _R_SRF = _build_surf_graph()
 
+
+# Cerulean City's cave door is on a BEACH (x 0-3, y 12-15) that no land touches: x 4-6 is a lake and x 7 a wall (raw map.bin: elevation-1 metatiles). The lake is one body of water with Route 24's river,
+# across the seam between the two maps (Route 24's rows 32-39, x 4-8 meet Cerulean's rows 0-4, x 16-20 through the 'up' connection, offset 12). The generated regions model water inside ONE map only,
+# so the way in is hand data: surf from Route 24's west bank into its river (a node of its own), cross the seam on the water, and land on the beach (#436).
+CERULEAN, ROUTE_24 = (3, 3), (3, 43)
+_LAKE_24, _LAKE_CERULEAN = (3, 43, "~"), (3, 3, "~")
+
+
+def _patch_cerulean_lake() -> None:
+    _R_SRF.setdefault((3, 43, "0"), []).append((6, 39, _LAKE_24))                # walk_to a river tile at Route 24's south edge from the west bank: it surfs on the way
+    _R_CONN[_LAKE_24] = [("South", _LAKE_CERULEAN)]                                  # across the map seam on the water (the same connection the land path uses)
+    _R_SRF[_LAKE_CERULEAN] = [(3, 13, (3, 3, "4"))]                                  # onto the beach below the cave door
+
+
+_patch_cerulean_lake()
+
 # A sleeping Snorlax is an object, not a tile, so the generated region grids see its square as a wall and split the map in two (Route 12's pier at (14,70): the region
 # above it and the one below were joined only by the water beside the pier, i.e. "needs Surf"). Hand data, because it is a fact of the story, not of the tiles:
 # {map: [(region above, region below, (x, y) above the Snorlax, (x, y) below it)]}. The crossing is a "snorlax" step that knowledge.gates holds to the map's wake flag.
