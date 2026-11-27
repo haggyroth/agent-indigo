@@ -47,6 +47,9 @@ jobs:
       - name: Build the cffi binding
         # Point the builder at Homebrew's prefix (works on both ARM and Intel runners).
         run: MGBA_PREFIX="$(brew --prefix)" python -m game._mgba_build
+      - name: Build the two-core link module (prototype, #363)
+        # Compiles against libmgba's internal SIO lockstep headers: catches a Homebrew upgrade that moves them.
+        run: MGBA_PREFIX="$(brew --prefix)" python -m game._mgba_link_build
       - name: Pytest (binding symbol checks; ROM tests skip)
         # ROM is copyrighted and never present in CI, so load/framebuffer tests
         # skip; the symbol test confirms the binding compiled and imports.

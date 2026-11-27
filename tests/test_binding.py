@@ -84,3 +84,13 @@ def test_load_flags_keep_the_cartridge_save():
     assert save == 31
     assert not load & SAVEDATA and load & ~SAVEDATA & 31 == load            # nothing but known flags, SAVEDATA excluded
     assert "deliberately NOT restored" in src and "everything except screenshot" not in src
+
+
+def test_the_link_module_exports_the_lockstep_host_functions():
+    """#363: when game/_mgba_link is compiled and loads, it exposes the two-core link API; skipped (like the rest of this file) where it cannot load."""
+    try:
+        from game import _mgba_link as mod
+    except Exception as e:                                   # not built, or libmgba's own dependencies (ffmpeg) do not load on this machine
+        pytest.skip(f"link module unavailable: {e}")
+    for name in ("link_create", "link_attach", "link_run", "link_frame_counter", "link_destroy"):
+        assert hasattr(mod.lib, name), name
