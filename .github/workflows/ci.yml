@@ -41,7 +41,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install libmgba
-        run: brew install mgba
+        # libmgba's bottle links Homebrew's current ffmpeg; the runner image can carry an older one (libavcodec.62 missing → the binding compiled but never imported, so its tests
+        # were skipped without anyone noticing, #446). Upgrade the dependency first.
+        run: |
+          brew update
+          brew install mgba
+          brew upgrade ffmpeg || true
       - name: Install build + test dependencies
         run: pip install cffi setuptools -r requirements-test.txt
       - name: Build the cffi binding
@@ -53,4 +58,4 @@ jobs:
       - name: Pytest (binding symbol checks; ROM tests skip)
         # ROM is copyrighted and never present in CI, so load/framebuffer tests
         # skip; the symbol test confirms the binding compiled and imports.
-        run: python -m pytest tests/test_binding.py -v
+        run: python -m pytest tests/test_binding.py -v -rs
