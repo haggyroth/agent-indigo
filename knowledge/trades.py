@@ -1,7 +1,7 @@
 """The in-game NPC trades of Kanto (pure data; every row read from the decomp — src/data/ingame_trades.h and each trader's map script — #362).
 
 Each trader wants ONE species from your party and gives theirs (level-matched, a nickname and a different OT: it evolves normally, and the Pokémon obeys at any level). One trade each, ever
-(a FLAG_DID_*_TRADE). `dex_sources.TRADES` says who wants what; this adds where the NPC stands and the flag. The two Nidoran trades differ between FireRed and LeafGreen and are not here."""
+(a FLAG_DID_*_TRADE). `dex_sources.TRADES` says who wants what; this adds where the NPC stands and the flag. The two Nidoran trades differ between FireRed and LeafGreen: the rows here are LeafGreen's (Nidoran M for a Nidoran F, Nidorino for a Nidorina)."""
 
 # received species id -> (wanted species id, map (group, num), NPC tile, FLAG_DID_*_TRADE, where)
 NPC_TRADES: dict[int, tuple[int, tuple, tuple, int, str]] = {
@@ -12,6 +12,9 @@ NPC_TRADES: dict[int, tuple[int, tuple, tuple, int, str]] = {
     114: (48, (12, 2), (10, 5), 0x275, "Cinnabar Pokémon Lab, the lounge"),       # Tangela for a Venonat
     122: (63, (15, 1), (7, 2), 0x248, "Route 2 house (the scientist)"),           # Mr. Mime for an Abra
     124: (61, (7, 2), (2, 2), 0x24A, "Cerulean City, house 3"),                   # Jynx for a Poliwhirl
+    # LeafGreen's two Nidoran trades (FireRed's are the mirror image: its `ingame_trades.h` branches on the version)
+    32: (29, (1, 30), (5, 6), 0x24B, "the Underground Path's Route 5 entrance house"),      # MR. NIDO (Nidoran M) for a Nidoran F
+    33: (30, (22, 1), (7, 3), 0x251, "Route 11 gatehouse, 2F (east entrance)"),            # NINO (Nidorino) for a Nidorina
 }
 
 
