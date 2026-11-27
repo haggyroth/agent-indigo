@@ -18,6 +18,16 @@ python tools/live_suite.py -k articuno                              # a subset (
 python tools/live_suite.py --changed origin/main --post-status      # only if the diff touches guarded code; then publish the `live-suite` status for HEAD
 ```
 
+## Regenerating fixtures (no play-through, no model)
+```bash
+python tools/make_live_fixtures.py --list                  # recipes, and whether each fixture exists
+python tools/make_live_fixtures.py                         # make every missing one from work.sav
+python tools/make_live_fixtures.py --only vermilion --force
+```
+`tools/make_live_fixtures.py` boots from `work.sav`, stages the situation with the harness helpers (`fly_to`, `add_mon`, `patch_mon`, flags, badges; the agent's own `go_to` walks out of the starting
+building) and writes the state. A generated fixture matches its recipe's description, not necessarily the original play-through's exact party or tile; a recipe is a few lines in the tool.
+Currently: `threemon`, `vermilion`, `league_door`.
+
 ## Fixtures (`saves/live/`, gitignored — ROM-derived)
 | file | what it is |
 |---|---|

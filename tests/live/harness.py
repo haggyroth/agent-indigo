@@ -157,6 +157,19 @@ class Live:
         if level:
             m.write8(b + 0x54, level)
 
+    def add_mon(self, species: int, level: int, moves=(33, 0, 0, 0)) -> int:
+        """Stage: append a party member (a copy of slot 0's struct, re-typed): `species` at `level` with a growth-consistent exp total and `moves` (full PP). Returns its slot."""
+        from knowledge.growth import exp_for_level
+        from knowledge.growth_data import GROWTH_RATE
+        n = self.m.read8(Addr.PARTY_COUNT)
+        assert 1 <= n < 6, f"party of {n}: nothing to copy from, or full"
+        for i in range(100):
+            self.m.write8(Addr.PARTY_DATA + 100 * n + i, self.m.read8(Addr.PARTY_DATA + i))
+        self.patch_mon(n, moves=list(moves), pps=[35 if mv else 0 for mv in moves], level=level, exp=exp_for_level(GROWTH_RATE.get(species, 0), level), species=species)
+        self.m.write8(Addr.PARTY_COUNT, n + 1)
+        self.heal_hp()
+        return n
+
     def strong_lead(self, level: int = 60, exp: int = 211060) -> None:
         """Stage: make the lead (the fixture's Venusaur, Medium-Slow growth) a level-60 with a consistent exp total, so a long dungeon of L40+ wild
         Pokémon cannot out-level it — and, because it stays well under L61, no level-up recomputes the stats that boost_party() raised."""
