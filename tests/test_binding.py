@@ -87,8 +87,10 @@ def test_load_flags_keep_the_cartridge_save():
 
 
 def test_the_link_module_exports_the_lockstep_host_functions():
-    """#363: when game/_mgba_link is compiled (CI builds it), it exposes the two-core link API; skipped where only the main binding was built."""
-    import pytest
-    mod = pytest.importorskip("game._mgba_link")
+    """#363: when game/_mgba_link is compiled and loads, it exposes the two-core link API; skipped (like the rest of this file) where it cannot load."""
+    try:
+        from game import _mgba_link as mod
+    except Exception as e:                                   # not built, or libmgba's own dependencies (ffmpeg) do not load on this machine
+        pytest.skip(f"link module unavailable: {e}")
     for name in ("link_create", "link_attach", "link_run", "link_frame_counter", "link_destroy"):
         assert hasattr(mod.lib, name), name
