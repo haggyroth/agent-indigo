@@ -47,7 +47,7 @@ class TwoCoreLink:
     def run(self, frames: int, timeout_ms: int = 20000) -> None:
         """Advance both cores by `frames`. A timeout means the lockstep deadlocked (the threads are stopped and joined before this raises)."""
         if self._link.link_run(int(frames), int(timeout_ms)):
-            raise LinkError(f"the link stalled after {self.frame_counters()} frames (deadlock)")
+            raise LinkError(f"the link stalled after {self.frame_counters()} frames (deadlock; SIO modes {self.sio_modes()})")
 
     def frame_counters(self) -> list[int]:
         return [self._link.link_frame_counter(i) for i in (0, 1)]
