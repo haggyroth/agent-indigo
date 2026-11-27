@@ -202,6 +202,11 @@ BEATS: tuple[Beat, ...] = (
                 "A first detour then ends at Three Island's port (FLAG_SEVII_DETOUR_FINISHED). The Seagallop from Vermilion / Cinnabar then takes the Tri-Pass to One-Three Island.",
                 "Celio's real request waits for the National Pokédex (the National Dex beat): after the Hall of Fame, 60 species caught and this visit."),
          tip="Information only: the ferry scenes are not driven yet — go_to / fly_to work on the islands you have visited."),
+    Beat("berry_forest", "Berry Forest on Three Island: rescue Lostelle", "Three Island -> Bond Bridge -> Berry Forest (the Tri-Pass ferry)", needs=("sevii_one_island",), optional=True,
+         done=(("flag", 0x2A3),),                                                            # FLAG_RESCUED_LOSTELLE
+         steps=("Past the Bond Bridge the forest is a maze of trees with wild Pokémon and a few trainers; Lostelle (a little girl who ran off) is at the far end.",
+                "Talk to her: the rescue sets FLAG_RESCUED_LOSTELLE, she hands over an Iapapa Berry and the forest's hidden path home opens."),
+         tip="The forest's item balls are in the Three Island sweep (quest('sweep Two-Three Island')); a Repel keeps the trip short."),
     Beat("moltres", "Moltres on Mt. Ember's summit (legendary, appears once)", "One Island -> Mt. Ember -> the Summit", needs=("sevii_one_island",), driver="moltres", optional=True,
          done=(("flag", 0x2BD),),                                                            # FLAG_FOUGHT_MOLTRES
          steps=("A level 50 Fire / Flying static encounter at the top of Mt. Ember (Sevii). Talking to it starts the fight; it is gone for good once you win or catch it (FLAG_FOUGHT_MOLTRES), but if you run it stays.",
@@ -237,6 +242,16 @@ BEATS: tuple[Beat, ...] = (
          steps=("The Network Machine (Celio, One Island) makes the Cerulean Cave guard leave: the cave north-west of Cerulean City opens. Mewtwo, level 70, waits on B1F; it is gone for good once you win or catch it (FLAG_FOUGHT_MEWTWO).",
                 "Bring a full team, plenty of Hyper Potions / Revives and the Master Ball (Silph Co.) or a stack of Ultra Balls; save_state before the fight."),
          tip="The roaming beast the Network Machine starts is chosen by your starter: Raikou for Squirtle, Entei for Bulbasaur, Suicune for Charmander (level 50, roaming the Kanto routes); it runs, so Mean Look / a speed lead / a sleep move helps."),
+    Beat("icefall_cave", "Icefall Cave on Four Island: rescue Lorelei", "Four Island -> Icefall Cave (the Rainbow Pass ferry), through to its back chamber", needs=("sevii_ruby",), optional=True,
+         done=(("flag", 0x08E),),                                                            # FLAG_HIDE_RUIN_VALLEY_SCIENTIST: set by the rescue scene
+         steps=("Team Rocket grunts hold Lorelei in the cave's back chamber: reach it from the south entrance (the cave is a slippery ice maze with item balls on the way) and beat the three grunts.",
+                "Lorelei thanks you and goes home to Four Island; the scene sets VAR_MAP_SCENE_ICEFALL_CAVE_BACK."),
+         tip="The Icefall Cave sweep (quest('sweep Four Island / Icefall Cave')) lists its items; bring a healed team for the grunts."),
+    Beat("tanoby_ruins", "Tanoby Ruins on Seven Island: open the chambers (the Unown)", "Seven Island -> Sevault Canyon (the Tanoby Key) -> Tanoby Ruins", needs=("sevii_ruby",), optional=True,
+         done=(("flag", 0x849),),                                                            # FLAG_SYS_UNLOCKED_TANOBY_RUINS
+         steps=("In Sevault Canyon the Tanoby Key room is a switch puzzle: press the seven switches (the boulders move to their solved places) and take the Tanoby Key.",
+                "With the key the Tanoby Ruins' seven chambers open (Monean, Liptoo, Weepth, Dilford, Scufib, Rixy, Viapois): each holds a wall puzzle and a room of Unown forms — a long tail of Pokédex entries and the Hoenn-style Unown letters."),
+         tip="Unown is a Dex entry for a completion run; the chambers' wild forms are in the generated encounter data (quest('dex') lists where)."),
     Beat("trainer_tower", "Trainer Tower on Seven Island: win all four challenges", "Seven Island -> Trainer Tower (the Rainbow Pass ferry)", needs=("sevii_ruby",), driver="trainer_tower", optional=True,
          done=(("tower", 4),),                                                               # the Owner's prize for Single, Double, Knockout and Mixed
          steps=("A TIME ATTACK: from the reception counter up eight floors (up to three trainers each) to the Owner on the roof, against the clock (it stops at 59:59). Doing it with the Owner's prize in hand wins that challenge.",
@@ -257,6 +272,9 @@ SIDE_INFO = {
     "exp_share": ("the Exp. Share", (("owned", 50),)),
     "vs_seeker": ("the VS Seeker: rematches with beaten trainers (experience, money; every top team is an achievement)", ()),
     "trainer_tower": ("Trainer Tower: four challenge prizes (a Time Attack; 5 points each in the RetroAchievements set)", (("gameclear",),)),
+    "berry_forest": ("Lostelle's rescue: an Iapapa Berry and Berry Forest's wild Pokémon", ()),
+    "icefall_cave": ("Lorelei's rescue (and Icefall Cave's items and wild Pokémon)", (("gameclear",),)),
+    "tanoby_ruins": ("the Tanoby Ruins' chambers: the Unown and their Pokédex entries", (("gameclear",),)),
     "moltres": ("Moltres, a legendary (appears once)", ()),
     "mewtwo": ("Mewtwo, a legendary (appears once)", (("gameclear",), ("badges", 8))),
     "sevii_one_island": ("the Sevii Islands open (Tri-Pass, Celio, the island towns to fly to)", ()),
