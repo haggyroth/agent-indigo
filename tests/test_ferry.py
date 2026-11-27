@@ -24,3 +24,13 @@ def test_the_tri_pass_lists_and_the_map_to_island_rule():
     assert fy.island_of_map((3, 5)) == 0 and fy.island_of_map((36, 2)) == 5 and fy.island_of_map((3, 6)) is None
     assert fy.island_of_map((3, 45)) == 1 and fy.island_of_map((1, 101)) == 1 and fy.island_of_map((3, 17)) == 7 and fy.on_sevii((1, 101)) and not fy.on_sevii((1, 95))   # Kindle Road, Mt. Ember's summit, Seven Island, the Power Plant
     assert set(fy.HARBORS) == {1, 2, 3, 4, 5, 6, 7} and "Four Island" in fy.route_text(0, 5) and "Four" not in fy.route_text(0, 1)
+
+
+def test_cerulean_cave_is_routed_over_the_water_from_route_24():
+    """#436: the cave door sits on a beach only Surf from Route 24's river reaches; the strict graph now knows the way (it used to answer only through the optimistic fallback)."""
+    from knowledge.map_graph import route_to
+    route = route_to((3, 3, "0"), (1, 74), coarse=False)
+    assert route is not None
+    kinds = [(k, a) for k, a, _n in route]
+    assert kinds[:4] == [("connection", "North"), ("surf", (6, 39)), ("connection", "South"), ("surf", (3, 13))]        # up to Route 24, into the river, across the seam, onto the beach
+    assert ("warp", (1, 12)) in kinds and route[-1][2] == (1, 74)
