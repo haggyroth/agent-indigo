@@ -105,6 +105,11 @@ class Live:
         sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
         self.m.write16(sb1 + Addr.COINS_OFFSET, n ^ (self.r._encryption_key() & 0xFFFF))
 
+    def repel(self, steps: int = 250) -> None:
+        """Stage: VAR_REPEL_STEP_COUNT — wild Pokémon weaker than the lead stay away for `steps` steps, so a test about walking a dungeon is not decided by its encounter rate."""
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        self.m.write16(sb1 + Addr.VARS_OFFSET + 2 * (0x4020 - 0x4000), steps)
+
     def set_flag(self, n: int, on: bool = True) -> None:
         sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
         a = sb1 + Addr.FLAGS_OFFSET + (n >> 3)
