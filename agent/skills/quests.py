@@ -159,11 +159,13 @@ class QuestMixin:
             return self._trade_npc(" ".join(words[1:]))
         if words and words[0] in ("fossil", "fossils", "revive"):
             return self._fossil(" ".join(words[1:]))
+        if words and words[0] in ("safari", "safari_hunt", "hunt"):
+            return self._safari_hunt(" ".join(words[1:]))
         status = self._story()
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
         if not str(name or "").strip():
-            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had; quest('rematch') runs the VS Seeker loop (charge, use, fight the trainers it flags); quest('fame') shows the Fame Checker (Gossip Checker); quest('trade') lists the in-game NPC trades; quest('fossil') revives a fossil at Cinnabar."
+            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had; quest('rematch') runs the VS Seeker loop (charge, use, fight the trainers it flags); quest('fame') shows the Fame Checker (Gossip Checker); quest('trade') lists the in-game NPC trades; quest('fossil') revives a fossil at Cinnabar; quest('safari <species>') hunts one in the Safari Zone."
         head, *self._quest_opts = str(name).split()                 # 'new_game squirtle name=KYLE': the words after the name are the driver's options
         name = head
         beat = sb.resolve(name)
