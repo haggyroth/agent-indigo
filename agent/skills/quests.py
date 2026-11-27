@@ -163,6 +163,8 @@ class QuestMixin:
             return self._safari_hunt(" ".join(words[1:]))
         if words and words[0] in ("ferry", "seagallop", "sail"):
             return self._ferry(" ".join(words[1:]))
+        if words and words[0] in ("trainer_tower", "trainertower", "ttower"):
+            return self._trainer_tower(" ".join(words[1:]))
         status = self._story()
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
