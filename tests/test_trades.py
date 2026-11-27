@@ -13,10 +13,17 @@ from agent.lm_studio_client import AgentClient  # noqa: E402
 
 
 def test_the_table_matches_the_dex_plans_wanted_species_and_places():
-    assert set(NPC_TRADES) == set(TRADES)
+    assert set(TRADES) <= set(NPC_TRADES) and set(NPC_TRADES) - set(TRADES) == {32, 33}        # + LeafGreen's two Nidoran trades
     for got, (want, mp, npc, flag, where) in NPC_TRADES.items():
-        assert TRADES[got] == (want, where), got
+        if got in TRADES:
+            assert TRADES[got] == (want, where), got
         assert len(mp) == 2 and len(npc) == 2 and 0x240 <= flag <= 0x280
+
+
+def test_the_leafgreen_nidoran_trades_are_the_decomps():
+    """ingame_trades.h LEAFGREEN: NINO is a Nidorino asked of a Nidorina (Route 11 gate, flag 0x251), MR. NIDO a Nidoran M asked of a Nidoran F (Underground Path, 0x24B)."""
+    assert NPC_TRADES[33][:1] == (30,) and NPC_TRADES[33][3] == 0x251 and NPC_TRADES[32][:1] == (29,) and NPC_TRADES[32][3] == 0x24B
+    assert find("nidorino", SPECIES_NAMES) == 33 and find("nidoran m", SPECIES_NAMES) == 32 and find("nidoran", SPECIES_NAMES) == 32      # (only the male is offered, so "nidoran" is unambiguous)
 
 
 def test_names_resolve_loosely_and_ambiguity_is_refused():
