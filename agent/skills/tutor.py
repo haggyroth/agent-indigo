@@ -76,6 +76,14 @@ class TutorMixin:
             if forget_idx is None:
                 return (f"{who} knows four moves and none is safe to forget ({', '.join(before)}): call tutor('{name}', '{who}', forget='<move>').")
         dest = MAP_NAMES.get(tuple(tmap))
+        from knowledge import ferry as fy
+        isle = fy.island_of_map(tuple(tmap))
+        if isle and tuple(self.reader.read_current_map()) != tuple(tmap):
+            dest = dest or f"map:{tmap[0]},{tmap[1]}"                          # the Sevii interiors have no go_to name: the map tuple is the address
+            if fy.island_of_map(self.reader.read_current_map()) != isle:       # another island, or the mainland: take the Seagallop first
+                out = self._ferry(str(isle))
+                if not out.startswith("Sailed"):
+                    return f"Can't reach the {name} tutor ({place}): {out}"
         for _ in range(8):
             if tuple(self.reader.read_current_map()) == tuple(tmap):
                 break

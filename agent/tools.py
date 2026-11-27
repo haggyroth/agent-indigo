@@ -267,7 +267,7 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "tutor",
-        "description": "Learn a move from its Kanto tutor (free, once each; travels there): Counter, Softboiled, Seismic Toss, Rock Slide, Thunder Wave, Double-Edge, Substitute… `pokemon` optional.",
+        "description": "Learn a move from its Kanto or Sevii tutor (free, once each; travels there, by ferry to an island): Counter, Rock Slide, Explosion, Swords Dance, Substitute… `pokemon` optional.",
         "parameters": {"type": "object", "properties": {
             "move": {"type": "string"}, "pokemon": {"type": "string"}, "forget": {"type": "string"}}, "required": ["move"]},
     }},

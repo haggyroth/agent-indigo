@@ -407,5 +407,8 @@ TUTORS: dict[str, tuple] = {
     'thunder_wave': ('Thunder Wave', 11, (1, 48), (10, 4), 0x2c1, 'Silph Co. 2F', ''),
     'double_edge': ('Double Edge', 4, (1, 40), (40, 9), 0x2c0, 'Victory Road 2F', ''),
     'dream_eater': ('Dream Eater', 10, (3, 1), (8, 26), 0x2c6, 'Viridian City', ''),
+    'explosion': ('Explosion', 12, (1, 97), (29, 45), 0x2c3, 'Mt. Ember exterior (One Island)', 'the Hiker beside the south entrance; needs the Tri-Pass or Rainbow Pass for the Seagallop'),
+    'body_slam': ('Body Slam', 3, (35, 3), (8, 3), 0x2ce, 'Four Island (the house by the Day Care)', 'needs the Rainbow Pass for the Seagallop'),
+    'swords_dance': ('Swords Dance', 1, (3, 17), (7, 18), 0x2c9, 'Seven Island', 'needs the Rainbow Pass for the Seagallop'),
     'mimic': ('Mimic', 7, (14, 1), (9, 6), 0x2cd, "Saffron Copycat's House 2F", 'needs a Poké Doll in the bag'),
 }

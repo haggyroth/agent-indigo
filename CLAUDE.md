@@ -220,7 +220,7 @@ elsewhere). The table below is generated — `python tools/gen_tool_docs.py` —
 | `forget_move` | overworld | pokemon, move, force? | Delete a move at the Move Deleter in Fuchsia (travels there): the only way to remove an HM move. |
 | `rename_pokemon` | overworld | pokemon, nickname | Change a Pokémon's nickname at the Name Rater in Lavender Town (travels there). |
 | `daycare` | overworld | action, pokemon? | Route 5 Day Care (travels there): action='deposit' leaves one Pokémon (it gains 1 exp per step you walk; another must be able to fight); 'withdraw' takes it back for ¥100 + ¥100 per level gained. |
-| `tutor` | overworld | move, pokemon?, forget? | Learn a move from its Kanto tutor (free, once each; travels there): Counter, Softboiled, Seismic Toss, Rock Slide, Thunder Wave, Double-Edge, Substitute… `pokemon` optional. |
+| `tutor` | overworld | move, pokemon?, forget? | Learn a move from its Kanto or Sevii tutor (free, once each; travels there, by ferry to an island): Counter, Rock Slide, Explosion, Swords Dance, Substitute… `pokemon` optional. |
 | `fish` | overworld | casts? | Cast your best rod at the nearest water (walks to a shore) up to `casts` times; a wild Pokémon on the hook becomes a battle. |
 | `fly_to` | overworld | town | Fly to a visited town (needs a Pokémon that knows Fly + the Thunder Badge, outdoors): Pallet, Viridian, Pewter, Cerulean, Lavender, Vermilion, Celadon, Fuchsia, Cinnabar, Saffron, Indigo Plateau. |
 | `use_hm` | overworld | move | Use a field move: Surf (at the nearest shore, then walk_to / go_to_map cross water), Cut (nearest tree), Rock Smash, Strength (then walk into the boulder), Flash (lights a cave). |
