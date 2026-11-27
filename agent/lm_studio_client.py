@@ -41,6 +41,7 @@ from agent.skills.silph import SilphMixin
 from agent.skills.victory import VictoryMixin
 from agent.skills.tower import TowerMixin
 from agent.skills.quests import QuestMixin
+from agent.skills.ttower import TrainerTowerMixin
 from agent.skills.ferry import FerryMixin
 from agent.skills.safari import SafariMixin
 from agent.skills.fossil import FossilMixin
@@ -64,7 +65,7 @@ if TYPE_CHECKING:
     from game.mgba_core import NativeMGBAClient
 
 
-class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, NewGameMixin, ServicesMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, FerryMixin, SafariMixin, FossilMixin, TradeMixin, FameMixin, RematchMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, NewGameMixin, ServicesMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, TrainerTowerMixin, FerryMixin, SafariMixin, FossilMixin, TradeMixin, FameMixin, RematchMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: "NativeMGBAClient", reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)

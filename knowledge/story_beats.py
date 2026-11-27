@@ -237,12 +237,12 @@ BEATS: tuple[Beat, ...] = (
          steps=("The Network Machine (Celio, One Island) makes the Cerulean Cave guard leave: the cave north-west of Cerulean City opens. Mewtwo, level 70, waits on B1F; it is gone for good once you win or catch it (FLAG_FOUGHT_MEWTWO).",
                 "Bring a full team, plenty of Hyper Potions / Revives and the Master Ball (Silph Co.) or a stack of Ultra Balls; save_state before the fight."),
          tip="The roaming beast the Network Machine starts is chosen by your starter: Raikou for Squirtle, Entei for Bulbasaur, Suicune for Charmander (level 50, roaming the Kanto routes); it runs, so Mean Look / a speed lead / a sleep move helps."),
-    Beat("trainer_tower", "Trainer Tower on Seven Island: win all four challenges", "Seven Island -> Trainer Tower (the Rainbow Pass ferry)", needs=("sevii_ruby",), optional=True,
+    Beat("trainer_tower", "Trainer Tower on Seven Island: win all four challenges", "Seven Island -> Trainer Tower (the Rainbow Pass ferry)", needs=("sevii_ruby",), driver="trainer_tower", optional=True,
          done=(("tower", 4),),                                                               # the Owner's prize for Single, Double, Knockout and Mixed
          steps=("A TIME ATTACK: from the reception counter up eight floors (up to three trainers each) to the Owner on the roof, against the clock (it stops at 59:59). Doing it with the Owner's prize in hand wins that challenge.",
                 "Four challenge types — Single, Double, Knockout and Mixed — each its own record and its own prize (SaveBlock1 trainerTower[0..3]; the progress line counts the prizes received).",
                 "The trainers' Pokémon are set to your party's highest level (so a stronger team does not make it easier) and winning gives no Exp or money; a loss sends you back to the lobby."),
-         tip="Information only: the lobby counter, the clock and the floor walks are not driven. Bring a deep, healed team: there is no Center on the way."),
+         tip="quest('trainer_tower single|double|knockout|mixed') runs one challenge (every battle is yours to play; there is no fleeing). Bring a deep, healed team: there is no Center on the way."),
 )
 # Gate flags beyond the badges/owned counts, with the reason shown while they are unmet (agent.story.side_ctx reads exactly these).
 FLAG_GATES = {0x89B: "needs a visit to One Island (the Sevii Islands) first"}      # FLAG_WORLD_MAP_ONE_ISLAND
