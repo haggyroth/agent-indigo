@@ -124,6 +124,19 @@ def test_an_item_in_a_sealed_pocket_is_tried_again_after_entering_it_once_and_ne
     assert len(calls) == 4 and out2.count("couldn't reach the item") == 4                    # tried once per ball, then skipped with the note
 
 
+def test_a_wild_battle_that_stops_the_walk_is_handed_back_not_recorded_as_unreachable():
+    """Mt. Moon (#428): a Zubat in the way ended the walk, the ball was marked 'couldn't reach' and skipped for the whole call. A battle is the model's to play; the ball stays open."""
+    g = Game(beaten=FOREST["trainers"])
+    c = _client(g)
+
+    def interrupted(x, y):
+        g.ctx = GameContext.IN_BATTLE
+        return "", f"couldn't reach the item at ({x},{y})"
+    c._pick_ball = interrupted
+    out = c._sweep("Viridian Forest")
+    assert "battle started" in out and "couldn't reach" not in out and "Skipped" not in out
+
+
 def test_a_trainer_who_does_not_fight_is_skipped_with_a_note():
     g = Game(taken=FOREST["items"])
     out = _client(g, battle_on_trainer=False)._sweep("Viridian Forest")
