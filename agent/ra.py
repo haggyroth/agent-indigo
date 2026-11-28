@@ -20,7 +20,19 @@ def make_check(reader, ltm):
         if kind == "trainer":
             return any(flag(f) for f in value)
         if kind == "caught":
-            return bool(reader.read_dex_owned(value))
+            return bool(reader.read_dex_owned_national(value))
+        if kind == "caught_any":
+            return any(reader.read_dex_owned_national(n) for n in value)
+        if kind == "dex_national":                       # at least this many national dex numbers registered as caught
+            return (reader.read_dex_owned_count_national() or 0) >= value
+        if kind == "stat":                               # a game stat reached a value: (constants/game_stat.h index, minimum)
+            index, least = value
+            return (reader.read_game_stat(index) or 0) >= least
+        if kind == "fame_full":                          # the Fame Checker holds all 6 flavor texts of all 16 people
+            return all(len(texts) == 6 for texts in reader.read_fame_checker().values())
+        if kind == "rematch_top":                        # every VS Seeker ladder is at its top party
+            from knowledge import rematches
+            return rematches.status(flag)["at_top"] == len(rematches.REMATCHES)
         if kind == "tower":
             if tower is None:
                 tower = reader.read_trainer_tower()

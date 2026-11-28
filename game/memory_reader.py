@@ -638,6 +638,31 @@ class LeafGreenReader:
         n = species_id - 1
         return bool(self.client.read8(sb2 + Addr.DEX_OWNED_OFFSET + (n >> 3)) >> (n & 7) & 1)
 
+    def read_dex_owned_national(self, number: int) -> bool | None:
+        """Is national dex number `number` (1-386) registered as CAUGHT? Internal species id == national number up to 251 (Johto's Raikou, Entei, Suicune are 243-245). None when unreadable."""
+        if not (1 <= number <= Addr.DEX_NATIONAL):
+            return None
+        sb2 = self.client.read32(Addr.SAVEBLOCK2_PTR)
+        if not self._valid_ewram_ptr(sb2):
+            return None
+        n = number - 1
+        return bool(self.client.read8(sb2 + Addr.DEX_OWNED_OFFSET + (n >> 3)) >> (n & 7) & 1)
+
+    def read_dex_owned_count_national(self) -> int | None:
+        """How many of the 386 national dex numbers are registered as CAUGHT (None when unreadable)."""
+        sb2 = self.client.read32(Addr.SAVEBLOCK2_PTR)
+        if not self._valid_ewram_ptr(sb2):
+            return None
+        raw = self.client.read_range(sb2 + Addr.DEX_OWNED_OFFSET, 49)                # 386 bits = 48 bytes + 2 bits
+        return sum(bin(b).count("1") for b in raw[:48]) + bin(raw[48] & 0x03).count("1")
+
+    def read_game_stat(self, index: int) -> int | None:
+        """gSaveBlock1.gameStats[index] (constants/game_stat.h; XOR'd with the encryption key like money). None when unreadable."""
+        sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)
+        if not self._valid_ewram_ptr(sb1) or not (0 <= index < 64):
+            return None
+        return self.client.read32(sb1 + Addr.GAME_STATS_OFFSET + 4 * index) ^ self._encryption_key()
+
     def read_flag(self, n: int) -> bool:
         """A gSaveBlock1 event/system flag (relocation-safe)."""
         sb1 = self.client.read32(Addr.SAVEBLOCK1_PTR)

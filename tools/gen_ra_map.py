@@ -9,7 +9,9 @@ trainer / item / species NAME below is resolved to its number from the decomp's 
 Spec kinds in CURATED (an achievement is unlocked when ALL of its specs hold):
   ("flag", NAME|int)              a game flag is set            ("trainer", (NAME, ...))     any of these trainers is beaten
   ("beat", key)                   a story beat is done          ("badge", bit)               a gym badge
-  ("item", NAME)                  a key item is in the bag      ("caught", NAME)             the species is caught (Kanto dex bits only)
+  ("item", NAME)                  a key item is in the bag      ("caught", NAME)             the species is caught (national dex number <= 251: internal id == national number)
+  ("caught_any", (NAME, ...))     any of these species is caught    ("dex_national", n)     at least n of the 386 national dex numbers are caught
+  ("stat", (STAT, n))             a game stat (constants/game_stat.h) is at least n     ("fame_full", 1)   all 96 Fame Checker entries     ("rematch_top", 1)   every VS Seeker ladder at its top
   ("sweep", area)                 every trainer + item ball of a sweep area (knowledge/area_sweeps)     ("sweep_trainers", area)   only its trainers      ("sweep_items", area)   only its items
   ("tower", index)                a Trainer Tower challenge's prize was received (0 single, 1 double, 2 knockout, 3 mixed)
 PARTIAL = checks that are necessary but may not be sufficient (the achievement can need more than we can read); MANUAL = no check yet, with the reason."""
@@ -138,6 +140,12 @@ CURATED: dict[int, tuple] = {
     541988: tuple(("flag", f"FLAG_TUTOR_{t}") for t in ("DOUBLE_EDGE", "THUNDER_WAVE", "ROCK_SLIDE", "EXPLOSION", "MEGA_PUNCH", "MEGA_KICK", "DREAM_EATER", "SOFT_BOILED", "SUBSTITUTE",
                                                          "SWORDS_DANCE", "SEISMIC_TOSS", "COUNTER", "METRONOME", "MIMIC", "BODY_SLAM")),
     541903: (("flag", "FLAG_SYS_MYSTERY_GIFT_ENABLED"),),
+    541985: (("fame_full", 1),),
+    541992: (("rematch_top", 1),),
+    34802: (("stat", ("GAME_STAT_ENTERED_HOF", 2)),),                  # the Hall of Fame entered a second time
+    34812: (("flag", "FLAG_HIDE_LOST_CAVE_SELPHY"),),                  # set by the 'take me home' scene in Lost Cave Room 10
+    34808: (("caught_any", ("RAIKOU", "ENTEI", "SUICUNE")),),
+    34809: (("dex_national", 171),),
 }
 
 # Necessary but maybe not sufficient: the check can be true before the achievement unlocks (shown as "probably", never as a sure unlock).
@@ -147,6 +155,7 @@ PARTIAL = {
     541954: "the Dojo's trainers are not a sweep area; only the Hitmon gift is read",
     541988: "the 15 Kanto/Sevii tutors; the three Sevii starter-move tutors may count too",
     541963: "Route 23 is not in the Victory Road sweep area",
+    34809: "171 caught is necessary, but trades and the FireRed exclusives count towards the Pokédex yet not towards the achievement",
 }
 for _area_ach in (541914, 541919, 541938, 541939, 541946, 541948, 541949, 541950, 541952, 541960, 541968, 541971, 541978, 541979, 541980):
     PARTIAL.setdefault(_area_ach, "hidden items (an Itemfinder finds them) may count; the sweep reads trainers + item balls")
@@ -158,12 +167,6 @@ MANUAL = {
     541986: "the Trainer Card machine's state is not a flag we read yet",
     541989: "triple 7s on the slots: a one-off event with no flag",
     541972: "renewable berries in Berry Forest: no flag",
-    541985: "the Fame Checker's entries are not read yet",
-    541992: "VS Seeker rematch levels: needs the rematch records",
-    34802: "the second Champion title (the Hall of Fame twice) has no flag",
-    34812: "Selphy's rescue flag is not verified",
-    34808: "the roaming beasts are beyond the Kanto Pokédex bits the reader sees",
-    34809: "171 species need the Sevii dex bits (> 151), which the reader does not see",
 }
 
 
@@ -203,6 +206,7 @@ def main():
     trainers = resolve_defines(opponents)
     items = resolve_defines(open(f"{pf}/include/constants/items.h").read())
     species = resolve_defines(open(f"{pf}/include/constants/species.h").read())
+    stats = resolve_defines(open(f"{pf}/include/constants/game_stat.h").read())
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from knowledge.area_sweeps import AREAS
     from knowledge.ra_set import ACHIEVEMENTS
@@ -232,6 +236,14 @@ def main():
                 rows.append(("item", num(items, a, "item")))
             elif kind == "caught":
                 rows.append(("caught", num(species, "SPECIES_" + a, "species")))
+            elif kind == "caught_any":
+                rows.append(("caught_any", tuple(num(species, "SPECIES_" + n, "species") for n in a)))
+            elif kind == "dex_national":
+                rows.append(("dex_national", a))
+            elif kind == "stat":
+                rows.append(("stat", (num(stats, a[0], "game stat"), a[1])))
+            elif kind in ("fame_full", "rematch_top"):
+                rows.append((kind, 1))
             elif kind in ("sweep", "sweep_trainers", "sweep_items"):
                 if a not in AREAS:
                     sys.exit(f"unknown sweep area {a!r}")

@@ -55,10 +55,12 @@ CHECKS: dict[int, tuple] = {
     541973: (('flag', 2112),),
     541975: (('flag', 733),),
     34811: (('beat', 'icefall_cave'),),
+    34812: (('flag', 147),),
     34813: (('flag', 725),),
     541984: (('beat', 'network_machine'),),
     541991: (('beat', 'sevii_sapphire'),),
     34807: (('caught', 150),),
+    34802: (('stat', (10, 2)),),
     34814: (('tower', 0),),
     34815: (('tower', 1),),
     34816: (('tower', 2),),
@@ -67,6 +69,8 @@ CHECKS: dict[int, tuple] = {
     34806: (('caught', 144),),
     34805: (('caught', 145),),
     34804: (('caught', 146),),
+    34808: (('caught_any', (243, 244, 245)),),
+    34809: (('dex_national', 171),),
     541905: (('flag', 585),),
     541911: (('flag', 589),),
     541912: (('flag', 584),),
@@ -118,12 +122,15 @@ CHECKS: dict[int, tuple] = {
     541979: (('sweep', 'Six Island region'),),
     541980: (('sweep', 'Seven Island region'),),
     541987: (('sweep_items', 'Cerulean Cave'),),
+    541985: (('fame_full', 1),),
     541988: (('flag', 704), ('flag', 705), ('flag', 706), ('flag', 707), ('flag', 708), ('flag', 709), ('flag', 710), ('flag', 711), ('flag', 712), ('flag', 713), ('flag', 714), ('flag', 715), ('flag', 716), ('flag', 717), ('flag', 718)),
+    541992: (('rematch_top', 1),),
     541903: (('flag', 2105),),
 }
 
 # achievement id -> why the check can be true before the achievement unlocks
 PARTIAL: dict[int, str] = {
+    34809: '171 caught is necessary, but trades and the FireRed exclusives count towards the Pokédex yet not towards the achievement',
     541914: 'hidden items (an Itemfinder finds them) may count; the sweep reads trainers + item balls',
     541919: 'hidden items (an Itemfinder finds them) may count; the sweep reads trainers + item balls',
     541926: 'the flag says the Tea was obtained, not that it was handed to the guards',
@@ -153,14 +160,8 @@ PARTIAL: dict[int, str] = {
 
 # achievement id -> why it has no check yet
 MANUAL: dict[int, str] = {
-    34802: 'the second Champion title (the Hall of Fame twice) has no flag',
-    34808: 'the roaming beasts are beyond the Kanto Pokédex bits the reader sees',
-    34809: '171 species need the Sevii dex bits (> 151), which the reader does not see',
-    34812: "Selphy's rescue flag is not verified",
     541972: 'renewable berries in Berry Forest: no flag',
     541983: "needs the 'Selphy asked for' Pokémon — the quiz answer is not a flag we know",
-    541985: "the Fame Checker's entries are not read yet",
     541986: "the Trainer Card machine's state is not a flag we read yet",
     541989: 'triple 7s on the slots: a one-off event with no flag',
-    541992: 'VS Seeker rematch levels: needs the rematch records',
 }
