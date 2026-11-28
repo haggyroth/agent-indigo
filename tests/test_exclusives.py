@@ -7,7 +7,7 @@ from knowledge.exclusives import FIRERED_ONLY
 
 
 def test_the_exclusives_are_the_seven_base_forms():
-    assert sorted(SPECIES_NAMES[s].title() for s in FIRERED_ONLY) == ["Electabuzz", "Ekans", "Growlithe", "Oddish", "Psyduck", "Scyther", "Shellder"]
+    assert sorted(SPECIES_NAMES[s].title() for s in FIRERED_ONLY) == ["Ekans", "Electabuzz", "Growlithe", "Oddish", "Psyduck", "Scyther", "Shellder"]
     assert not set(FIRERED_ONLY) & set(EVOLVES_FROM)                       # an evolved form is evolved, not traded for
     assert all(1 <= lv <= 100 and where for lv, where in FIRERED_ONLY.values())
 
