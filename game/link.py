@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import os
 
-from game.mgba_core import _mask
-
-A, UP, DOWN, LEFT, RIGHT = (_mask([b]) for b in ("A", "Up", "Down", "Left", "Right"))
+# GBA key bits (the same masks as game/mgba_core.py; not imported from it so this module loads where the compiled binding is absent, e.g. CI's unit-test jobs).
+A, RIGHT, LEFT, UP, DOWN = 1 << 0, 1 << 4, 1 << 5, 1 << 6, 1 << 7
 TRADE_CENTER = (0, 1)
 CB2_OVERWORLD = 0x080565B5                       # gMain.callback2 on the free field
 CB2_TRADE_SCREEN = 0x0804D639                    # gMain.callback2 while the "Choose a POKéMON." trade screen is up (this LeafGreen build)
