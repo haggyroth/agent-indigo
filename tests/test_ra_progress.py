@@ -1,4 +1,6 @@
 """The RetroAchievements map and the local evaluator (#358) — pure."""
+import pytest
+
 from knowledge import ra_progress
 from knowledge.ra_map import CHECKS, MANUAL, PARTIAL
 from knowledge.ra_set import ACHIEVEMENTS
@@ -67,3 +69,36 @@ def test_open_ones_lists_missables_first_and_leaves_out_the_done():
     assert all(r[5] != "yes" for r in rows)
     first_non_missable = next(i for i, r in enumerate(rows) if r[4] != "missable")
     assert all(r[4] != "missable" for r in rows[first_non_missable:])
+
+
+def _tick(flags, achievements, points, run=None):
+    from types import SimpleNamespace
+    reader = SimpleNamespace(read_flag=lambda n: n in flags, read_key_items=lambda: [], read_badges=lambda: (0, 0), read_dex_owned=lambda s: False,
+                             read_trainer_tower=lambda: [{"prize": False}] * 4)
+    ltm = SimpleNamespace(data={"achievements": achievements, "achievement_points": points, "milestones": []})
+    return SimpleNamespace(run=run or SimpleNamespace(achv_sig=None, achv_seen=None), reader=reader, ltm=ltm)
+
+
+def test_the_achievement_line_shows_the_baseline_once_then_only_unlocks():
+    pytest.importorskip("openai")                                                   # agent.observation imports the LLM client; CI's unit jobs have no openai
+    from agent import observation as obs
+    t = _tick({0x829}, 1, 1)                                                       # the Pokédex is in hand
+    first = obs._achievement_line(t)
+    assert len(first) == 1 and first[0].startswith("Achievements 1/128") and "quest('achievements')" in first[0]
+    assert obs._achievement_line(t) == []                                          # unchanged: silent
+    unlocked = _tick({0x829, 0x240}, 2, 2, run=t.run)                              # + FLAG_GOT_OLD_ROD: 'A Stick, Some String, and Some Glue to Hold It Together'
+    line = obs._achievement_line(unlocked)
+    assert len(line) == 1 and line[0].startswith("★ Achievement unlocked") and "Some Glue to Hold It Together" in line[0] and "(+1)" in line[0] and "2/128" in line[0]
+    assert obs._achievement_line(unlocked) == []
+    drifted = _tick({0x829, 0x240}, 3, 3, run=t.run)                               # the journal moved but nothing new is held: no line
+    assert obs._achievement_line(drifted) == []
+
+
+def test_the_achievement_line_names_at_most_three_unlocks():
+    pytest.importorskip("openai")                                                   # agent.observation imports the LLM client; CI's unit jobs have no openai
+    from agent import observation as obs
+    t = _tick({0x829}, 1, 1)
+    obs._achievement_line(t)
+    many = _tick({0x829, 0x240, 0x244, 0x255, 0x241, 0x271}, 6, 6, run=t.run)      # Old / Good / Super Rod, the Bike Voucher, the Bicycle
+    line = obs._achievement_line(many)[0]
+    assert line.count("(+") == 3 and "and 2 more" in line

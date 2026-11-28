@@ -184,6 +184,28 @@ def _post_game_line(t: Tick) -> list[str]:
     return [completion.post_game_text(ctx.owned, national, status, ctx)]
 
 
+def _achievement_line(t: Tick) -> list[str]:
+    """RetroAchievements of the LeafGreen set (local tracking, #358): the progress once per run, then only the unlocks as they happen — shown when the journal's count changes (main refreshes it every
+    few ticks), never repeated. quest('achievements') lists what is left and what can still be lost."""
+    d = t.ltm.data
+    sig = (int(d.get("achievements", 0) or 0), int(d.get("achievement_points", 0) or 0))
+    if sig == t.run.achv_sig:
+        return []
+    from agent import ra
+    from knowledge import ra_progress
+    from knowledge.ra_set import ACHIEVEMENTS
+    states = ra.states(t.reader, t.ltm)
+    yes = frozenset(aid for aid, st in states.items() if st == "yes")
+    seen, t.run.achv_sig, t.run.achv_seen = t.run.achv_seen, sig, yes
+    if seen is None:                                                  # the first look of this run: the baseline
+        return [f"{ra_progress.line(states)} quest('achievements') lists what is left and what can still be lost."]
+    new = [(title, pts) for aid, title, _d, pts, _k in ACHIEVEMENTS if aid in yes and aid not in seen]
+    if not new:
+        return []
+    shown = ", ".join(f"'{title}' (+{pts})" for title, pts in new[:3]) + (f" and {len(new) - 3} more" if len(new) > 3 else "")
+    return [f"★ Achievement unlocked (local tracking): {shown}. {ra_progress.line(states)}"]
+
+
 def _rematch_line(t: Tick) -> list[str]:
     """Rematch progress once the VS Seeker is owned (knowledge.rematches): shown when the counts change, silent otherwise and before the item exists."""
     from knowledge import rematches
@@ -283,6 +305,7 @@ def _readiness_and_bag(t: Tick) -> list[str]:
         out.extend(_post_game_line(t))
     if t.overworld and not opening:
         out.extend(_sweep_line(t))
+        out.extend(_safe("achievements", lambda: _achievement_line(t), []))
     if tms is not None:                  # shown when it changes, then every 30 ticks — the model forgot TMs picked up long ago
         sig = (tuple(tms), tuple((i, q) for i, q in items if i in BAG_SIG_ITEMS),
                tuple(tuple(p.move_names) for p in party), tuple(p.held_item for p in party))

@@ -41,3 +41,21 @@ def test_the_journal_count_is_refreshed_from_the_real_game(live, tmp_path):
     main._apply_progress(run, SimpleNamespace(badges=8, party_count=6, party=[], badge_bits=255), SimpleNamespace(badges_changed=False), live.r, ltm)
     assert ltm.data["achievements"] >= 9 and ltm.data["achievement_points"] >= 9 * 10 - 5, ltm.data          # eight badges + The Real Champion at least
     assert goals.achievements_at_least(9)(None, ltm) and not goals.achievements_at_least(129)(None, ltm)
+
+
+def test_the_observation_shows_the_achievement_baseline_once(live):
+    """#358: on the free field after the Pokédex the observation carries the RA progress once (the baseline), and the next tick of the same run stays silent."""
+    import copy
+
+    import main
+    from agent.observation import build_observation
+    live.load("post_misty")
+    run = main._RunState()
+
+    def obs():
+        s = live.r.read_state()
+        return build_observation(state=s, diff=live.r.diff(None, s), in_battle=False, run=run, reader=live.r, tilemap=live.rt.tilemap,
+                                 ltm=copy.deepcopy(live.rt.ltm), stm=copy.deepcopy(live.rt.stm), map_key=(s.map_bank, s.map_id))
+    first = obs()
+    assert "Achievements " in first and "/128" in first and "quest('achievements')" in first, first[-600:]
+    assert "Achievements " not in obs()                                    # the same run, nothing new: silent

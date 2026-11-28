@@ -410,6 +410,8 @@ class _RunState:
     prev_dex_owned: Optional[int] = None
     rematch_sig: Optional[tuple] = None    # the VS Seeker rematch line as last shown (agent.observation._rematch_line)
     sweep_sig: Optional[tuple] = None      # the area-progress line as last shown (agent.observation._sweep_line)
+    achv_sig: Optional[tuple] = None       # (achievements, points) as last shown (agent.observation._achievement_line)
+    achv_seen: Optional[frozenset] = None  # the achievements held when that line last looked: a new one is named when it appears
     bag_sig: Optional[tuple] = None
     sidequest_sig: Optional[tuple] = None  # (open side quests, locked count) as last shown: the digest line only reappears when it changes
     area_shown: Optional[tuple] = None    # the map whose area guide was last shown (see agent.observation._area)
