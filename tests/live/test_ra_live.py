@@ -59,3 +59,19 @@ def test_the_observation_shows_the_achievement_baseline_once(live):
     first = obs()
     assert "Achievements " in first and "/128" in first and "quest('achievements')" in first, first[-600:]
     assert "Achievements " not in obs()                                    # the same run, nothing new: silent
+
+
+def test_the_game_stat_and_national_dex_readers_and_the_new_checks_on_real_fixtures(live):
+    """#358: the Hall-of-Fame counter (gameStats[10], XOR'd with the encryption key), the national dex bits and the checks built on them read sensibly from real states."""
+    from game.constants import Addr
+    live.load("post_misty")
+    assert live.r.read_game_stat(Addr.GAME_STAT_ENTERED_HOF) == 0
+    live.load("post_hof")                                                # the Hall of Fame entered once
+    assert live.r.read_game_stat(Addr.GAME_STAT_ENTERED_HOF) == 1
+    assert live.r.read_dex_owned_count_national() == live.r.read_pokedex()[0]          # 21 caught: all Kanto, none of Johto's
+    assert live.r.read_dex_owned_national(243) is False                  # no Raikou
+    st = _states(live)
+    assert st[34797] == "yes"                                            # champion once ...
+    assert st[34802] == "no"                                             # ... not twice
+    assert st[34808] == "no" and st[34812] == "no" and st[541985] == "no"        # no beasts, Selphy not rescued, an empty Fame Checker
+    assert st[34809] == "no"                                             # 21 of 171

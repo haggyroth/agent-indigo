@@ -321,6 +321,9 @@ class Addr:
     STORAGE_CURSOR_POS = 0x02039821
     MB_PC              = 0x83           # metatile behavior of the Pokémon Center PC tile
     SAVEBLOCK2_PTR     = 0x0300500C     # gSaveBlock2Ptr (pokedex lives at +0x18)
+    GAME_STATS_OFFSET  = 0x1200         # SaveBlock1: u32 gameStats[64], each XOR'd with SaveBlock2's encryptionKey (GetGameStat)
+    GAME_STAT_ENTERED_HOF = 10          # constants/game_stat.h: how many times the Hall of Fame was entered
+    DEX_NATIONAL       = 386            # national dex numbers: bit n-1 of the owned array (internal id == national number up to 251)
     DEX_OWNED_OFFSET   = 0x28           # SaveBlock2 + 0x18 + 0x10 : u8 owned[52]
     DEX_SEEN_OFFSET    = 0x5C           # SaveBlock2 + 0x18 + 0x44 : u8 seen[52]
     FLAGS_OFFSET       = 0xEE0          # + [SAVEBLOCK1_PTR]; flag n = byte n>>3, bit n&7

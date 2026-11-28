@@ -7,7 +7,7 @@ from knowledge.ra_set import ACHIEVEMENTS
 from knowledge.area_sweeps import AREAS
 from knowledge.story_beats import BY_KEY
 
-KINDS = {"flag", "trainer", "item", "caught", "sweep", "sweep_trainers", "sweep_items", "beat", "badge", "tower"}
+KINDS = {"flag", "trainer", "item", "caught", "caught_any", "dex_national", "stat", "fame_full", "rematch_top", "sweep", "sweep_trainers", "sweep_items", "beat", "badge", "tower"}
 
 
 def test_every_achievement_is_mapped_or_manual_never_both():
@@ -23,6 +23,8 @@ def test_every_spec_is_well_formed_and_points_at_something_real():
             assert kind in KINDS, (aid, kind)
             if kind in ("flag", "item", "caught"):
                 assert isinstance(value, int) and value > 0
+            elif kind in ("fame_full", "rematch_top"):
+                assert value == 1
             elif kind == "trainer":
                 assert value and all(isinstance(f, int) and 0x500 <= f <= 0x7FF for f in value), (aid, value)       # a trainer defeat flag
             elif kind.startswith("sweep"):
@@ -34,7 +36,13 @@ def test_every_spec_is_well_formed_and_points_at_something_real():
             elif kind == "tower":
                 assert 0 <= value <= 3
             if kind == "caught":
-                assert value <= 151                                          # the reader sees only the Kanto dex bits
+                assert value <= 251                                          # internal species id == national dex number up to 251
+            if kind == "caught_any":
+                assert value and all(1 <= n <= 251 for n in value)
+            if kind == "dex_national":
+                assert 1 <= value <= 386
+            if kind == "stat":
+                assert 0 <= value[0] < 64 and value[1] >= 1
 
 
 def test_a_known_flag_matches_the_decomp_value():
@@ -44,9 +52,9 @@ def test_a_known_flag_matches_the_decomp_value():
 
 def test_evaluate_needs_every_spec_and_reports_partial_manual_and_errors():
     everything = ra_progress.evaluate(lambda spec: True)
-    assert everything[541899] == "yes" and everything[541937] == "probably" and everything[541985] == "unknown"
+    assert everything[541899] == "yes" and everything[541937] == "probably" and everything[541983] == "unknown"
     nothing = ra_progress.evaluate(lambda spec: False)
-    assert nothing[541899] == "no" and nothing[541985] == "unknown"
+    assert nothing[541899] == "no" and nothing[541983] == "unknown"
     only_one_of_two = ra_progress.evaluate(lambda spec: spec == ("flag", 0x239))        # Surf+Strength needs both HM flags
     assert only_one_of_two[541933] == "no"
     def boom(spec):
@@ -102,3 +110,39 @@ def test_the_achievement_line_names_at_most_three_unlocks():
     many = _tick({0x829, 0x240, 0x244, 0x255, 0x241, 0x271}, 6, 6, run=t.run)      # Old / Good / Super Rod, the Bike Voucher, the Bicycle
     line = obs._achievement_line(many)[0]
     assert line.count("(+") == 3 and "and 2 more" in line
+
+
+def _reader(**kw):
+    from types import SimpleNamespace
+    base = dict(read_flag=lambda n: False, read_key_items=lambda: [], read_badges=lambda: (0, 0), read_dex_owned_national=lambda n: False, read_dex_owned_count_national=lambda: 0,
+                read_game_stat=lambda i: 0, read_fame_checker=lambda: {i: set() for i in range(16)}, read_trainer_tower=lambda: [{"prize": False}] * 4)
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def test_the_new_check_kinds_read_the_game():
+    from types import SimpleNamespace
+
+    from agent import ra
+    ltm = SimpleNamespace(data={"milestones": []})
+    check = ra.make_check(_reader(), ltm)
+    assert not check(("stat", (10, 2))) and not check(("caught_any", (243, 244, 245))) and not check(("dex_national", 171)) and not check(("fame_full", 1))
+    assert ra.make_check(_reader(read_game_stat=lambda i: 2 if i == 10 else 0), ltm)(("stat", (10, 2)))
+    assert not ra.make_check(_reader(read_game_stat=lambda i: 1), ltm)(("stat", (10, 2)))                    # one Hall of Fame entry is not two
+    assert ra.make_check(_reader(read_dex_owned_national=lambda n: n == 244), ltm)(("caught_any", (243, 244, 245)))     # Entei alone is enough
+    assert ra.make_check(_reader(read_dex_owned_count_national=lambda: 171), ltm)(("dex_national", 171))
+    assert not ra.make_check(_reader(read_dex_owned_count_national=lambda: 170), ltm)(("dex_national", 171))
+    full = {i: set(range(6)) for i in range(16)}
+    assert ra.make_check(_reader(read_fame_checker=lambda: full), ltm)(("fame_full", 1))
+    assert not ra.make_check(_reader(read_fame_checker=lambda: {**full, 7: {0, 1, 2, 3, 4}}), ltm)(("fame_full", 1))     # one flavor text short
+
+
+def test_rematch_top_needs_every_ladder_at_the_top():
+    from types import SimpleNamespace
+
+    from agent import ra
+    from knowledge import rematches
+    ltm = SimpleNamespace(data={"milestones": []})
+    assert not ra.make_check(_reader(), ltm)(("rematch_top", 1))                                              # nothing beaten
+    every_flag = lambda n: True                                                                                # noqa: E731
+    assert ra.make_check(_reader(read_flag=every_flag), ltm)(("rematch_top", 1)) == (rematches.status(every_flag)["at_top"] == len(rematches.REMATCHES))
