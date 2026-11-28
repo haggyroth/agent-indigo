@@ -25,3 +25,18 @@ def test_the_tool_description_names_every_exclusive():
     tool = next(t["function"] for t in TOOLS if t["function"]["name"] == "link_trade")
     for sid in FIRERED_ONLY:
         assert SPECIES_NAMES[sid].title() in tool["description"], sid
+
+
+def test_a_wild_moveset_follows_the_game_level_up_order_and_drops_the_oldest():
+    from game.constants import MOVE_NAMES
+    from knowledge.movelearn import moves_at
+    names = lambda sid, lv: [MOVE_NAMES[m] for m in moves_at(sid, lv)]       # noqa: E731
+    assert names(1, 10) == ["Tackle", "Growl", "Leech Seed", "Vine Whip"]
+    assert names(1, 15) == ["Leech Seed", "Vine Whip", "Poison Powder", "Sleep Powder"]    # two moves at 15: the oldest two make room
+    assert moves_at(1, 0) == [] and moves_at(999, 50) == []
+
+
+def test_every_exclusive_knows_something_at_the_level_it_is_found():
+    from knowledge.movelearn import moves_at
+    for sid, (lv, _where) in FIRERED_ONLY.items():
+        assert 1 <= len(moves_at(sid, lv)) <= 4, sid

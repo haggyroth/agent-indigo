@@ -31,11 +31,13 @@ def test_trade_evolve_evolves_at_the_cable_club(live, tmp_path, monkeypatch, spe
     before = [m.species_name for m in live.r.read_party()][:2]
     assert before[0] == "Bulbasaur" and before[1] != "Pikachu", before
     outs = []
-    for _ in range(4):
+    for _ in range(6):
         live.repel()
         outs.append(live.c._execute("trade_evolve", json.dumps({"pokemon": "2"})))
-        if "evolved" in outs[-1] or live.r.detect_context().name == "IN_BATTLE":
+        if "evolved" in outs[-1]:
             break
+        if live.r.detect_context().name == "IN_BATTLE":                   # a wild encounter on the way (the tool stops at every one): run, then call again
+            outs.append(live.c._execute("flee_battle", "{}"))
     assert any(f"evolved into {evolved}" in o for o in outs), outs
     assert [m.species_name for m in live.r.read_party()][:2] == ["Bulbasaur", evolved]
     assert tuple(live.r.read_current_map()) == (5, 5)                      # back upstairs in Viridian's Pokémon Center
