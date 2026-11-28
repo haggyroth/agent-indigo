@@ -75,6 +75,32 @@ class Live:
         self.patch_mon(0, moves=[75, 22, 33, 0], pps=[25, 25, 35, 0])        # back to real attacks (Razor Leaf / Vine Whip / Tackle)
         self.heal_hp()
 
+    def warp_to(self, dest: tuple, x: int | None = None, y: int | None = None) -> None:
+        """Stage: put the player on map `dest` = (bank, id) at tile (x, y) — by writing SaveBlock1's position and current map and handing gMain.callback2 to the game's own map loader (the
+        run a door or stairs starts), so objects, the tileset and the camera are loaded for real; works from any map, indoors included (Fly does not). Without (x, y) the player lands on the
+        map's entrance: the first warp that leads outdoors (bank 3), else its first warp tile. Ends on the free field."""
+        from knowledge.map_graph import MAP_WARPS
+        dest = tuple(dest)
+        if x is None or y is None:
+            warps = MAP_WARPS.get(dest) or []
+            assert warps, f"no warps known for map {dest}: pass x and y"
+            x, y, _ = next((w for w in warps if w[2][0] == 3), warps[0])
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        self.m.write16(sb1 + 0, x)                                         # pos.x / pos.y
+        self.m.write16(sb1 + 2, y)
+        self.m.write8(sb1 + 4, dest[0])                                    # location: mapGroup, mapNum, warpId (-1: not a warp), x, y
+        self.m.write8(sb1 + 5, dest[1])
+        self.m.write8(sb1 + 6, 0xFF)
+        self.m.write16(sb1 + 8, x)
+        self.m.write16(sb1 + 10, y)
+        self.m.write32(Addr.GMAIN_CALLBACK2, Addr.CB2_MAP_LOAD)
+        for _ in range(40):
+            self.m.tick(20)
+            if self.m.read32(Addr.GMAIN_CALLBACK2) == Addr.CB2_OVERWORLD and self.r.detect_context() == GameContext.OVERWORLD:
+                break
+        self.m.tick(30)
+        assert (tuple(self.r.read_current_map()), tuple(self.r.read_player_pos())) == (dest, (x, y)), (self.r.read_current_map(), self.r.read_player_pos(), self.r.detect_context())
+
     def defeat_all_trainers(self) -> None:
         """Stage: mark every trainer (flags 0x500..0x7E6) as already beaten — for tests about NAVIGATION, where a fight on the way is noise
         (a defeated trainer just repeats his post-battle line; line-of-sight trainers no longer start fights)."""
