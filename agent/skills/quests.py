@@ -141,6 +141,31 @@ class QuestMixin:
         except Exception:
             return ""
 
+    def _achievements(self, arg: str = "") -> str:
+        """quest('achievements [missable|done|all]'): the RetroAchievements LeafGreen set (knowledge/ra_set.py) read against this game: progress, the missables (they can be lost for good), then what is
+        worth most. Local tracking only — Agent Indigo is not an RA client, nothing unlocks on retroachievements.org (#358)."""
+        from agent import ra
+        from knowledge import ra_progress
+        states = ra.states(self.reader, self.ltm)
+        want = arg.strip().lower()
+        rows = ra_progress.open_ones(states)
+        mark = {"probably": " (probably)", "unknown": " (not tracked yet)", "no": ""}
+        if want == "done":
+            from knowledge.ra_set import ACHIEVEMENTS
+            lines = [f"✔ {t} ({p} pts)" for aid, t, _d, p, _k in ACHIEVEMENTS if states.get(aid) == "yes"]
+            return ra_progress.line(states) + "\nUnlocked here:\n" + ("\n".join(lines) or "none yet")
+        missable = [r for r in rows if r[4] == "missable" and r[5] != "unknown"]
+        others = [r for r in rows if r[4] != "missable" and r[5] != "unknown"]
+        limit = 200 if want == "all" else 10
+        fmt = lambda r: f"• {r[1]} — {r[2]} ({r[3]} pts){mark[r[5]]}"                  # noqa: E731
+        parts = [ra_progress.line(states)]
+        if missable:
+            parts.append("Can be lost for good — do these before the point of no return:\n" + "\n".join(fmt(r) for r in missable[:limit]))
+        if want != "missable" and others:
+            parts.append("Next by points:\n" + "\n".join(fmt(r) for r in others[:limit]))
+        parts.append("Local tracking only (this is not an RA client: nothing unlocks on retroachievements.org). quest('achievements all') lists everything left, quest('achievements done') what is unlocked.")
+        return "\n".join(parts)
+
     def _quest_tool(self, name: str = "", auto_trainers: bool = False) -> str:
         """quest(name?) — the story chain (knowledge.story_beats). No name lists every beat from the Pokédex to the Elite Four with
         ✔ done / ▶ next / … blocked; a name runs its script when it has one (ss_ticket, cut, coin_case, rocket_hideout, tea, surf,
@@ -151,6 +176,8 @@ class QuestMixin:
         if str(name or "").strip().lower().startswith("sweep"):
             return self._sweep(str(name).strip()[5:].strip())
         words = str(name or "").strip().lower().split()
+        if words and words[0] in ("achievements", "achievement", "ra"):
+            return self._achievements(" ".join(words[1:]))
         if words and words[0] in ("rematch", "rematches"):
             return self._rematch(" ".join(words[1:]))
         if words and words[0] in ("fame", "fame_checker", "gossip"):
@@ -169,7 +196,7 @@ class QuestMixin:
         from agent.story import side_ctx
         ctx = side_ctx(self.reader)
         if not str(name or "").strip():
-            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had; quest('rematch') runs the VS Seeker loop (charge, use, fight the trainers it flags); quest('fame') shows the Fame Checker (Gossip Checker); quest('trade') lists the in-game NPC trades; quest('fossil') revives a fossil at Cinnabar; quest('safari <species>') hunts one in the Safari Zone."
+            return sb.listing(status, ctx) + self._sweep_listing() + "\nquest('dex') shows the Kanto Pokédex: what is missing and where each species can be had; quest('rematch') runs the VS Seeker loop (charge, use, fight the trainers it flags); quest('fame') shows the Fame Checker (Gossip Checker); quest('trade') lists the in-game NPC trades; quest('achievements') shows the RetroAchievements checklist (progress, what can still be lost); quest('fossil') revives a fossil at Cinnabar; quest('safari <species>') hunts one in the Safari Zone."
         head, *self._quest_opts = str(name).split()                 # 'new_game squirtle name=KYLE': the words after the name are the driver's options
         name = head
         beat = sb.resolve(name)
