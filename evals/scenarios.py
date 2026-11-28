@@ -145,6 +145,24 @@ SCENARIOS += [
 ]
 SCENARIOS += [
     Scenario(
+        name="achievements_early",
+        goal=goals.achievements_at_least(20),
+        max_steps=800,
+        start_state=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saves", "live", "post_misty.ss1"),
+        notes="Route 24 with Brock and Misty beaten (9 of the LeafGreen set's 128 RetroAchievements held, 35 pts): the objectives are the checklist's — quest('achievements') lists what is left "
+              "and what can still be lost. Local tracking only (not an RA client); the scorecard's `achv` column reports the count.",
+    ),
+    Scenario(
+        name="achievements_post_game_points",
+        goal=goals.achievement_points_at_least(450),
+        max_steps=1500,
+        xfail="most of the remaining points are area sweeps and Sevii quests nothing scripts end to end yet (#358, #366)",
+        start_state=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "saves", "live", "post_hof.ss1"),
+        notes="Pallet Town after the Hall of Fame: how many of the set's 781 points a post-game run reaches with quest('achievements') as its checklist.",
+    ),
+]
+SCENARIOS += [
+    Scenario(
         name="full_chain",
         goal=goals.has_milestone("hall_of_fame"),
         max_steps=40000,
