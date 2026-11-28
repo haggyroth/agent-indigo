@@ -1,7 +1,8 @@
 """The RetroAchievements numbers in the eval harness (#358): the goal predicates, the journal fields, the throttled refresh and the scorecard row — pure."""
 from types import SimpleNamespace
 
-import main
+import pytest
+
 from evals import goals
 from memory.long_term import LongTermMemory
 
@@ -30,6 +31,8 @@ def _reader(flags=()):
 
 
 def test_apply_progress_refreshes_the_count_every_few_ticks_and_never_crashes(tmp_path):
+    pytest.importorskip("openai")                                            # main imports the LLM client; CI's unit jobs have no openai
+    import main
     state = SimpleNamespace(badges=0, party_count=1, party=[], badge_bits=0)
     diff = SimpleNamespace(badges_changed=False)
     ltm = LongTermMemory(path=tmp_path / "p.json")
@@ -51,6 +54,8 @@ def test_apply_progress_refreshes_the_count_every_few_ticks_and_never_crashes(tm
 
 
 def test_the_scorecard_carries_the_achievement_counts():
+    pytest.importorskip("openai")
+    import main
     r = main.EpisodeResult(reason="goal", passed=True, steps=3, llm_calls=1, prompt_tokens=1, completion_tokens=1, final_map=(3, 0), final_pos=(1, 1), badges=0,
                            achievements=14, achievement_points=61)
     d = r.to_dict()
