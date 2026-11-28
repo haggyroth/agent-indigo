@@ -41,8 +41,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install libmgba
-        # NOTE (#446): Homebrew's mgba bottle (0.10.5_2) was built against ffmpeg 8 (libavcodec.62) while the runner installs ffmpeg 9.1, so the compiled extensions cannot be imported here
-        # and the binding tests below skip (-rs prints why). Building libmgba from source without Qt/ffmpeg would fix it; until then this job proves only that the extensions COMPILE.
+        # NOTE (#446): Homebrew's mgba bottle (0.10.5_2) was built against ffmpeg 8 (libavcodec.62) while the runner installs ffmpeg 9.1; the next step links the missing ffmpeg paths to the
+        # installed copies so libmgba loads and the binding tests below really run (only the ROM tests skip).
         run: brew install mgba
       - name: Link libmgba's ffmpeg dependencies to the installed ffmpeg (#446)
         # The bottle was linked against an older ffmpeg major than the runner's: every libav*/libsw* path it names that does not exist gets a symlink to the installed copy of the same library, so the
@@ -67,6 +67,8 @@ jobs:
       - name: Build the two-core link module (prototype, #363)
         # Compiles against libmgba's internal SIO lockstep headers: catches a Homebrew upgrade that moves them.
         run: MGBA_PREFIX="$(brew --prefix)" python -m game._mgba_link_build
+      - name: The compiled extensions must import (a silent skip hid a broken import for weeks, #446)
+        run: python -c "import game._mgba_native, game._mgba_link; print('both compiled extensions import')"
       - name: Pytest (binding symbol checks; ROM tests skip)
         # ROM is copyrighted and never present in CI, so load/framebuffer tests
         # skip; the symbol test confirms the binding compiled and imports.
