@@ -254,6 +254,11 @@ TOOLS = [
         }, "required": ["pokemon", "move"]},
     }},
     {"type": "function", "function": {
+        "name": "trade_evolve",
+        "description": "Evolve a Kadabra/Machoke/Graveler/Haunter via a Cable Club partner at a Pokémon Center (travels there).",
+        "parameters": {"type": "object", "properties": {"pokemon": {"type": "string"}}, "required": ["pokemon"]},
+    }},
+    {"type": "function", "function": {
         "name": "rename_pokemon",
         "description": "Change a Pokémon's nickname at the Name Rater in Lavender Town (travels there). Not for traded Pokémon or Eggs.",
         "parameters": {"type": "object", "properties": {
