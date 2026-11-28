@@ -135,7 +135,7 @@ def firered_partner_names() -> dict[str, int]:
 
 def make_firered_partner(group: int, out: Path) -> Path:
     """The FireRed partner state for `group`: FIRERED_STATE (a state of a FireRed game standing at a Pokémon Center 2F counter, e.g. ~/mgba-http/firered_trade_counter.ss0) with the group's
-    exclusives added to the party (Tackle only, at the level they are first found at in FireRed). Written to `out`/partner_firered_<group>.ss1."""
+    exclusives added to the party (at the level they are first found at in FireRed, with the moves a wild one of that level knows). Written to `out`/partner_firered_<group>.ss1."""
     import functools
     import types
     sys.path.insert(0, str(ROOT))
@@ -143,7 +143,10 @@ def make_firered_partner(group: int, out: Path) -> Path:
     from agent.skills.linkpartner import FIRERED_ROM, partner_groups
     from game.memory_reader import LeafGreenReader
     from game.mgba_core import NativeMGBAClient
+    from game.constants import MOVE_NAMES
     from knowledge.exclusives import FIRERED_ONLY
+    from knowledge.move_data import MOVE_DATA
+    from knowledge.movelearn import moves_at
     from live.harness import Live
     rom = Path(os.path.expanduser(os.environ.get("FIRERED_ROM_PATH", FIRERED_ROM)))
     state = Path(os.path.expanduser(os.environ.get("FIRERED_STATE", "~/mgba-http/firered_trade_counter.ss0")))
@@ -161,7 +164,10 @@ def make_firered_partner(group: int, out: Path) -> Path:
             setattr(stage, name, functools.partial(getattr(Live, name), stage))
         assert tuple(reader.read_current_map()) == (5, 5) and len(reader.read_party()) == 1, (reader.read_current_map(), reader.read_party())
         for sid in partner_groups()[group]:
-            Live.add_mon(stage, sid, FIRERED_ONLY[sid][0], moves=(33, 0, 0, 0))
+            level = FIRERED_ONLY[sid][0]
+            moves = (moves_at(sid, level) + [0] * 4)[:4]                        # what a wild one of that level knows
+            pps = [MOVE_DATA[MOVE_NAMES[mv]][2] if mv else 0 for mv in moves]
+            Live.add_mon(stage, sid, level, moves=tuple(moves), pps=pps)
         fr.tick(30)
         assert [p.species_id for p in reader.read_party()][1:] == partner_groups()[group]
         target = out / f"partner_firered_{group}.ss1"

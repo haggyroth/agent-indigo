@@ -37,11 +37,13 @@ def _stage(live):
 
 def _trade(live, want, give="2"):
     outs = []
-    for _ in range(4):
+    for _ in range(6):
         live.repel()
         outs.append(live.c._execute("link_trade", json.dumps({"want": want, "give": give})))
-        if "Traded" in outs[-1] or live.r.detect_context().name == "IN_BATTLE":
+        if "Traded" in outs[-1]:
             break
+        if live.r.detect_context().name == "IN_BATTLE":                   # a wild encounter on the way (the tool stops at every one): run, then call again
+            outs.append(live.c._execute("flee_battle", "{}"))
     return outs
 
 
@@ -53,6 +55,12 @@ def test_link_trade_gets_a_firered_exclusive_for_a_party_member(live, partner_di
     party = [m.species_name for m in live.r.read_party()]
     assert party[:2] == ["Bulbasaur", want], party                          # the Pikachu slot now holds the exclusive
     assert "Pikachu" not in party                                          # and Pikachu stayed with the partner
+    from game.constants import SPECIES_NAMES
+    from knowledge.exclusives import FIRERED_ONLY
+    from knowledge.movelearn import moves_at
+    sid = next(s for s in FIRERED_ONLY if SPECIES_NAMES[s].title() == want)
+    got = live.r.read_party()[1]
+    assert (got.level, [m for m in got.move_ids if m]) == (FIRERED_ONLY[sid][0], moves_at(sid, FIRERED_ONLY[sid][0])), (got.level, got.move_ids)   # a wild one's level and level-up moves
     assert tuple(live.r.read_current_map()) == (5, 5)                                                         # back upstairs in Viridian's Pokémon Center
 
 

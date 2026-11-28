@@ -188,7 +188,7 @@ class Live:
         if level:
             m.write8(b + 0x54, level)
 
-    def add_mon(self, species: int, level: int, moves=(33, 0, 0, 0)) -> int:
+    def add_mon(self, species: int, level: int, moves=(33, 0, 0, 0), pps=None) -> int:
         """Stage: append a party member (a copy of slot 0's struct, re-typed): `species` at `level` with a growth-consistent exp total and `moves` (full PP). Returns its slot."""
         from knowledge.growth import exp_for_level
         from knowledge.growth_data import GROWTH_RATE
@@ -196,7 +196,7 @@ class Live:
         assert 1 <= n < 6, f"party of {n}: nothing to copy from, or full"
         for i in range(100):
             self.m.write8(Addr.PARTY_DATA + 100 * n + i, self.m.read8(Addr.PARTY_DATA + i))
-        self.patch_mon(n, moves=list(moves), pps=[35 if mv else 0 for mv in moves], level=level, exp=exp_for_level(GROWTH_RATE.get(species, 0), level), species=species)
+        self.patch_mon(n, moves=list(moves), pps=list(pps) if pps is not None else [35 if mv else 0 for mv in moves], level=level, exp=exp_for_level(GROWTH_RATE.get(species, 0), level), species=species)
         self.m.write8(Addr.PARTY_COUNT, n + 1)
         self.heal_hp()
         return n

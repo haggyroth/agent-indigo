@@ -74,3 +74,17 @@ def choose_move_to_forget(current_names: list[str], new_name: str, own_types=())
             return i
         return None                                    # the cheapest allowed slot isn't worth replacing
     return None
+
+
+def moves_at(species_id: int, level: int) -> list[int]:
+    """The move ids a Pokémon of `species_id` has at `level` as a wild encounter or a freshly generated one: its level-up moves up to `level` in the game's order, a full set of four
+    dropping the oldest for each new one (the game's own GiveMonInitialMoveset). Empty for a species without data."""
+    from knowledge.levelup_learnsets import LEVEL_UP
+    moves: list[int] = []
+    for lv, mv in LEVEL_UP.get(species_id, ()):
+        if lv > level or mv in moves:
+            continue
+        if len(moves) == 4:
+            moves.pop(0)
+        moves.append(mv)
+    return moves
