@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -110,7 +111,6 @@ RECIPES = {
 def build_live(live_dir: Path, work_sav: Path):
     """The runtime booted from work.sav and the harness around it (the same as tests/live/conftest.py)."""
     os.environ.pop("RESUME", None)
-    os.environ["START_FROM_SAVE"] = str(work_sav)
     sys.path.insert(0, str(ROOT))
     sys.path.insert(0, str(ROOT / "tests"))
     import game.mgba_core as mgba_core
@@ -118,7 +118,10 @@ def build_live(live_dir: Path, work_sav: Path):
     import main
     from live.harness import Live
     tmp = Path(tempfile.mkdtemp(prefix="fixtures-"))
-    runtime = main.build_runtime(ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"), verbose=False)
+    boot_sav = tmp / "work.sav"                                                 # a COPY: the cartridge save is file-backed, and an in-game save would overwrite the real work.sav
+    shutil.copyfile(work_sav, boot_sav)
+    os.environ["START_FROM_SAVE"] = str(boot_sav)
+    runtime = main.build_runtime(start_save=str(boot_sav), ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"), verbose=False)
     if runtime is None:
         raise SystemExit("the emulator runtime could not be built (ROM_PATH / the binding?)")
     return Live(runtime, live_dir), tmp

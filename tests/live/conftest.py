@@ -8,6 +8,7 @@ no ROM, just skips them). Run locally with:
 Fixtures live in `saves/live/` (gitignored — ROM-derived). See tests/live/README.md for what each one is.
 """
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -39,12 +40,16 @@ def rt(tmp_path_factory):
     # tests/conftest.py imports config (→ .env) before this file runs, so a developer's SHOW_WINDOW=true
     # is already baked in: override the module constants directly. A paced window makes tests crawl.
     mgba_core.SHOW_WINDOW = False
-    os.environ["START_FROM_SAVE"] = str(sav)
     sys.path.insert(0, str(ROOT))
     import main
     tmp = tmp_path_factory.mktemp("live")
+    # Boot from a COPY: the runtime's cartridge save is file-backed, so an in-game save (the Cable Club asks "Would you like to save?" before every link-up) would otherwise overwrite the
+    # fixture and every later test would boot from it.
+    boot_sav = tmp / "work.sav"
+    shutil.copyfile(sav, boot_sav)
+    os.environ["START_FROM_SAVE"] = str(boot_sav)
     try:
-        runtime = main.build_runtime(ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"),
+        runtime = main.build_runtime(start_save=str(boot_sav), ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"),
                                      verbose=False)
     except main.StartPointError as e:
         pytest.skip(f"start point could not be loaded: {e}")
