@@ -26,6 +26,7 @@ python tools/make_live_fixtures.py --only vermilion --force
 ```
 `tools/make_live_fixtures.py` boots from `work.sav`, stages the situation with the harness helpers (`fly_to`, `add_mon`, `patch_mon`, flags, badges; the agent's own `go_to` walks out of the starting
 building) and writes the state. A generated fixture matches its recipe's description, not necessarily the original play-through's exact party or tile; a recipe is a few lines in the tool.
+`Live.warp_to((bank, id), x?, y?)` (the harness's teleport: SaveBlock1's position + map and the game's own map loader, so it works from indoors where Fly is refused) stages the dungeon recipes: `mt_moon_1f`, `rock_tunnel_1f`, `silph_co_1f`, `victory_road_1f`.
 Currently: `threemon`, `vermilion`, `league_door`, `cable_club_counter` (Viridian Pokémon Center 2F, Bulbasaur + Kadabra L30: the two-core link-cable trade test), `partner_counter` (the same counter, Bulbasaur + a Rattata: the trade partner's side).
 
 **The trade partner (#363).** `trade_evolve` links the running game to a second core restored from `saves/partner/partner_counter.ss1`; make it with `python tools/make_live_fixtures.py --only partner_counter --out saves/partner` (needs `work.sav` and the link module, `python -m game._mgba_link_build`). The live tests build their own into a temp folder.

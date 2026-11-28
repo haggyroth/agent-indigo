@@ -98,11 +98,28 @@ def recipe_league_door(live) -> None:
     assert len(live.r.read_party()) == 6
 
 
+def _dungeon_recipe(name: str, dest: tuple, flags=(), badges: int = 0):
+    """A recipe that stands the lead at the entrance of a dungeon interior (`Live.warp_to`: no walk, no Fly), with `flags` set and `badges` held."""
+    def recipe(live) -> None:
+        live.set_badges(badges)
+        for f in flags:
+            live.set_flag(f)
+        live.warp_to(dest)
+        assert tuple(live.r.read_current_map()) == dest, live.r.read_current_map()
+        assert live.r.detect_context().name == "OVERWORLD"
+    recipe.__doc__ = f"{name}: the entrance of {dest} on the free field."
+    return recipe
+
+
 # name -> (recipe, one-line description). A recipe stages from the boot state and asserts what it promises.
 RECIPES = {
     "threemon": (recipe_threemon, "Viridian City with a three-member party"),
     "partner_counter": (recipe_partner_counter, "the trade partner's side: Bulbasaur + a Rattata at the same Cable Club counter"),
     "cable_club_counter": (recipe_cable_club_counter, "Viridian Pokémon Center 2F at the Direct Corner counter, a party of two (the link-cable tests)"),
+    "mt_moon_1f": (_dungeon_recipe("mt_moon_1f", (1, 1)), "Mt. Moon 1F, at the entrance"),
+    "rock_tunnel_1f": (_dungeon_recipe("rock_tunnel_1f", (1, 81)), "Rock Tunnel 1F, at the entrance (dark: no Flash)"),
+    "silph_co_1f": (_dungeon_recipe("silph_co_1f", (1, 47)), "Silph Co. 1F, at the door"),
+    "victory_road_1f": (_dungeon_recipe("victory_road_1f", (1, 39), badges=0xFF), "Victory Road 1F, at the Route 23 entrance, 8 badges"),
     "vermilion": (recipe_vermilion, "Vermilion City, Ivysaur L30, the SS Ticket, no Cut"),
     "league_door": (recipe_league_door, "Indigo Plateau, 8 badges, a boosted L70 team of six"),
 }
