@@ -47,7 +47,7 @@ class FakeClient:
 
 
 def build_party_mon(pid: int, ot_id: int, *, level: int, cur_hp: int, max_hp: int,
-                    status_word: int = 0, species: int = 1,
+                    status_word: int = 0, species: int = 1, exp: int = 0,
                     moves=(1, 2, 3, 4), pp=(35, 30, 25, 20)) -> bytes:
     """Construct a valid 100-byte Gen III party slot with encrypted substructures.
 
@@ -61,6 +61,7 @@ def build_party_mon(pid: int, ot_id: int, *, level: int, cur_hp: int, max_hp: in
     # Build the four decrypted 12-byte substructures.
     growth = bytearray(12)
     growth[0:2] = species.to_bytes(2, "little")
+    growth[4:8] = exp.to_bytes(4, "little")
     attacks = bytearray(12)
     for i, m in enumerate(moves):
         attacks[i * 2:i * 2 + 2] = int(m).to_bytes(2, "little")

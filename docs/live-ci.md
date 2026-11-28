@@ -61,9 +61,20 @@ Suggested phasing if the owner wants it: (1) `tools/make_live_fixtures.py` worki
 
 ## The end-to-end regression (the fourth checkbox)
 
-`evals` already has `full_chain` (goal: `hall_of_fame`), but with a real model it takes days. The LLM-free equivalent is `agent/scripted_policy.py` / `tools/scripted_run.py` (drives the real skills
-with no model calls); extending its plan from four gyms to the whole `quest()` chain would give a deterministic overnight run. Not built here — it should come after the fixture generator, since it starts
-from `work.sav` and needs nothing else.
+`evals` has `full_chain` (goal: `hall_of_fame`), but with a real model it takes days — run by hand. The model-free equivalent is the scripted chain: `agent/scripted_policy.py`'s `ChainPolicy` answers every
+decision with the real skills (`quest()` for each open beat, `grind` / `heal` / `shop` when a quest says the team is not ready, the same battle logic for every fight) and no model:
+
+    python tools/scripted_run.py --goal clear --chain --state saves/live/route23_stuck.ss1 --max-steps 6000 --max-wall 10800
+
+It boots from a COPY of the battery save (an in-game save must never overwrite the real one), writes a normal run log under `logs/scripted/` and ends with the scorecard. A clean run ends
+`reason='goal', passed=True` on the Hall of Fame map (1, 80). Reference run, 2026-11-28, from `route23_stuck`: **passed — 1,937 steps, 74 level-ups, 5 blackouts, 41 min**. A run that ends
+`reason='stalled'` names the beat and the last result: that is where a model would stall too. The three things it found and fixed on 2026-11-28, after the Level wall made the League un-skippable:
+
+- its progress check counted only badges / maps / levels, so a grind toward the L46 bar (experience long before a level) tripped the 40-call stall → the party's total experience, in 1,000-point steps, counts (`read_party_exp`);
+- inside the sealed League rooms `heal()` answers 'press on with quest(...)' and the policy healed again for 40 calls → that refusal now means 'go on without healing for a few decisions';
+- after many League losses the advisory bar rose and `grind()` from the Plateau found no grass ('call grind() again' read as 'not ready') → a no-grass grind makes the policy ignore the advisory and call the quest again.
+
+It takes about 45 minutes and nothing but the ROM and the fixture, so it belongs in an overnight or pre-release run rather than every PR (`tools/live_suite.py` stays the per-PR gate).
 
 ## Measured baseline — and what the first full run found
 
