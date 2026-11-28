@@ -228,10 +228,13 @@ def leave_trade_room(pair: TwoCoreLink) -> None:
         pair.press(*(p[i] if i < len(p) else 0 for p in paths), hold=6, rest=20)
     pair.press(A, A, hold=6, rest=150)                                           # "Cancel trade?"
     pair.press(A, A, hold=6, rest=150)                                           # YES
-    for _ in range(40):                                                          # the screen fades out on both before the field is back (it can take a while: the link is closed in step)
+    for i in range(40):                                                          # the screen fades out on both before the field is back (it can take a while: the link is closed in step)
         pair.run(60)
-        if all(cb == CB2_OVERWORLD for cb in _poll_callbacks(pair)):
+        cbs = _poll_callbacks(pair)
+        if all(cb == CB2_OVERWORLD for cb in cbs):
             break
+        if i % 5 == 4:                                                           # still not closed after ~5 s: a core that missed an A (the save before the link-up takes a different time depending on the flash it
+            pair.press(*(A if cb == CB2_TRADE_SCREEN else 0 for cb in cbs), hold=6, rest=6)     # starts from) gets one — it opens the prompt or answers YES; a core that has left the screen is left alone
     else:
         raise LinkError(f"the trade screen did not close (callbacks {[hex(cb) for cb in _poll_callbacks(pair)]})")
     pair.run(120)
