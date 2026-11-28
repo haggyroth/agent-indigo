@@ -44,6 +44,21 @@ jobs:
         # NOTE (#446): Homebrew's mgba bottle (0.10.5_2) was built against ffmpeg 8 (libavcodec.62) while the runner installs ffmpeg 9.1, so the compiled extensions cannot be imported here
         # and the binding tests below skip (-rs prints why). Building libmgba from source without Qt/ffmpeg would fix it; until then this job proves only that the extensions COMPILE.
         run: brew install mgba
+      - name: Link libmgba's ffmpeg dependencies to the installed ffmpeg (#446)
+        # The bottle was linked against an older ffmpeg major than the runner's: every libav*/libsw* path it names that does not exist gets a symlink to the installed copy of the same library, so the
+        # dylib loads (libmgba only touches ffmpeg to record video, which the binding never does). Prints what it saw, so a future mismatch is diagnosable from the log.
+        run: |
+          LIB="$(brew --prefix)/lib/libmgba.dylib"
+          echo "--- libmgba's ffmpeg dependencies"; otool -L "$LIB" | grep -E "lib(av|sw)" || true
+          for dep in $(otool -L "$LIB" | awk '/lib(av|sw)[a-z]*\.[0-9]+\.dylib/ {print $1}'); do
+            if [ ! -e "$dep" ]; then
+              base="$(basename "$dep" | sed -E 's/\.[0-9]+\.dylib$//')"
+              have="$(ls "$(dirname "$dep")/$base".*.dylib 2>/dev/null | head -n 1 || true)"
+              echo "missing $dep -> ${have:-nothing installed}"
+              if [ -n "$have" ]; then ln -s "$have" "$dep"; fi
+            fi
+          done
+          echo "--- after"; otool -L "$LIB" | grep -E "lib(av|sw)" | while read -r dep _; do [ -e "$dep" ] && echo "ok $dep" || echo "STILL MISSING $dep"; done
       - name: Install build + test dependencies
         run: pip install cffi setuptools -r requirements-test.txt
       - name: Build the cffi binding
