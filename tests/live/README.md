@@ -26,7 +26,10 @@ python tools/make_live_fixtures.py --only vermilion --force
 ```
 `tools/make_live_fixtures.py` boots from `work.sav`, stages the situation with the harness helpers (`fly_to`, `add_mon`, `patch_mon`, flags, badges; the agent's own `go_to` walks out of the starting
 building) and writes the state. A generated fixture matches its recipe's description, not necessarily the original play-through's exact party or tile; a recipe is a few lines in the tool.
-Currently: `threemon`, `vermilion`, `league_door`, `cable_club_counter` (Viridian Pokémon Center 2F, Bulbasaur + Kadabra L30: the two-core link-cable trade test).
+Currently: `threemon`, `vermilion`, `league_door`, `cable_club_counter` (Viridian Pokémon Center 2F, Bulbasaur + Kadabra L30: the two-core link-cable trade test), `partner_counter` (the same counter, Bulbasaur + a Rattata: the trade partner's side).
+
+**The trade partner (#363).** `trade_evolve` links the running game to a second core restored from `saves/partner/partner_counter.ss1`; make it with `python tools/make_live_fixtures.py --only partner_counter --out saves/partner` (needs `work.sav` and the link module, `python -m game._mgba_link_build`). The live tests build their own into a temp folder.
+**Live runs never write `work.sav`.** The cartridge save is file-backed, and the Cable Club asks "Would you like to save?" before every link-up, so the runtime and the fixture tool boot from a *copy* (a test that loads the battery save itself must copy it too); the session fails if the real file changes.
 
 ## Fixtures (`saves/live/`, gitignored — ROM-derived)
 | file | what it is |
