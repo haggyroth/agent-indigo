@@ -35,7 +35,9 @@ def available() -> bool:
 class TwoCoreLink:
     """Two cores running the same ROM, linked. Core 0 is the cable's master (the player who opens the link), core 1 the slave."""
 
-    def __init__(self, rom_path: str):
+    def __init__(self, rom_path: str | None = None, clients: list | None = None):
+        """Either `rom_path` (both cores are created here) or `clients` — two ready NativeMGBAClients (core 0 the master). A client passed in is NOT closed with the pair, and its own
+        `run_frames` comes back on close (see with_partner)."""
         from game._mgba_link import lib as link
         from game.memory_reader import LeafGreenReader
         from game.mgba_core import NativeMGBAClient
@@ -43,8 +45,14 @@ class TwoCoreLink:
         if link.link_create() != 0:
             raise LinkError("a link already exists in this process (one at a time): close() it first")
         self.clients: list = []
+        self._owned: list[bool] = []
         try:
-            self.clients = [NativeMGBAClient(os.path.expanduser(rom_path), show_window=False) for _ in range(2)]
+            if clients is None:
+                clients = [NativeMGBAClient(os.path.expanduser(rom_path), show_window=False) for _ in range(2)]
+                self._owned = [True, True]
+            else:
+                self._owned = [False] * len(clients)
+            self.clients = list(clients)
             self.ids = [link.link_attach(c._h) for c in self.clients]
         except Exception:
             self.close()
@@ -55,6 +63,22 @@ class TwoCoreLink:
         self.readers = [LeafGreenReader(c) for c in self.clients]
         for c in self.clients:
             c.run_frames = self.run                         # a tap / hold / tick on either client steps the whole pair
+
+    @classmethod
+    def with_partner(cls, main_client, partner_rom: str, partner_state: str) -> "TwoCoreLink":
+        """Link a RUNNING client (the main runtime's) to a fresh partner core restored from `partner_state`. The partner is created and closed here; the main client is left as it was."""
+        from game.mgba_core import NativeMGBAClient
+        partner = NativeMGBAClient(os.path.expanduser(partner_rom), show_window=False)
+        try:
+            if not partner.load_state_file(str(partner_state)):
+                raise LinkError(f"could not load the partner state {partner_state}")
+            pair = cls(clients=[main_client, partner])
+        except Exception:
+            partner.close()
+            raise
+        pair._owned = [False, True]
+        pair.run(30)
+        return pair
 
     def load_states(self, path0: str, path1: str | None = None) -> None:
         """Restore a saved state on each core (the second defaults to the first's: two copies of one player)."""
@@ -88,8 +112,10 @@ class TwoCoreLink:
 
     def close(self) -> None:
         self._link.link_destroy()
-        for c in self.clients:
-            c.close()                                       # the client owns its core (its __del__ would free it a second time)
+        for c, owned in zip(self.clients, self._owned):
+            c.__dict__.pop("run_frames", None)              # back to the client's own stepping
+            if owned:
+                c.close()                                   # the client owns its core (its __del__ would free it a second time)
         self.clients = []
 
     def __enter__(self):
@@ -104,17 +130,56 @@ def _cursor_moves(slot: int) -> list[int]:
     return [RIGHT] * (slot % 2) + [DOWN] * (slot // 2)
 
 
-def cable_club_trade(pair: TwoCoreLink, give0: int = 1, give1: int = 1, max_presses: int = 300) -> None:
-    """Both players stand at the Pokémon Center 2F counter (the `cable_club_counter` fixture): link up, sit down, trade party slot `give0` (0-based) of core 0 for `give1` of core 1, and sit through
-    the evolution scene. The pair is left on the trade screen again (the game offers another trade). Raises LinkError when a stage does not come."""
-    # 1. Talk to the attendant and mash A through "Trade Center", the save prompt and the link-up until both games are in the Trade Center room (map 0,1).
+# The trade screen's cursor (decomp src/trade.c sCursorMoveDestinations): positions 0-5 are the player's party (two columns, row-major), 6-11 the partner's, 12 is Cancel. Per position, the
+# destination lists for UP, DOWN, LEFT, RIGHT: the first one that holds a Pokémon (or Cancel) is taken, and none means position 0.
+_CURSOR_MOVES = (
+    ((4, 2, 12, 12, 0, 0), (2, 4, 12, 12, 0, 0), (7, 6, 1, 0, 0, 0), (1, 6, 7, 0, 0, 0)),
+    ((5, 3, 12, 12, 0, 0), (3, 5, 12, 12, 0, 0), (0, 7, 6, 1, 0, 0), (6, 7, 0, 1, 0, 0)),
+    ((0, 0, 0, 0, 0, 0), (4, 0, 0, 0, 0, 0), (9, 8, 7, 6, 0, 0), (3, 1, 0, 0, 0, 0)),
+    ((1, 1, 1, 1, 0, 0), (5, 1, 1, 1, 0, 0), (2, 9, 8, 7, 0, 0), (8, 9, 6, 6, 0, 0)),
+    ((2, 2, 2, 2, 0, 0), (0, 0, 0, 0, 0, 0), (11, 10, 9, 8, 7, 6), (5, 3, 1, 0, 0, 0)),
+    ((3, 3, 3, 3, 0, 0), (1, 1, 1, 1, 0, 0), (4, 4, 4, 4, 0, 0), (10, 8, 6, 0, 0, 0)),
+    ((10, 8, 12, 0, 0, 0), (8, 10, 12, 0, 0, 0), (1, 0, 0, 0, 0, 0), (7, 0, 1, 0, 0, 0)),
+    ((12, 0, 0, 0, 0, 0), (9, 12, 0, 0, 0, 0), (6, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 0)),
+    ((6, 0, 0, 0, 0, 0), (10, 6, 0, 0, 0, 0), (3, 2, 1, 0, 0, 0), (9, 7, 0, 0, 0, 0)),
+    ((7, 0, 0, 0, 0, 0), (11, 12, 0, 0, 0, 0), (8, 0, 0, 0, 0, 0), (2, 1, 0, 0, 0, 0)),
+    ((8, 0, 0, 0, 0, 0), (6, 0, 0, 0, 0, 0), (5, 4, 3, 2, 1, 0), (11, 9, 7, 0, 0, 0)),
+    ((9, 0, 0, 0, 0, 0), (12, 0, 0, 0, 0, 0), (10, 0, 0, 0, 0, 0), (4, 2, 0, 0, 0, 0)),
+    ((11, 9, 7, 6, 0, 0), (7, 6, 0, 0, 0, 0), (12, 0, 0, 0, 0, 0), (12, 0, 0, 0, 0, 0)),
+)
+_CANCEL = 12
+
+
+def _cursor_path(start: int, goal: int, own: int, other: int) -> list[int]:
+    """The shortest key sequence on the trade screen from cursor position `start` to `goal`, with `own` Pokémon on the player's side and `other` on the partner's (breadth-first search over the
+    game's own cursor table). A position holds something when it is Cancel or within the party counts."""
+    active = {i for i in range(6) if i < own} | {6 + i for i in range(6) if i < other} | {_CANCEL}
+    keys = (UP, DOWN, LEFT, RIGHT)
+    seen, queue = {start: []}, [start]
+    for pos in queue:
+        if pos == goal:
+            return seen[pos]
+        for k, dests in zip(keys, _CURSOR_MOVES[pos]):
+            new = next((d for d in dests if d in active), 0)
+            if new not in seen:
+                seen[new] = seen[pos] + [k]
+                queue.append(new)
+    raise LinkError(f"no way to move the trade cursor from {start} to {goal} ({own}/{other} Pokémon)")
+
+
+def _poll_callbacks(pair: TwoCoreLink) -> list[int]:
+    return [c.read32(0x030030F4) for c in pair.clients]
+
+
+def enter_trade_room(pair: TwoCoreLink, max_presses: int = 300) -> None:
+    """Both players stand at the Pokémon Center 2F counter (the `cable_club_counter` fixture): talk to the attendant, mash A through "Trade Center", the save prompt and the link-up until both are
+    in the Trade Center room, walk to the two seats — (4,5) for the master, (7,5) for the slave; stepping onto a seat starts the trade link — and wait for the trade screen. Ends on it."""
     for _ in range(max_presses):
         if pair.maps() == [TRADE_CENTER, TRADE_CENTER]:
             break
         pair.press(A, A, hold=6, rest=24)
     else:
         raise LinkError(f"never reached the Trade Center (maps {pair.maps()})")
-    # 2. Walk to the two seats — (4,5) for the master, (7,5) for the slave; stepping onto a seat starts the trade link.
     pair.run(60)
     for _ in range(3):
         pair.press(UP, UP, hold=16, rest=4)
@@ -122,12 +187,17 @@ def cable_club_trade(pair: TwoCoreLink, give0: int = 1, give1: int = 1, max_pres
     pair.press(UP, UP, hold=16, rest=4)
     for _ in range(40):                                                          # "Communication standby…" until the trade screen is up on both
         pair.run(30)
-        if all(c.read32(0x030030F4) == CB2_TRADE_SCREEN for c in pair.clients):
+        if all(cb == CB2_TRADE_SCREEN for cb in _poll_callbacks(pair)):
             break
     else:
         raise LinkError("the trade screen never came up")
     pair.run(600)                                                                # let the screen finish fading in and both sides settle before any input
-    # 3. Pick the Pokémon: move the cursor, A (menu: SUMMARY / TRADE), Down, A (TRADE), A ("Is this trade okay?"), A on YES.
+
+
+def swap(pair: TwoCoreLink, give0: int, give1: int) -> None:
+    """On the trade screen: trade party slot `give0` (0-based) of core 0 for `give1` of core 1 and sit through the animation and any evolution scene. The game then offers another trade, so the
+    pair is left on the trade screen again. (Each side's received Pokémon takes the slot its own gave from.)"""
+    # Pick: move the cursor, A (menu: SUMMARY / TRADE), Down, A (TRADE), A ("Is this trade okay?"), A on YES.
     moves0, moves1 = _cursor_moves(give0), _cursor_moves(give1)
     for i in range(max(len(moves0), len(moves1))):
         pair.press(moves0[i] if i < len(moves0) else 0, moves1[i] if i < len(moves1) else 0, hold=6, rest=40)
@@ -137,12 +207,58 @@ def cable_club_trade(pair: TwoCoreLink, give0: int = 1, give1: int = 1, max_pres
     pair.press(A, A, hold=6, rest=120)                                           # "Is this trade okay?"
     pair.run(300)                                                                # …the YES / NO box only comes up after both players have asked
     pair.press(A, A, hold=6, rest=60)                                            # YES
-    # 4. The trade animation and the evolution scene (A advances their text), until both games are back on the "Choose a POKéMON." screen — the game offers another trade.
+    # The trade animation and the evolution scene (A advances their text), until both are back on the "Choose a POKéMON." screen.
     left = False
     for _ in range(120):
         pair.press(A, A, hold=6, rest=114)
-        cbs = [c.read32(0x030030F4) for c in pair.clients]
+        cbs = _poll_callbacks(pair)
         left = left or any(cb != CB2_TRADE_SCREEN for cb in cbs)
         if left and all(cb == CB2_TRADE_SCREEN for cb in cbs):
             return
-    raise LinkError(f"the trade never finished (callbacks {[hex(c.read32(0x030030F4)) for c in pair.clients]})")
+    raise LinkError(f"the trade never finished (callbacks {[hex(cb) for cb in _poll_callbacks(pair)]})")
+
+
+def leave_trade_room(pair: TwoCoreLink) -> None:
+    """From the trade screen: the cursor to Cancel (the keys depend on the two party sizes), A, A ("Cancel trade?" YES), walk to the exit tiles — (5,8) and (6,8) — and Down once more ("The link will be terminated if you leave"), A through it: both
+    are back on the Pokémon Center 2F floor and the link is closed by the game."""
+    pair.run(600)                                                                # the screen has only just come back from the trade: let it finish drawing before any input
+    counts = [len(p) for p in pair.parties()]                                    # a finished trade re-opens the screen with the cursor on slot 0
+    paths = [_cursor_path(0, _CANCEL, counts[i], counts[1 - i]) for i in (0, 1)]
+    for i in range(max(map(len, paths))):
+        pair.press(*(p[i] if i < len(p) else 0 for p in paths), hold=6, rest=20)
+    pair.press(A, A, hold=6, rest=150)                                           # "Cancel trade?"
+    pair.press(A, A, hold=6, rest=150)                                           # YES
+    for _ in range(40):                                                          # the screen fades out on both before the field is back (it can take a while: the link is closed in step)
+        pair.run(60)
+        if all(cb == CB2_OVERWORLD for cb in _poll_callbacks(pair)):
+            break
+    else:
+        raise LinkError(f"the trade screen did not close (callbacks {[hex(cb) for cb in _poll_callbacks(pair)]})")
+    pair.run(120)
+    for _ in range(2):
+        pair.press(DOWN, DOWN, hold=16, rest=4)
+    pair.press(RIGHT, LEFT, hold=16, rest=4)
+    pair.press(DOWN, DOWN, hold=16, rest=4)
+    pair.press(DOWN, DOWN, hold=16, rest=30)                                     # onto the warp: "The link will be terminated if you leave"
+    for _ in range(8):
+        pair.press(A, A, hold=6, rest=150)
+        if all(m != TRADE_CENTER for m in pair.maps()):                          # back upstairs in whichever Pokémon Center this is
+            pair.run(300)
+            return
+    raise LinkError(f"never left the Trade Center (maps {pair.maps()})")
+
+
+def cable_club_trade(pair: TwoCoreLink, give0: int = 1, give1: int = 1) -> None:
+    """One trade, start to finish: enter the room, swap `give0` for `give1`, leave."""
+    enter_trade_room(pair)
+    swap(pair, give0, give1)
+    leave_trade_room(pair)
+
+
+def trade_evolve(pair: TwoCoreLink, give0: int, give1: int) -> None:
+    """A trade evolution with a partner: the Pokémon only evolves on the RECEIVING side, so core 0's slot `give0` goes to the partner (in exchange for its slot `give1`, a throwaway), evolves
+    there, and is traded back for the throwaway — both on the same two slots, in one visit to the room."""
+    enter_trade_room(pair)
+    swap(pair, give0, give1)
+    swap(pair, give0, give1)
+    leave_trade_room(pair)

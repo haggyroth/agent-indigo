@@ -146,6 +146,12 @@ ffi.set_source(
         return 0;
     }
     void link_destroy(void) {
+        /* A core may outlive the link (the main runtime's does): take our drivers out of its SIO first (NULL unloads + deinits the old driver and clears activeDriver), then detach the nodes. */
+        for (int i = 0; i < NP; ++i) {
+            struct GBA* gba = (struct GBA*) P[i].core->board;
+            GBASIOSetDriver(&gba->sio, NULL, SIO_MULTI);
+            GBASIOSetDriver(&gba->sio, NULL, SIO_NORMAL_32);
+        }
         for (int i = 0; i < NP; ++i) { GBASIOLockstepDetachNode(&L, &P[i].node); pthread_cond_destroy(&P[i].cv); }
         NP = 0; created = 0;
     }
@@ -191,10 +197,8 @@ ffi.set_source(
     }
     int link_run_keys(int frames, int timeout_ms, uint32_t keys0, uint32_t keys1, int hold) {
         stopping = 0;
-        uint32_t base = 0;                                      /* every core runs to the SAME absolute frame: a core that ran ahead last time makes the others catch up, so the counters never drift apart */
-        for (int i = 0; i < NP; ++i) { uint32_t fc = P[i].core->frameCounter(P[i].core); if (fc > base) base = fc; }
         for (int i = 0; i < NP; ++i) {
-            P[i].frames = frames; P[i].done = 0; P[i].framesDone = 0; P[i].hold = hold; P[i].keys = i == 0 ? keys0 : (i == 1 ? keys1 : 0); P[i].target = base + frames;
+            P[i].frames = frames; P[i].done = 0; P[i].framesDone = 0; P[i].hold = hold; P[i].keys = i == 0 ? keys0 : (i == 1 ? keys1 : 0); P[i].target = P[i].core->frameCounter(P[i].core) + frames;
             pthread_create(&P[i].thread, NULL, runner, &P[i]);
         }
         struct timespec t0, t;

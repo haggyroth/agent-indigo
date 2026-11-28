@@ -7,7 +7,9 @@ no ROM, just skips them). Run locally with:
 
 Fixtures live in `saves/live/` (gitignored — ROM-derived). See tests/live/README.md for what each one is.
 """
+import hashlib
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -22,6 +24,16 @@ os.environ.pop("RESUME", None)
 ROOT = Path(__file__).resolve().parents[2]
 LIVE_DIR = Path(os.environ.get("LIVE_DIR", ROOT / "saves" / "live"))
 ROM = Path(os.path.expanduser(os.environ.get("ROM_PATH", "~/mgba-http/Pokemon_LeafGreen.gba")))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _work_sav_is_never_written():
+    """No test may write the real work.sav (the cartridge save is file-backed: boot from a copy). A change fails the session, loudly, so a poisoned fixture is caught at once."""
+    sav = LIVE_DIR / "work.sav"
+    before = hashlib.md5(sav.read_bytes()).hexdigest() if sav.exists() else None
+    yield
+    if before is not None:
+        assert hashlib.md5(sav.read_bytes()).hexdigest() == before, f"{sav} was modified during the live session: something booted from or loaded it directly instead of from a copy"
 
 
 @pytest.fixture(scope="session")
@@ -39,12 +51,16 @@ def rt(tmp_path_factory):
     # tests/conftest.py imports config (→ .env) before this file runs, so a developer's SHOW_WINDOW=true
     # is already baked in: override the module constants directly. A paced window makes tests crawl.
     mgba_core.SHOW_WINDOW = False
-    os.environ["START_FROM_SAVE"] = str(sav)
     sys.path.insert(0, str(ROOT))
     import main
     tmp = tmp_path_factory.mktemp("live")
+    # Boot from a COPY: the runtime's cartridge save is file-backed, so an in-game save (the Cable Club asks "Would you like to save?" before every link-up) would otherwise overwrite the
+    # fixture and every later test would boot from it.
+    boot_sav = tmp / "work.sav"
+    shutil.copyfile(sav, boot_sav)
+    os.environ["START_FROM_SAVE"] = str(boot_sav)
     try:
-        runtime = main.build_runtime(ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"),
+        runtime = main.build_runtime(start_save=str(boot_sav), ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"),
                                      verbose=False)
     except main.StartPointError as e:
         pytest.skip(f"start point could not be loaded: {e}")

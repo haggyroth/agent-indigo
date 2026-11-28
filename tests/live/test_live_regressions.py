@@ -2941,11 +2941,14 @@ def test_shop_before_the_league_flies_to_a_mart_that_sells_hyper_potions(live):
     assert bag.get(20, 0) == before.get(20, 0) and bag.get(19, 0) == before.get(19, 0), out               # no Max Potions / Full Restores
 
 
-def test_load_state_does_not_rewind_a_loaded_battery_save(live):
+def test_load_state_does_not_rewind_a_loaded_battery_save(live, tmp_path):
     """#380: with a battery save loaded, a state from a LATER point (7 badges) rewinds RAM only — after a power cycle 'Continue' still loads the .sav's own save."""
+    import shutil
+
     import main
     from live.conftest import LIVE_DIR
-    assert live.m.load_save(str(LIVE_DIR / "work.sav"))
+    shutil.copyfile(LIVE_DIR / "work.sav", tmp_path / "work.sav")      # a COPY: the cartridge save is file-backed, and a later in-game save would overwrite the fixture
+    assert live.m.load_save(str(tmp_path / "work.sav"))
     main.drive_into_gameplay(live.m, live.r)
     before = (live.r.read_badges()[0], live.r.read_current_map())
     live.load("blaine_won")

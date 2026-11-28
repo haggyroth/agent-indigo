@@ -35,3 +35,27 @@ def test_a_kadabra_trade_over_the_link_cable_evolves_into_alakazam(live, tmp_pat
         assert pair.parties() == [[("Bulbasaur", 8), ("Kadabra", 30)]] * 2
         link.cable_club_trade(pair, give0=1, give1=1)
         assert pair.parties() == [[("Bulbasaur", 8), ("Alakazam", 30)]] * 2      # each side received a Kadabra, and a traded Kadabra evolves
+
+
+@needs_link
+def test_the_partner_trades_a_kadabra_back_as_an_alakazam_for_the_main_runtime(live, tmp_path):
+    """The main runtime's own core (at the Pokémon Center 2F counter) is linked to a freshly loaded partner core: Kadabra goes over, evolves on the partner's side, and comes back for the Rattata it
+    was traded for — then the link closes, the partner is gone and the main core steps on its own again."""
+    proc = subprocess.run([sys.executable, str(ROOT / "tools" / "make_live_fixtures.py"), "--only", "cable_club_counter,partner_counter", "--out", str(tmp_path)],
+                          capture_output=True, text=True, timeout=900, env={**os.environ, "LIVE_DIR": str(live.dir)})
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert live.m.load_state_file(str(tmp_path / "cable_club_counter.ss1"))
+    live.m.tick(30)
+    assert [(m.species_name, m.level) for m in live.r.read_party()] == [("Bulbasaur", 8), ("Kadabra", 30)]
+    pair = link.TwoCoreLink.with_partner(live.m, ROM, str(tmp_path / "partner_counter.ss1"))
+    try:
+        link.trade_evolve(pair, give0=1, give1=1)
+        partner_party = pair.parties()[1]
+    finally:
+        pair.close()
+    assert [(m.species_name, m.level) for m in live.r.read_party()] == [("Bulbasaur", 8), ("Alakazam", 30)]
+    assert partner_party == [("Bulbasaur", 8), ("Rattata", 5)]                       # the partner got its throwaway back
+    assert tuple(live.r.read_current_map()) == (5, 5)
+    frame = live.m.read32(0x030030F4)
+    live.m.tick(30)
+    assert live.m.read32(0x030030F4) == frame                                         # the main core runs alone again, on the field

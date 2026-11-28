@@ -22,6 +22,7 @@ from agent.skills.base import SkillBase
 from agent.skills.gamecorner import GameCornerMixin
 from agent.skills.selling import SellMixin
 from agent.skills.deleter import MoveDeleterMixin
+from agent.skills.linkpartner import LinkPartnerMixin
 from agent.skills.league import LeagueMixin
 from agent.skills.fishing import FishingMixin
 from agent.skills.bike import BikeMixin
@@ -65,7 +66,7 @@ if TYPE_CHECKING:
     from game.mgba_core import NativeMGBAClient
 
 
-class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, NewGameMixin, ServicesMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, TrainerTowerMixin, FerryMixin, SafariMixin, FossilMixin, TradeMixin, FameMixin, RematchMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
+class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin, LinkPartnerMixin, LeagueMixin, FishingMixin, BikeMixin, TutorMixin, GymQuestMixin, LegendsMixin, NewGameMixin, ServicesMixin, GameCornerMixin, PCMixin, PartyMixin, QuestMixin, TrainerTowerMixin, FerryMixin, SafariMixin, FossilMixin, TradeMixin, FameMixin, RematchMixin, HideoutMixin, ErrandsMixin, TowerMixin, MansionMixin, SilphMixin, VictoryMixin, GymPuzzleMixin, NavMixin, OverworldMixin, BattleMixin, MoveLearnMixin, EvolutionMixin, MenuMixin, FieldItemMixin, HMMixin, TMHMMixin):
 
     def __init__(self, mgba: "NativeMGBAClient", reader: LeafGreenReader, ltm: LongTermMemory):
         self.llm    = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
@@ -505,7 +506,7 @@ class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin
 
     _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
                                  "quest", "pc", "pick_up_items",
-                                 "use_hm", "teach_move", "forget_move", "fish", "tutor", "rename_pokemon", "daycare", "load_state"})
+                                 "use_hm", "teach_move", "forget_move", "trade_evolve", "fish", "tutor", "rename_pokemon", "daycare", "load_state"})
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
@@ -567,6 +568,8 @@ class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin
                 return self._rename_pokemon(str(args["pokemon"]), str(args["nickname"]))
             case "daycare":
                 return self._daycare(str(args["action"]), str(args.get("pokemon", "") or ""))
+            case "trade_evolve":
+                return self._trade_evolve(str(args["pokemon"]))
             case "forget_move":
                 return self._forget_move(str(args["pokemon"]), str(args["move"]), bool(args.get("force", False)))
             case "fly_to":

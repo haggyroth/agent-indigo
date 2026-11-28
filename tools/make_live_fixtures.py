@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -44,11 +45,12 @@ def recipe_threemon(live) -> None:
     assert len(live.r.read_party()) == 3
 
 
-def recipe_cable_club_counter(live) -> None:
-    """Viridian Pokémon Center 2F, across the counter from the Direct Corner attendant (the Trade Center / Colosseum counter): the Cable Club tutorial done, a party of two, the Pokédex in hand (#363)."""
+def _stand_at_cable_club_counter(live, second_mon: tuple) -> None:
+    """Viridian Pokémon Center 2F, across the counter from the Direct Corner attendant: the Cable Club tutorial done, the Pokédex in hand, and a second party member `second_mon` = (species, level, moves)."""
     import json
     live.set_flag(0x829)                                                       # FLAG_SYS_POKEDEX_GET
-    live.add_mon(64, 30, moves=(100, 93, 0, 0))                                # a Kadabra (Teleport, Confusion): the party needs two members to link, and it evolves by trade
+    species, level, moves = second_mon
+    live.add_mon(species, level, moves=moves)                                  # the party needs two members to link
     live.set_var(0x407C, 2)                                                    # VAR_MAP_SCENE_POKEMON_CENTER_TEALA: the first-visit tutorial is over
     go_to_town(live, "Viridian City", (3, 1))
     for _ in range(6):                                                         # inside and up the stairs: map (5, 5)
@@ -60,6 +62,16 @@ def recipe_cable_club_counter(live) -> None:
     assert tuple(live.r.read_player_pos()) == (10, 4), live.r.read_player_pos()
     live.m.tap("Up")                                                           # face the attendant (the walk may have ended facing another way)
     live.m.tick(20)
+
+
+def recipe_cable_club_counter(live) -> None:
+    """The player side of the link-cable tests (#363): Bulbasaur + a Kadabra L30 (Teleport, Confusion), which evolves by trade."""
+    _stand_at_cable_club_counter(live, (64, 30, (100, 93, 0, 0)))
+
+
+def recipe_partner_counter(live) -> None:
+    """The partner side: Bulbasaur + a Rattata L5 (the throwaway it gives in a trade) at the same counter (#363)."""
+    _stand_at_cable_club_counter(live, (19, 5, (33, 39, 0, 0)))
 
 
 def recipe_vermilion(live) -> None:
@@ -89,6 +101,7 @@ def recipe_league_door(live) -> None:
 # name -> (recipe, one-line description). A recipe stages from the boot state and asserts what it promises.
 RECIPES = {
     "threemon": (recipe_threemon, "Viridian City with a three-member party"),
+    "partner_counter": (recipe_partner_counter, "the trade partner's side: Bulbasaur + a Rattata at the same Cable Club counter"),
     "cable_club_counter": (recipe_cable_club_counter, "Viridian Pokémon Center 2F at the Direct Corner counter, a party of two (the link-cable tests)"),
     "vermilion": (recipe_vermilion, "Vermilion City, Ivysaur L30, the SS Ticket, no Cut"),
     "league_door": (recipe_league_door, "Indigo Plateau, 8 badges, a boosted L70 team of six"),
@@ -98,7 +111,6 @@ RECIPES = {
 def build_live(live_dir: Path, work_sav: Path):
     """The runtime booted from work.sav and the harness around it (the same as tests/live/conftest.py)."""
     os.environ.pop("RESUME", None)
-    os.environ["START_FROM_SAVE"] = str(work_sav)
     sys.path.insert(0, str(ROOT))
     sys.path.insert(0, str(ROOT / "tests"))
     import game.mgba_core as mgba_core
@@ -106,7 +118,10 @@ def build_live(live_dir: Path, work_sav: Path):
     import main
     from live.harness import Live
     tmp = Path(tempfile.mkdtemp(prefix="fixtures-"))
-    runtime = main.build_runtime(ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"), verbose=False)
+    boot_sav = tmp / "work.sav"                                                 # a COPY: the cartridge save is file-backed, and an in-game save would overwrite the real work.sav
+    shutil.copyfile(work_sav, boot_sav)
+    os.environ["START_FROM_SAVE"] = str(boot_sav)
+    runtime = main.build_runtime(start_save=str(boot_sav), ltm_path=str(tmp / "ltm.json"), journal_path=str(tmp / "j.jsonl"), verbose=False)
     if runtime is None:
         raise SystemExit("the emulator runtime could not be built (ROM_PATH / the binding?)")
     return Live(runtime, live_dir), tmp
