@@ -125,6 +125,52 @@ RECIPES = {
 }
 
 
+def firered_partner_names() -> dict[str, int]:
+    """partner_firered_<group> -> group: the FireRed partner states (a FireRed core at the Cable Club counter holding the exclusives, five to a state). Not part of RECIPES: they need the
+    FireRed ROM and a FireRed counter state, which not every contributor has, so they are made only when named (or with --firered)."""
+    sys.path.insert(0, str(ROOT))
+    from agent.skills.linkpartner import partner_groups
+    return {f"partner_firered_{g}": g for g in partner_groups()}
+
+
+def make_firered_partner(group: int, out: Path) -> Path:
+    """The FireRed partner state for `group`: FIRERED_STATE (a state of a FireRed game standing at a Pokémon Center 2F counter, e.g. ~/mgba-http/firered_trade_counter.ss0) with the group's
+    exclusives added to the party (Tackle only, at the level they are first found at in FireRed). Written to `out`/partner_firered_<group>.ss1."""
+    import functools
+    import types
+    sys.path.insert(0, str(ROOT))
+    sys.path.insert(0, str(ROOT / "tests"))
+    from agent.skills.linkpartner import FIRERED_ROM, partner_groups
+    from game.memory_reader import LeafGreenReader
+    from game.mgba_core import NativeMGBAClient
+    from knowledge.exclusives import FIRERED_ONLY
+    from live.harness import Live
+    rom = Path(os.path.expanduser(os.environ.get("FIRERED_ROM_PATH", FIRERED_ROM)))
+    state = Path(os.path.expanduser(os.environ.get("FIRERED_STATE", "~/mgba-http/firered_trade_counter.ss0")))
+    for need, what in ((rom, "the FireRed ROM (FIRERED_ROM_PATH)"), (state, "a FireRed state at the Cable Club counter (FIRERED_STATE)")):
+        if not need.exists():
+            raise FileNotFoundError(f"missing {what}: {need}")
+    fr = NativeMGBAClient(str(rom), show_window=False)
+    try:
+        fr.unrestricted_writes = True                                           # staging a partner, like the harness: this core is never the agent's game
+        assert fr.load_state_file(str(state)), f"could not load {state}"
+        fr.tick(30)
+        reader = LeafGreenReader(fr)                                            # FireRed shares LeafGreen's RAM and callback addresses (verified for the link, #363)
+        stage = types.SimpleNamespace(m=fr, r=reader)
+        for name in ("patch_mon", "heal_hp"):
+            setattr(stage, name, functools.partial(getattr(Live, name), stage))
+        assert tuple(reader.read_current_map()) == (5, 5) and len(reader.read_party()) == 1, (reader.read_current_map(), reader.read_party())
+        for sid in partner_groups()[group]:
+            Live.add_mon(stage, sid, FIRERED_ONLY[sid][0], moves=(33, 0, 0, 0))
+        fr.tick(30)
+        assert [p.species_id for p in reader.read_party()][1:] == partner_groups()[group]
+        target = out / f"partner_firered_{group}.ss1"
+        assert fr.save_state_file(str(target)), f"could not write {target}"
+        return target
+    finally:
+        fr.close()
+
+
 def build_live(live_dir: Path, work_sav: Path):
     """The runtime booted from work.sav and the harness around it (the same as tests/live/conftest.py)."""
     os.environ.pop("RESUME", None)
@@ -148,6 +194,7 @@ def main_cli(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--list", action="store_true", help="show the recipes and whether each fixture exists")
     ap.add_argument("--only", default="", help="comma-separated recipe names (default: every recipe whose fixture is missing)")
+    ap.add_argument("--firered", action="store_true", help="also make the FireRed partner states (partner_firered_<n>: needs the FireRed ROM and a FireRed counter state)")
     ap.add_argument("--force", action="store_true", help="regenerate even when the fixture exists")
     ap.add_argument("--out", default="", help="output folder (default: LIVE_DIR or saves/live)")
     args = ap.parse_args(argv)
@@ -156,9 +203,12 @@ def main_cli(argv=None) -> int:
     if args.list:
         for name, (_fn, doc) in RECIPES.items():
             print(f"{name:12} {'exists ' if (out / f'{name}.ss1').exists() else 'missing'}  {doc}")
+        for name, group in firered_partner_names().items():
+            print(f"{name:12} {'exists ' if (out / f'{name}.ss1').exists() else 'missing'}  the FireRed trade partner, group {group} (--firered or --only; needs the FireRed ROM)")
         return 0
-    names = [n.strip() for n in args.only.split(",") if n.strip()] or list(RECIPES)
-    unknown = [n for n in names if n not in RECIPES]
+    frs = firered_partner_names()
+    names = [n.strip() for n in args.only.split(",") if n.strip()] or list(RECIPES) + (list(frs) if args.firered else [])
+    unknown = [n for n in names if n not in RECIPES and n not in frs]
     if unknown:
         print(f"unknown recipe(s): {', '.join(unknown)} (see --list)")
         return 2
@@ -166,17 +216,26 @@ def main_cli(argv=None) -> int:
     if not todo:
         print("nothing to do: every selected fixture exists (use --force to regenerate)")
         return 0
+    out.mkdir(parents=True, exist_ok=True)
+    failed = 0
+    for name in [n for n in todo if n in frs]:                                  # the FireRed partners need no LeafGreen runtime
+        try:
+            print(f"made {make_firered_partner(frs[name], out)}")
+        except Exception as e:
+            failed += 1
+            print(f"FAILED {name}: {type(e).__name__}: {e}")
+    todo = [n for n in todo if n in RECIPES]
+    if not todo:
+        return 1 if failed else 0
     work_sav = Path(os.environ.get("WORK_SAV", live_dir / "work.sav"))
     rom = Path(os.path.expanduser(os.environ.get("ROM_PATH", "~/mgba-http/Pokemon_LeafGreen.gba")))
     for need, what in ((rom, "the ROM (ROM_PATH)"), (work_sav, "work.sav, the battery save the runtime boots from (WORK_SAV)")):
         if not need.exists():
             print(f"missing {what}: {need}")
             return 2
-    out.mkdir(parents=True, exist_ok=True)
     live, tmp = build_live(out, work_sav)
     boot = tmp / "boot.ss1"
     assert live.m.save_state_file(str(boot)), "could not capture the boot state"
-    failed = 0
     for name in todo:
         fn, _doc = RECIPES[name]
         assert live.m.load_state_file(str(boot)), "could not restore the boot state"

@@ -30,6 +30,7 @@ The table below is generated from `agent/tools.py` — run `python tools/gen_too
 | `teach_move` | overworld | tm, pokemon?, forget?, confirm? | Teach a TM/HM to a party Pokémon via the TM Case. |
 | `forget_move` | overworld | pokemon, move, force? | Delete a move at the Move Deleter in Fuchsia (travels there): the only way to remove an HM move. |
 | `trade_evolve` | overworld | pokemon | Evolve a Kadabra/Machoke/Graveler/Haunter via a Cable Club partner at a Pokémon Center (travels there). |
+| `link_trade` | overworld | want, give | Trade a Pokémon of yours (it stays) for a FireRed-only one: Ekans, Oddish, Psyduck, Growlithe, Shellder, Scyther, Electabuzz. |
 | `rename_pokemon` | overworld | pokemon, nickname | Change a Pokémon's nickname at the Name Rater in Lavender Town (travels there). |
 | `daycare` | overworld | action, pokemon? | Route 5 Day Care (travels there): action='deposit' leaves one Pokémon (it gains 1 exp per step you walk; another must be able to fight); 'withdraw' takes it back for ¥100 + ¥100 per level gained. |
 | `tutor` | overworld | move, pokemon?, forget? | Learn a move from its Kanto or Sevii tutor (free, once each; travels there, by ferry to an island): Counter, Rock Slide, Explosion, Swords Dance, Substitute… `pokemon` optional. |
@@ -52,5 +53,5 @@ The table below is generated from `agent/tools.py` — run `python tools/gen_too
 | `wait_frames` | overworld | frames | Wait N frames (60fps).  Use during animations and transitions. |
 | `record_milestone` | overworld | name, note? | Record a story milestone to long-term memory right after it happens: starter_chosen, delivered_oaks_parcel, got_cut, got_flash, cleared_rock_tunnel, got_silph_scope, rescued_mr_fuji, got_poke_flute, got_surf, got_strength, got_fly, woke_snorlax_12, woke_snorlax_16. |
 
-Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 42 tools in total.
+Other contexts (menus, dialog, transitions, unknown) are offered every tool. `?` marks an optional argument. 43 tools in total.
 <!-- TOOLS:END -->
