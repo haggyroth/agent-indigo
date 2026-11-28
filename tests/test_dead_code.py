@@ -16,6 +16,7 @@ ALLOW = {
     "write16", "write32",                           # low-level memory writes (write16 is used by the live harness)
     "decode_gen3_string",                           # charset helper with tests
     "is_fainted", "anything_changed",               # small dataclass conveniences
+    "load_states",                                  # TwoCoreLink API (game/link.py): restores both cores in the live link tests
 }
 
 
