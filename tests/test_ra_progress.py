@@ -1,4 +1,6 @@
 """The RetroAchievements map and the local evaluator (#358) — pure."""
+import pytest
+
 from knowledge import ra_progress
 from knowledge.ra_map import CHECKS, MANUAL, PARTIAL
 from knowledge.ra_set import ACHIEVEMENTS
@@ -78,6 +80,7 @@ def _tick(flags, achievements, points, run=None):
 
 
 def test_the_achievement_line_shows_the_baseline_once_then_only_unlocks():
+    pytest.importorskip("openai")                                                   # agent.observation imports the LLM client; CI's unit jobs have no openai
     from agent import observation as obs
     t = _tick({0x829}, 1, 1)                                                       # the Pokédex is in hand
     first = obs._achievement_line(t)
@@ -92,6 +95,7 @@ def test_the_achievement_line_shows_the_baseline_once_then_only_unlocks():
 
 
 def test_the_achievement_line_names_at_most_three_unlocks():
+    pytest.importorskip("openai")                                                   # agent.observation imports the LLM client; CI's unit jobs have no openai
     from agent import observation as obs
     t = _tick({0x829}, 1, 1)
     obs._achievement_line(t)
