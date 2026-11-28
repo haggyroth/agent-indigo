@@ -25,3 +25,19 @@ def test_after_the_hall_of_fame_the_league_achievements_are_unlocked(live):
     assert all(st[a] == "yes" for a in (34785, 34786, 34787, 34788, 34789, 34790, 34791, 34792))     # all eight badges
     done = live.c._execute("quest", json.dumps({"name": "achievements done"}))
     assert "The Real Champion!" in done and "A Stone Gray City" in done, done
+
+
+def test_the_journal_count_is_refreshed_from_the_real_game(live, tmp_path):
+    """#358: main._apply_progress puts the unlocked count into the journal (what the eval goals and the scorecard read) — here from the post-Hall-of-Fame fixture, into a scratch journal."""
+    from types import SimpleNamespace
+
+    import main
+    from evals import goals
+    from memory.long_term import LongTermMemory
+    live.load("post_hof")
+    ltm = LongTermMemory(path=tmp_path / "journal.json")
+    run = main._RunState()
+    run.step_count = 0
+    main._apply_progress(run, SimpleNamespace(badges=8, party_count=6, party=[], badge_bits=255), SimpleNamespace(badges_changed=False), live.r, ltm)
+    assert ltm.data["achievements"] >= 9 and ltm.data["achievement_points"] >= 9 * 10 - 5, ltm.data          # eight badges + The Real Champion at least
+    assert goals.achievements_at_least(9)(None, ltm) and not goals.achievements_at_least(129)(None, ltm)

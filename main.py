@@ -114,6 +114,8 @@ class EpisodeResult:
     cached_tokens:     int = 0        # prompt tokens served from the server's prompt cache (0 when the endpoint doesn't report it)
     post_game_steps:   int = 0        # decision ticks played after the Hall of Fame (a completion run)
     dex_owned:         int = 0        # Kanto species caught at the end
+    achievements:      int = 0        # RetroAchievements of the LeafGreen set unlocked here at the end (local tracking, #358)
+    achievement_points: int = 0       # their points (of 781)
 
     @property
     def total_tokens(self) -> int:
@@ -483,6 +485,9 @@ def _handle_battle_end(run: _RunState) -> None:
     run.current_enemy = ""
 
 
+ACHIEVEMENT_EVERY = 5          # decision ticks between reads of the RetroAchievements checklist (it reads a few hundred flags)
+
+
 def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
                     reader: LeafGreenReader, ltm: LongTermMemory) -> None:
     """Auto-milestones and long-term progress derived from this tick's state diff (badges, key items, the starter).
@@ -520,6 +525,15 @@ def _apply_progress(run: _RunState, state: GameState, diff: StateDiff,
     except Exception:
         log_once("main._apply_progress", "main._apply_progress: tolerated failure (continuing with a default)")
         pass
+
+    if run.step_count % ACHIEVEMENT_EVERY == 0:
+        try:                                                  # the RA checklist, read from the game's flags (a few hundred cheap reads): the eval goals and the scorecard read the journal
+            from agent import ra
+            from knowledge import ra_progress
+            totals = ra_progress.totals(ra.states(reader, ltm))
+            ltm.data["achievements"], ltm.data["achievement_points"] = int(totals["yes"][0]), int(totals["yes"][1])
+        except Exception:
+            log_once("main._apply_progress.achievements", "main._apply_progress: achievements unreadable (keeping the last count)")
 
     if reader.read_flag(0x840) and ltm.add_milestone("national_dex", "Prof. Oak enabled the National Pokédex"):         # FLAG_SYS_NATIONAL_DEX
         events.emit("milestone", "milestone: national_dex — the Pokédex goes beyond Kanto")
@@ -640,6 +654,7 @@ def run_episode(rt: AgentRuntime, *, goal: Optional[Goal] = None, goal_desc: str
             stuck_ratio=round(run.stuck_ticks / run.decision_ticks, 3) if run.decision_ticks else 0.0,
             goal_desc=goal_desc,
             post_game_steps=run.post_game_steps, dex_owned=int(ltm.data.get("dex_owned", 0) or 0),
+            achievements=int(ltm.data.get("achievements", 0) or 0), achievement_points=int(ltm.data.get("achievement_points", 0) or 0),
         )
 
     while True:

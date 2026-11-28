@@ -132,7 +132,7 @@ def _report(results: list[dict]) -> None:
         console.print("[yellow]No scenarios ran.[/]")
         return
     table = Table(title="Eval results", show_lines=False)
-    for col in ("scenario", "status", "reason", "steps", "events",
+    for col in ("scenario", "status", "reason", "steps", "events", "achv",
                 "final_map", "stuck", "llm_calls", "tokens", "time"):
         table.add_column(col)
     for r in results:
@@ -140,7 +140,7 @@ def _report(results: list[dict]) -> None:
                  "FAIL": "red", "xfail": "dim", "SKIPPED": "yellow"}.get(r["status"], "")
         table.add_row(
             r["scenario"], f"[{style}]{r['status']}[/]" if style else r["status"],
-            r["reason"], str(r["steps"]), _event_cell(r.get("stats") or {}),
+            r["reason"], str(r["steps"]), _event_cell(r.get("stats") or {}), f"{r.get('achievements', 0)} ({r.get('achievement_points', 0)}p)",
             str(tuple(r["final_map"])), f"{r['stuck_ratio']:.0%}",
             str(r["llm_calls"]), str(r["total_tokens"]), f"{r['elapsed_s']}s",
         )

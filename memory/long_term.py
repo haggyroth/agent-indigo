@@ -23,6 +23,8 @@ DEFAULTS = {
     "pc_visited": [],     # "bank,id" towns whose Pokémon Center was visited on first arrival (nav._maybe_visit_new_town)
     "model_milestones": [],  # milestones the MODEL recorded by hand (record_milestone), not derived from the game — startup drops any the cartridge contradicts (#379)
     "dex_owned": 0,       # Kanto species caught as last read (the eval goals and the scorecard read the journal, not the emulator)
+    "achievements": 0,    # RetroAchievements of the LeafGreen set unlocked as last read ('yes' only — knowledge/ra_progress.py; local tracking, #358)
+    "achievement_points": 0,   # their points (of 781)
     "shop_broke_at": None,  # money at the last shop() visit that bought nothing for lack of funds (readiness stays quiet until richer)
 }
 

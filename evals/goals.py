@@ -44,6 +44,15 @@ def dex_owned_at_least(n: int) -> Goal:
     return Goal(lambda _s, l: int(l.data.get("dex_owned", 0) or 0) >= n, f"≥{n} species caught")
 
 
+def achievements_at_least(n: int) -> Goal:
+    """RetroAchievements of the LeafGreen set unlocked (the journal's `achievements`, refreshed every few ticks from the game's flags — local tracking, #358)."""
+    return Goal(lambda _s, l: int(l.data.get("achievements", 0) or 0) >= n, f"≥{n} achievement(s) unlocked")
+
+
+def achievement_points_at_least(n: int) -> Goal:
+    return Goal(lambda _s, l: int(l.data.get("achievement_points", 0) or 0) >= n, f"≥{n} achievement point(s)")
+
+
 def party_size_at_least(n: int) -> Goal:
     return Goal(lambda s, _l: s.party_count >= n,
                 f"party size ≥{n}")
