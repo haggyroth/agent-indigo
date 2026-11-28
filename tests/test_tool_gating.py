@@ -66,8 +66,8 @@ def test_every_schema_has_a_dispatcher_case():
 
 def test_token_budget_has_not_crept_back():
     assert tokens(GameContext.IN_BATTLE) < 1500            # was ~5.6k with every tool on every call
-    assert tokens(GameContext.OVERWORLD) < 4900               # grew with forget_move (#273), fish (#269), tutor (#274), rename_pokemon and daycare (#277), trade_evolve (#363): each a capability the agent lacked, kept to a line
-    assert tokens(None) < 5700                              # the "everything" fallback grew with save_game, give_item, safari, game_corner, rename_pokemon, daycare, trade_evolve
+    assert tokens(GameContext.OVERWORLD) < 5000               # grew with forget_move (#273), fish (#269), tutor (#274), rename_pokemon and daycare (#277), trade_evolve and link_trade (#363): each a capability the agent lacked, kept to a line
+    assert tokens(None) < 5800                              # the "everything" fallback grew with save_game, give_item, safari, game_corner, rename_pokemon, daycare, trade_evolve, link_trade
     for t in TOOLS:
         assert len(t["function"]["description"]) < 650, t["function"]["name"]      # long guidance belongs in the prompt
 

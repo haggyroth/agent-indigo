@@ -259,6 +259,12 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {"pokemon": {"type": "string"}}, "required": ["pokemon"]},
     }},
     {"type": "function", "function": {
+        "name": "link_trade",
+        "description": "Trade a Pokémon of yours (it stays) for a FireRed-only one: Ekans, Oddish, Psyduck, Growlithe, Shellder, Scyther, Electabuzz. Cable Club at a Pokémon Center (travels there).",
+        "parameters": {"type": "object", "properties": {
+            "want": {"type": "string", "description": "the FireRed exclusive"}, "give": {"type": "string", "description": "species or slot"}}, "required": ["want", "give"]},
+    }},
+    {"type": "function", "function": {
         "name": "rename_pokemon",
         "description": "Change a Pokémon's nickname at the Name Rater in Lavender Town (travels there). Not for traded Pokémon or Eggs.",
         "parameters": {"type": "object", "properties": {

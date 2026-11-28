@@ -506,7 +506,7 @@ class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin
 
     _ABANDONS_GRIND = frozenset({"go_to", "go_to_map", "walk_to", "heal", "shop", "challenge_leader", "fly_to",
                                  "quest", "pc", "pick_up_items",
-                                 "use_hm", "teach_move", "forget_move", "trade_evolve", "fish", "tutor", "rename_pokemon", "daycare", "load_state"})
+                                 "use_hm", "teach_move", "forget_move", "trade_evolve", "link_trade", "fish", "tutor", "rename_pokemon", "daycare", "load_state"})
 
     def _execute_inner(self, name: str, args_json: str) -> str:
         args = json.loads(args_json) if args_json else {}
@@ -570,6 +570,8 @@ class AgentClient(SkillBase, SkillState, SweepMixin, SellMixin, MoveDeleterMixin
                 return self._daycare(str(args["action"]), str(args.get("pokemon", "") or ""))
             case "trade_evolve":
                 return self._trade_evolve(str(args["pokemon"]))
+            case "link_trade":
+                return self._link_trade(str(args["want"]), str(args["give"]))
             case "forget_move":
                 return self._forget_move(str(args["pokemon"]), str(args["move"]), bool(args.get("force", False)))
             case "fly_to":
