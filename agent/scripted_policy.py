@@ -144,6 +144,8 @@ class ChainPolicy(ScriptedPolicy):
 
     STALL_REPEATS = 3                 # the same failure text this many times in a row = a stall
     STALL_CALLS = 40                  # calls spent on one beat with no new badge / key item / map progress
+    _no_grass_left = 0                # (an instance sets its own: decisions during which a 'train first' advisory is ignored after a grind that found no grass)
+    EXP_STEP = 1000                   # the party's total experience, in steps of this many points, counts as progress too: a grind toward a Level wall (the Elite Four wants five at L46+) earns exp long before a level shows
     MAX_BEAT_CALLS = 1500             # …and the absolute cap on one beat: a level gain counts as progress, so a grind that crawls never trips STALL_CALLS
 
     OPTIONAL_WANTED = ("fly",)        # optional beats the chain takes anyway: HM02 Fly is the only way back from the Indigo Plateau (no grass there, Victory Road behind)
@@ -160,6 +162,7 @@ class ChainPolicy(ScriptedPolicy):
         self._fly_taught = False       # HM02 Fly was offered to a Pokémon (once: a refusal must not loop)
         self._prepped = False          # the team was levelled BEFORE Victory Road (past it there is no grass to train on: Plateau → back through the cave)
         self._skip_heal = 0            # decisions to go on WITHOUT healing after a heal that could not (a cave with no Center, an empty Bag)
+        self._no_grass_left = 0        # decisions during which a "train first" advisory is ignored: a grind that found no grass (the Plateau has none) cannot be what the advisory asks for
         self._calls_on: dict[str, int] = {}
         self._total_on: dict[str, int] = {}
         self._progress: dict = {}
@@ -168,7 +171,7 @@ class ChainPolicy(ScriptedPolicy):
     def on_result(self, result: str) -> None:
         low = result
         self._pending = ""
-        if self.history and self.history[-1].startswith("heal(") and low.startswith(("Victory Road has no", "On the way to a Pokémon Center to heal", "No Pokémon Center is reachable")) and "healed from the Bag" not in low:
+        if self.history and self.history[-1].startswith("heal(") and low.startswith(("Victory Road has no", "On the way to a Pokémon Center to heal", "No Pokémon Center is reachable", "The Elite Four's rooms are sealed")) and "healed from the Bag" not in low:
             self._skip_heal = 6
             return
         if any(k in low for k in self.NEEDS_HEAL) and "Healed" not in low:
@@ -179,6 +182,10 @@ class ChainPolicy(ScriptedPolicy):
             self._pending = "shop"
         elif any(k in low for k in self.NOT_READY):
             self._pending = "grind"
+        if self.history and self.history[-1].startswith("grind(") and low.startswith("No tall grass"):
+            self._no_grass_left = 8                      # its own text says 'call grind() again', which reads as 'not ready' — a loop of 40 calls until the stall fired (scripted run 2026-11-28): go on with the quest instead
+        if self._no_grass_left > 0 and self._pending == "grind":
+            self._pending, self._no_grass_left = "", self._no_grass_left - 1
         failed = any(k in low for k in ("Can't reach", "Can't get to", "No route", "stuck at", "No walkable path", "couldn't", "Couldn't", "isn't working", "was stopped"))
         if self.history and self.history[-1].startswith("grind(") and low.startswith(("Party is balanced", "Your best Pokémon is already", "No tall grass", "Not worth", "Training isn't")):
             self._prepped = True
@@ -220,7 +227,7 @@ class ChainPolicy(ScriptedPolicy):
         bounces between two maps forever changed the old signature every call and hid a 2,800-call loop)."""
         seen = self._maps_seen.setdefault(key, set())
         seen.add(tuple(self.r.read_current_map()))
-        return (self.r.read_badges()[0], len(self.r.read_key_items()), len(seen), sum(p.level for p in self.r.read_party()))
+        return (self.r.read_badges()[0], len(self.r.read_key_items()), len(seen), sum(p.level for p in self.r.read_party()), sum(self.r.read_party_exp()) // self.EXP_STEP)
 
     def _note_beat_call(self, key: str, sig) -> None:
         """Count one call against beat `key` and record a stall when (a) STALL_CALLS calls pass with the progress signature unchanged, or (b) the beat has taken MAX_BEAT_CALLS calls in all —
@@ -232,7 +239,7 @@ class ChainPolicy(ScriptedPolicy):
         if self.stall:
             return
         if self._calls_on[key] > self.STALL_CALLS:
-            self.stall = f"{key}: {self.STALL_CALLS} calls with no new badge, key item, map or level (last: {self.last_result[:160]})"
+            self.stall = f"{key}: {self.STALL_CALLS} calls with no new badge, key item, map, level or experience (last: {self.last_result[:160]})"
         elif self._total_on[key] > self.MAX_BEAT_CALLS:
             self.stall = f"{key}: {self.MAX_BEAT_CALLS} calls on one beat — progress keeps being made, but too slowly to be going anywhere (last: {self.last_result[:160]})"
 

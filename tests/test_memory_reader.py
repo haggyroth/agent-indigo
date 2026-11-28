@@ -257,3 +257,13 @@ def test_diff_none_before_is_empty():
     st = make_reader(fc).read_state()
     d = make_reader(fc).diff(None, st)
     assert not d.anything_changed
+
+
+def test_read_party_exp_reads_each_members_growth_experience():
+    fc = FakeClient()
+    fc.set8(Addr.PARTY_COUNT, 2)
+    fc.set_bytes(Addr.PARTY_DATA + 0 * 100, build_party_mon(0x1234, 0x9999, level=12, cur_hp=25, max_hp=40, species=1, exp=1728))
+    fc.set_bytes(Addr.PARTY_DATA + 1 * 100, build_party_mon(0x5678, 0xAAAA, level=7, cur_hp=0, max_hp=22, species=4, exp=343))
+    assert make_reader(fc).read_party_exp() == [1728, 343]
+    fc.set8(Addr.PARTY_COUNT, 0)
+    assert make_reader(fc).read_party_exp() == []

@@ -177,3 +177,48 @@ def test_chain_policy_absolute_cap_catches_a_grind_that_crawls():
     for _ in range(ChainPolicy.STALL_CALLS + 1):
         q._note_beat_call("victory_road", ("same",))
     assert "no new badge" in q.stall                                       # the old rule still fires first
+
+
+def test_chain_progress_signature_counts_experience_in_steps():
+    """A grind toward a level wall earns experience long before a level shows: the party's total exp, in steps of EXP_STEP, is progress too."""
+    from types import SimpleNamespace
+
+    from agent.scripted_policy import ChainPolicy
+    exp = [10_000, 20_000]
+    r = SimpleNamespace(read_current_map=lambda: (3, 0), read_badges=lambda: (8, 255), read_key_items=lambda: [], read_party=lambda: [SimpleNamespace(level=44), SimpleNamespace(level=45)],
+                        read_party_exp=lambda: list(exp))
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.r, p._maps_seen = r, {}
+    before = p._progress_sig("elite_four")
+    exp[0] += ChainPolicy.EXP_STEP // 4
+    assert p._progress_sig("elite_four") == before                         # a little exp inside the same step: not yet
+    exp[0] += ChainPolicy.EXP_STEP
+    assert p._progress_sig("elite_four") != before                         # a step's worth: progress, with no level gained
+
+
+def test_chain_policy_presses_on_when_the_league_rooms_are_sealed():
+    """Scripted run 2026-11-28: inside Lorelei's room the readiness check wanted a heal, heal() answered 'the rooms are sealed … press on with quest('elite_four')', and the policy healed again for 40 calls
+    until the stall fired. A heal that cannot happen here means: go on without it for a few decisions."""
+    from agent.scripted_policy import ChainPolicy
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.stall, p._pending, p._fails, p._skip_heal, p.history = "", "", [], 0, ["heal({})"]
+    p.on_result("The Elite Four's rooms are sealed — there is no Pokémon Center to leave for, and nothing more in the Bag is worth using now (0 Full Restore, 0 Revive, 0 Potions). "
+                "Press on with quest('elite_four'): win outright, or if the whole team faints the whiteout returns you to the Plateau's Center fully healed (the League resets).")
+    assert p._skip_heal == 6 and p._pending == ""
+
+
+def test_chain_policy_stops_grinding_when_there_is_no_grass_and_goes_on_with_the_quest():
+    """Scripted run 2026-11-28: after 28 League losses the advisory bar was L70 and grind() from the Plateau answered 'No tall grass reachable … call grind() again', which reads as 'not ready, grind' —
+    40 calls of that until the stall fired. A no-grass grind means: ignore the 'train first' advisory for a few decisions and call the quest again."""
+    from agent.scripted_policy import ChainPolicy
+    p = ChainPolicy.__new__(ChainPolicy)
+    p.stall, p._pending, p._fails, p._skip_heal, p._no_grass_left, p._prepped, p.history = "", "", [], 0, 0, False, ["grind({})"]
+    p.on_result("No tall grass reachable from here — go_to a route with grass (e.g. 'Route 1'/'Route 2' or Viridian Forest), then call grind() again.")
+    assert p._pending == "" and p._no_grass_left == 7                     # the refusal's own 'call grind() again' did not make it pending
+    p.history = ["quest({\"name\": \"elite_four\"})"]
+    p.on_result("You have lost in the Pokémon League 28 losses so far, so the bar has gone up … grind() with no level lifts the weaker members … Training is encouraged, not required — call quest('elite_four') again to go anyway.")
+    assert p._pending == "" and p._no_grass_left == 6                     # the advisory is ignored too: the next decision is the quest
+    q = ChainPolicy.__new__(ChainPolicy)
+    q.stall, q._pending, q._fails, q._skip_heal, q._no_grass_left, q._prepped, q.history = "", "", [], 0, 0, False, ["quest({})"]
+    q.on_result("Not ready for quest('elite_four'): your best Pokémon is L53. grind() with no level lifts the weaker members.")
+    assert q._pending == "grind"                                           # with grass available the advisory still means: train

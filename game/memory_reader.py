@@ -638,6 +638,16 @@ class LeafGreenReader:
         n = species_id - 1
         return bool(self.client.read8(sb2 + Addr.DEX_OWNED_OFFSET + (n >> 3)) >> (n & 7) & 1)
 
+    def read_party_exp(self) -> list[int]:
+        """The experience points of each party member (the Growth substruct's exp, +4): a progress signal finer than the level — a grind earns exp long before a level shows. [] on a read hiccup."""
+        try:
+            n = min(self.client.read8(Addr.PARTY_COUNT), 6)
+            raw = self.client.read_range(Addr.PARTY_DATA, 100 * n)
+            return [int.from_bytes(decrypt_substructs(raw[i * 100:(i + 1) * 100])["G"][4:8], "little") for i in range(n)]
+        except Exception:
+            logger.warning("party exp read failed", exc_info=True)
+            return []
+
     def read_dex_owned_national(self, number: int) -> bool | None:
         """Is national dex number `number` (1-386) registered as CAUGHT? Internal species id == national number up to 251 (Johto's Raikou, Entei, Suicune are 243-245). None when unreadable."""
         if not (1 <= number <= Addr.DEX_NATIONAL):

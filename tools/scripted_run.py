@@ -24,8 +24,13 @@ def main():
     ap.add_argument("--state", default="", help="start from this emulator state instead of the save")
     ap.add_argument("--save", default=os.path.expanduser("~/mgba-http/Pokemon_LeafGreen.sav"))
     a = ap.parse_args()
+    import shutil
+    import tempfile
+    # Boot from a COPY of the battery save: the cartridge save is file-backed, and a chain that saves in-game (save_game, or the Cable Club's prompt) would otherwise overwrite the real one.
+    boot_save = os.path.join(tempfile.mkdtemp(prefix="scripted-save-"), os.path.basename(a.save))
+    shutil.copyfile(os.path.expanduser(a.save), boot_save)
     os.environ.update(USE_VISION="false", SHOW_WINDOW="false",
-                      MAX_LLM_CALLS="0", TOKEN_BUDGET="0", START_FROM_SAVE=a.save)
+                      MAX_LLM_CALLS="0", TOKEN_BUDGET="0", START_FROM_SAVE=boot_save)
     if a.state:
         os.environ["START_FROM_STATE"] = a.state
     import game.mgba_core as mc
@@ -38,7 +43,6 @@ def main():
     kind, _, val = a.goal.partition(":")
     goal = (goals.has_milestone("hall_of_fame") if kind == "clear" else goals.badges_at_least(int(val)) if kind == "badges"
             else goals.reached_map(*[int(x) for x in val.split(",")]))
-    import tempfile
     tmp = tempfile.mkdtemp()
     rt = main.build_runtime(ltm_path=f"{tmp}/ltm.json", journal_path=f"{tmp}/j.jsonl", verbose=False,
                             **({"start_state": a.state} if a.state else {}))
