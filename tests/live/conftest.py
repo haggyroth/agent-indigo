@@ -7,6 +7,7 @@ no ROM, just skips them). Run locally with:
 
 Fixtures live in `saves/live/` (gitignored — ROM-derived). See tests/live/README.md for what each one is.
 """
+import hashlib
 import os
 import shutil
 import sys
@@ -23,6 +24,16 @@ os.environ.pop("RESUME", None)
 ROOT = Path(__file__).resolve().parents[2]
 LIVE_DIR = Path(os.environ.get("LIVE_DIR", ROOT / "saves" / "live"))
 ROM = Path(os.path.expanduser(os.environ.get("ROM_PATH", "~/mgba-http/Pokemon_LeafGreen.gba")))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _work_sav_is_never_written():
+    """No test may write the real work.sav (the cartridge save is file-backed: boot from a copy). A change fails the session, loudly, so a poisoned fixture is caught at once."""
+    sav = LIVE_DIR / "work.sav"
+    before = hashlib.md5(sav.read_bytes()).hexdigest() if sav.exists() else None
+    yield
+    if before is not None:
+        assert hashlib.md5(sav.read_bytes()).hexdigest() == before, f"{sav} was modified during the live session: something booted from or loaded it directly instead of from a copy"
 
 
 @pytest.fixture(scope="session")

@@ -221,6 +221,7 @@ def swap(pair: TwoCoreLink, give0: int, give1: int) -> None:
 def leave_trade_room(pair: TwoCoreLink) -> None:
     """From the trade screen: the cursor to Cancel (the keys depend on the two party sizes), A, A ("Cancel trade?" YES), walk to the exit tiles — (5,8) and (6,8) — and Down once more ("The link will be terminated if you leave"), A through it: both
     are back on the Pokémon Center 2F floor and the link is closed by the game."""
+    pair.run(600)                                                                # the screen has only just come back from the trade: let it finish drawing before any input
     counts = [len(p) for p in pair.parties()]                                    # a finished trade re-opens the screen with the cursor on slot 0
     paths = [_cursor_path(0, _CANCEL, counts[i], counts[1 - i]) for i in (0, 1)]
     for i in range(max(map(len, paths))):
