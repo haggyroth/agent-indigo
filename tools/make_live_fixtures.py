@@ -44,6 +44,24 @@ def recipe_threemon(live) -> None:
     assert len(live.r.read_party()) == 3
 
 
+def recipe_cable_club_counter(live) -> None:
+    """Viridian Pokémon Center 2F, across the counter from the Direct Corner attendant (the Trade Center / Colosseum counter): the Cable Club tutorial done, a party of two, the Pokédex in hand (#363)."""
+    import json
+    live.set_flag(0x829)                                                       # FLAG_SYS_POKEDEX_GET
+    live.add_mon(64, 30, moves=(100, 93, 0, 0))                                # a Kadabra (Teleport, Confusion): the party needs two members to link, and it evolves by trade
+    live.set_var(0x407C, 2)                                                    # VAR_MAP_SCENE_POKEMON_CENTER_TEALA: the first-visit tutorial is over
+    go_to_town(live, "Viridian City", (3, 1))
+    for _ in range(6):                                                         # inside and up the stairs: map (5, 5)
+        if tuple(live.r.read_current_map()) == (5, 5):
+            break
+        live.c._execute("go_to", json.dumps({"destination": "map:5,5"}))
+    assert tuple(live.r.read_current_map()) == (5, 5), live.r.read_current_map()
+    live.c._execute("walk_to", json.dumps({"x": 10, "y": 4}))
+    assert tuple(live.r.read_player_pos()) == (10, 4), live.r.read_player_pos()
+    live.m.tap("Up")                                                           # face the attendant (the walk may have ended facing another way)
+    live.m.tick(20)
+
+
 def recipe_vermilion(live) -> None:
     """Vermilion City, Ivysaur L30, the SS Ticket held, no Cut yet."""
     from knowledge.growth import exp_for_level
@@ -71,6 +89,7 @@ def recipe_league_door(live) -> None:
 # name -> (recipe, one-line description). A recipe stages from the boot state and asserts what it promises.
 RECIPES = {
     "threemon": (recipe_threemon, "Viridian City with a three-member party"),
+    "cable_club_counter": (recipe_cable_club_counter, "Viridian Pokémon Center 2F at the Direct Corner counter, a party of two (the link-cable tests)"),
     "vermilion": (recipe_vermilion, "Vermilion City, Ivysaur L30, the SS Ticket, no Cut"),
     "league_door": (recipe_league_door, "Indigo Plateau, 8 badges, a boosted L70 team of six"),
 }

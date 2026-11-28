@@ -23,6 +23,7 @@ ffi.cdef("""
     void     link_destroy(void);
     int      link_attach(void* pycore);                  /* the node id (0 = master), or -1 */
     int      link_run(int frames, int timeout_ms);       /* 0 = ok, 1 = timed out (deadlock: see link_state) */
+    int      link_run_keys(int frames, int timeout_ms, uint32_t keys0, uint32_t keys1, int hold);   /* the same, each core holding its keys for its own first `hold` frames */
     int      link_attached(void);
     uint32_t link_frame_counter(int id);
     int      link_mode(int id);                          /* the SIO mode a node's game has selected */
@@ -55,6 +56,7 @@ ffi.set_source(
         unsigned waitMask;
         int32_t cyclesPosted;
         int frames, done, framesDone, waitReq;
+        uint32_t keys, hold, start, target;
         long tick;
         pthread_t thread;
     } Player;
@@ -162,25 +164,39 @@ ffi.set_source(
         GBASIOSetDriver(&gba->sio, &p->node.d, SIO_NORMAL_32);
         return NP++;
     }
+    static int all_done(void) { for (int i = 0; i < NP; ++i) if (!P[i].done) return 0; return 1; }
     static void* runner(void* arg) {
         Player* p = (Player*) arg;
         struct mCore* core = p->core;
-        uint32_t target = core->frameCounter(core) + p->frames;
-        while (!stopping && (int32_t)(target - core->frameCounter(core)) > 0) {
+        p->start = core->frameCounter(core);
+        int released = 0;
+        if (p->keys) core->setKeys(core, p->keys);
+        /* A core that has run its frames KEEPS RUNNING until every core has: its partner may be asleep waiting for it (a transfer in progress), and a finished thread would never wake it. */
+        while (!stopping) {
+            if (!released && p->keys && (int32_t)(core->frameCounter(core) - p->start) >= (int32_t) p->hold) { core->setKeys(core, 0); released = 1; }
             pthread_mutex_lock(&M);
-            while (p->waitReq && !stopping) pthread_cond_wait(&p->cv, &M);
+            if (!p->done && (int32_t)(p->target - core->frameCounter(core)) <= 0) {
+                p->done = 1;
+                if (all_done()) for (int k = 0; k < NP; ++k) pthread_cond_broadcast(&P[k].cv);   /* wake any sleeper so it sees that everyone is done */
+            }
+            int finished = all_done();
+            while (!finished && p->waitReq && !stopping) { pthread_cond_wait(&p->cv, &M); finished = all_done(); }
             pthread_mutex_unlock(&M);
+            if (finished || stopping) break;
             core->runLoop(core);
-            p->framesDone = p->frames - (int)(target - core->frameCounter(core));
+            p->framesDone = (int)(core->frameCounter(core) - p->start);
         }
-        pthread_mutex_lock(&M);
-        p->done = 1;
-        pthread_mutex_unlock(&M);
+        if (p->keys) core->setKeys(core, 0);
         return NULL;
     }
-    int link_run(int frames, int timeout_ms) {
+    int link_run_keys(int frames, int timeout_ms, uint32_t keys0, uint32_t keys1, int hold) {
         stopping = 0;
-        for (int i = 0; i < NP; ++i) { P[i].frames = frames; P[i].done = 0; P[i].framesDone = 0; pthread_create(&P[i].thread, NULL, runner, &P[i]); }
+        uint32_t base = 0;                                      /* every core runs to the SAME absolute frame: a core that ran ahead last time makes the others catch up, so the counters never drift apart */
+        for (int i = 0; i < NP; ++i) { uint32_t fc = P[i].core->frameCounter(P[i].core); if (fc > base) base = fc; }
+        for (int i = 0; i < NP; ++i) {
+            P[i].frames = frames; P[i].done = 0; P[i].framesDone = 0; P[i].hold = hold; P[i].keys = i == 0 ? keys0 : (i == 1 ? keys1 : 0); P[i].target = base + frames;
+            pthread_create(&P[i].thread, NULL, runner, &P[i]);
+        }
         struct timespec t0, t;
         clock_gettime(CLOCK_MONOTONIC, &t0);
         int timed_out = 0;
@@ -188,8 +204,6 @@ ffi.set_source(
             pthread_mutex_lock(&M);
             int all = 1;
             for (int i = 0; i < NP; ++i) if (!P[i].done) all = 0;
-            /* the master finished: a slave still sleeping for cycles would wait forever — release them */
-            if (P[0].done) for (int i = 1; i < NP; ++i) if (!P[i].done) { P[i].cyclesPosted = 1 << 30; wake_player(&P[i]); }
             pthread_mutex_unlock(&M);
             if (all) break;
             clock_gettime(CLOCK_MONOTONIC, &t);
@@ -209,6 +223,7 @@ ffi.set_source(
         for (int i = 1; i < NP; ++i) if (P[i].cyclesPosted > (1 << 29)) P[i].cyclesPosted = 0;   /* the release above gave a slave free cycles: the next run starts gated again (a transfer in progress is left as it is) */
         return timed_out;
     }
+    int link_run(int frames, int timeout_ms) { return link_run_keys(frames, timeout_ms, 0, 0, 0); }
     int link_attached(void) { return NP; }
     uint32_t link_frame_counter(int id) { return (id >= 0 && id < NP) ? (uint32_t) P[id].core->frameCounter(P[id].core) : 0; }
     int link_mode(int id) { return (id >= 0 && id < NP) ? (int) P[id].node.mode : -1; }

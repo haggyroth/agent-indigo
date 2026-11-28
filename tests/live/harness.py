@@ -116,6 +116,11 @@ class Live:
         v = self.m.read8(a)
         self.m.write8(a, (v | (1 << (n & 7))) if on else (v & ~(1 << (n & 7))))
 
+    def set_var(self, n: int, value: int) -> None:
+        """Stage: a script variable (VAR_*, 0x4000+): SaveBlock1 vars at +0x1000, 2 bytes each."""
+        sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
+        self.m.write16(sb1 + Addr.VARS_OFFSET + 2 * (n - 0x4000), value)
+
     def set_badges(self, mask: int) -> None:
         sb1 = self.m.read32(Addr.SAVEBLOCK1_PTR)
         self.m.write8(sb1 + Addr.BADGES_OFFSET, mask)
